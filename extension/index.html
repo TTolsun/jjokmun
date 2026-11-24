@@ -101,6 +101,14 @@
             <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
           </div>
         </template>
+        <div id="regular-card" class="regular-card">
+          <canvas id="regular-portrait" width="24" height="32" aria-hidden="true"></canvas>
+          <div>
+            <p class="regular-heading"><strong id="regular-name"></strong><span id="regular-title"></span></p>
+            <progress id="regular-progress" max="1" value="0" aria-labelledby="regular-name"></progress>
+            <p id="regular-hint"></p>
+          </div>
+        </div>
         <form id="reply-form" autocomplete="off">
           <label class="field-label" for="reply-input">답장 남기기</label>
           <div class="inline-form">
@@ -119,11 +127,17 @@
         <p id="daily-empty">지난날의 메모가 여기에 걸려요.</p>
         <div id="daily-board" hidden>
           <button type="button" id="daily-memo">
+            <span id="daily-request"></span>
             <span id="daily-excerpt"></span>
             <span class="daily-read" aria-hidden="true">메모 열기 ↗</span>
           </button>
           <button type="button" id="defer-memo">오늘은 접어두기</button>
         </div>
+      </section>
+      <section class="roster" aria-labelledby="roster-title">
+        <div class="section-heading"><h3 id="roster-title">단골 명부</h3><span id="roster-count" class="count"></span></div>
+        <p id="roster-tally"></p>
+        <ol id="roster-list"></ol>
       </section>
 
     </aside>

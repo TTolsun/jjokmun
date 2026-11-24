@@ -301,6 +301,48 @@ h1 { font-family: var(--display); font-weight: 400; }
 #daily-excerpt { font-size: .82rem; line-height: 1.48; overflow-wrap: anywhere; }
 .daily-read { color: var(--olive); font-size: .73rem; }
 #defer-memo { padding: 4px 0; margin-top: 2px; font-size: .72rem; }
+#daily-request { color: #874721; font-size: .72rem; font-weight: 650; }
+#daily-request:empty { display: none; }
+
+.roster { margin-top: 22px; }
+.roster h3 { font-size: .89rem; }
+#roster-tally { color: var(--muted); margin: 6px 0 0; font-size: .72rem; line-height: 1.5; }
+#roster-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+#roster-list button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 9px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+#roster-list button:hover { background: var(--raised); }
+#roster-list canvas { grid-row: span 2; width: 24px; height: 32px; image-rendering: pixelated; }
+#roster-list strong { font-size: .76rem; font-weight: 650; overflow-wrap: anywhere; }
+#roster-list span { color: var(--muted); font-size: .7rem; }
+
+.regular-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border: 1px dashed #c8a565;
+  border-radius: 10px;
+  background: #fff5df;
+}
+.regular-card > div { min-width: 0; flex: 1; }
+#regular-portrait { flex: none; width: 36px; height: 48px; image-rendering: pixelated; }
+.regular-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: .82rem; }
+.regular-heading span { color: #874721; font-size: .74rem; font-weight: 650; }
+#regular-progress { display: block; width: 100%; height: 6px; margin: 6px 0 4px; accent-color: #b5563f; }
+#regular-hint { color: var(--muted); font-size: .74rem; line-height: 1.5; }
 dialog {
   width: min(455px, calc(100% - 28px));
   max-height: calc(100% - 30px);

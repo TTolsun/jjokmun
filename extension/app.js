@@ -6,7 +6,7 @@ import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
 import { folderConnection, useFolder, reconnectFolder } from './vault.js';
 import { FolderAccessError } from './folder.js';
-import { DEFAULT_NAME, newShop } from './shop.js';
+import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindShop } from './ui/bookshop.js';
 
@@ -61,10 +61,13 @@ function clearSensitive(showLock) {
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
     'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
-    'delete-message', 'vault-state', 'unlock-status']) {
+    'delete-message', 'vault-state', 'unlock-status', 'daily-request', 'roster-count', 'roster-tally', 'roster-list',
+    'regular-name', 'regular-title', 'regular-hint']) {
     element(id).replaceChildren();
   }
   element('detail-date').removeAttribute('datetime');
+  const portrait = element('regular-portrait');
+  portrait.getContext('2d').clearRect(0, 0, portrait.width, portrait.height);
   element('daily-board').hidden = true;
   element('detail-dialog').hidden = true;
   element('edit-form').hidden = true;
@@ -174,6 +177,10 @@ function render(date) {
   if (memo) {
     const characters = Array.from(memo.text);
     element('daily-excerpt').textContent = characters.length > 66 ? characters.slice(0, 66).join('') + '…' : memo.text;
+    const { name } = regularOf(memo.id);
+    element('daily-request').textContent = memo.replies.some((reply) => reply.createdOn === date)
+      ? name + '의 부탁을 들어줬어요 · 정 +' + BOND_POINTS.request
+      : name + '이 이 책을 다시 찾아요';
   } else if (boardHadFocus) {
     element('memo-input').focus();
   }
@@ -189,7 +196,55 @@ function render(date) {
     return;
   }
   renderArchive(sorted, detailId, openDetail);
+  renderRoster();
   renderSelection();
+}
+
+const ROSTER_SIZE = 5;
+
+function renderRoster() {
+  const roster = bondRoster(state);
+  element('roster-count').textContent = roster.length + '명';
+  element('roster-tally').textContent = roster.length
+    ? BOND_TIERS.map((tier, index) => [tier.name, roster.filter((entry) => entry.bond.tier === index).length])
+      .filter(([, count]) => count).reverse().map(([name, count]) => name + ' ' + count + '명').join(' · ')
+    : '메모를 한 편 쓰면 단골이 한 명 생겨요.';
+  const list = element('roster-list');
+  const focused = list.contains(document.activeElement) ? document.activeElement.dataset.regular : undefined;
+  list.replaceChildren(...roster.slice(0, ROSTER_SIZE).map((entry) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.regular = entry.memo.id;
+    const canvas = document.createElement('canvas');
+    canvas.width = 24;
+    canvas.height = 32;
+    canvas.setAttribute('aria-hidden', 'true');
+    bookshop.portrait(canvas, entry.memo.id);
+    const name = document.createElement('strong');
+    name.textContent = entry.name;
+    const title = document.createElement('span');
+    title.textContent = entry.bond.title + ' · 정 ' + entry.bond.points;
+    button.append(canvas, name, title);
+    button.addEventListener('click', () => openDetail(entry.memo.id, undefined, button));
+    item.append(button);
+    return item;
+  }));
+  if (focused) list.querySelector(`[data-regular="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+}
+
+function renderRegular(memo) {
+  const bond = bondOf(memo, state.daily);
+  element('regular-name').textContent = regularOf(memo.id).name;
+  element('regular-title').textContent = bond.title + ' · 정 ' + bond.points;
+  const progress = element('regular-progress');
+  progress.max = Math.max(1, bond.ceiling - bond.floor);
+  progress.value = bond.nextTitle ? bond.points - bond.floor : progress.max;
+  element('regular-hint').textContent = bondHint(bond, {
+    requestedToday: state.daily.some((entry) => entry.date === displayedDate && entry.memoId === memo.id),
+    repliedToday: memo.replies.some((reply) => reply.createdOn === displayedDate)
+  });
+  bookshop.portrait(element('regular-portrait'), memo.id);
 }
 
 function bindTextForm(formId, inputId, buttonId, statusId, onSubmit) {
@@ -246,8 +301,18 @@ bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text)
   });
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
-  return '메모를 남겼어요. 베스트셀러를 보러 손님이 찾아옵니다.';
+  return '메모를 남겼어요. ' + regularOf(id).name + '이 새 단골이 되어 책방에 들러요.';
 });
+
+function replyMessage(memoId, before) {
+  const memo = state.memos.find((record) => record.id === memoId);
+  if (!memo || !before) return '답장을 저장했어요.';
+  const after = bondOf(memo, state.daily);
+  const { name } = regularOf(memoId);
+  if (after.tier > before.tier) return '답장을 저장했어요. ' + name + '과 한층 가까워졌어요: ' + after.title + '.';
+  if (after.points > before.points) return '답장을 저장했어요. ' + name + '과의 정 +' + (after.points - before.points) + '.';
+  return '답장을 저장했어요. 오늘은 ' + name + '과 이미 정을 쌓았어요.';
+}
 
 function findMemo(draft, id) {
   const memo = draft.memos.find((record) => record.id === id);
@@ -258,13 +323,15 @@ function findMemo(draft, id) {
 bindTextForm('reply-form', 'reply-input', 'reply-save', 'detail-status', async (text) => {
   const replyId = crypto.randomUUID();
   const memoId = detailId;
+  const previous = currentMemo();
+  const before = previous && bondOf(previous, state.daily);
   await change((draft, date) => {
     const memo = findMemo(draft, memoId);
     if (memo.replies.some((reply) => reply.id === replyId)) return;
     memo.replies.push({ id: replyId, text, createdOn: date, createdAt: Date.now() });
   });
   if (detailId === memoId && document.activeElement === document.body) element('reply-input').focus();
-  return '답장을 저장했어요. 베스트셀러를 보러 손님이 찾아옵니다.';
+  return replyMessage(memoId, before);
 });
 
 bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (text) => {
@@ -284,6 +351,7 @@ function renderDetail() {
   time.dateTime = memo.createdOn;
   time.textContent = formatDate(memo.createdOn);
   element('detail-original').textContent = memo.text;
+  renderRegular(memo);
   const replies = [...memo.replies].sort((a, b) => a.createdOn.localeCompare(b.createdOn) || a.createdAt - b.createdAt);
   const container = element('detail-replies');
   const focused = container.contains(document.activeElement) ? document.activeElement : undefined;

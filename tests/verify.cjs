@@ -397,6 +397,7 @@ async function checkRecovery(session, bytes, initial) {
 async function run() {
   await require('./undo.cjs').checkPlainJournal();
   await require('./undo.cjs').checkLegacyFieldOrder();
+  await require('./regulars.cjs').checkBondRules();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));
   assert.equal(manifest.chrome_url_overrides,undefined);
   assert.equal(manifest.host_permissions,undefined);
@@ -425,6 +426,7 @@ async function run() {
     session = await launch(path.join(directory, 'bookshop-profile'));
     await require('./bookshop.cjs').checkBookshop(session);
     await require('./folder.cjs').checkFolder(session);
+    await require('./regulars.cjs').checkRegulars(session);
     assert.deepEqual(session.external,[]);
   } finally {
     if (session) await session.context.close();
