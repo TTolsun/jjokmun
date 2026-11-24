@@ -1,13 +1,13 @@
-# 메모 골목
+# jjokmun
 
 ## 설치
 
 1. Chrome 주소창에 `chrome://extensions`를 입력합니다.
 2. 오른쪽 위에서 **개발자 모드**를 켜고 **압축해제된 확장 프로그램을 로드합니다**를 누릅니다.
 3. `manifest.json`이 들어 있는 확장 폴더를 선택합니다. Git 저장소에서 설치할 때는 `extension` 폴더를 선택합니다.
-4. Chrome 도구 모음 오른쪽의 **확장 프로그램** 메뉴에서 **메모 골목**을 누르면 전용 탭이 열립니다. 자주 쓰려면 메뉴에서 메모 골목을 고정해 두세요. Chrome의 새 탭은 기본 화면으로 열립니다.
+4. Chrome 도구 모음 오른쪽의 **확장 프로그램** 메뉴에서 **jjokmun**을 누르면 전용 탭이 열립니다. 자주 쓰려면 메뉴에서 jjokmun을 고정해 두세요. Chrome의 새 탭은 기본 화면으로 열립니다.
 
-이전 버전을 사용 중이라면 메모 골목 탭을 모두 닫고, `chrome://extensions`에서 기존 메모 골목 카드의 **새로고침**을 누르세요. 확장을 제거하거나 폴더를 옮기면 기존 설치에 저장된 기록에 접근할 수 없으니 같은 폴더를 사용하세요. 이전 탭이 열려 있으면 저장소 형식 전환이 대기할 수 있습니다.
+이전 버전을 사용 중이라면 jjokmun 탭을 모두 닫고, `chrome://extensions`에서 기존 jjokmun 카드의 **새로고침**을 누르세요. 확장을 제거하거나 폴더를 옮기면 기존 설치에 저장된 기록에 접근할 수 없으니 같은 폴더를 사용하세요. 이전 탭이 열려 있으면 저장소 형식 전환이 대기할 수 있습니다.
 
 ## 첫 메모
 
@@ -36,7 +36,7 @@
 
 ## 브라우저 검증
 
-Node.js 24와 Chrome for Testing으로 검증할 수 있습니다. Git 저장소의 `tests` 폴더(별도 배포본은 `memo-alley-tests`)에서 `npm install`을 실행하세요. `MEMO_CHROME_PATH`에 Chrome for Testing 실행 파일 경로를 지정하거나 `npx playwright-core install chromium`으로 테스트 브라우저를 설치한 뒤 같은 폴더에서 `npm test`를 실행합니다. 테스트는 별도의 임시 Chrome 프로필과 루프백 서버를 사용합니다.
+Node.js 24와 Chrome for Testing으로 검증할 수 있습니다. Git 저장소의 `tests` 폴더(별도 배포본은 `jjokmun-tests`)에서 `npm install`을 실행하세요. `MEMO_CHROME_PATH`에 Chrome for Testing 실행 파일 경로를 지정하거나 `npx playwright-core install chromium`으로 테스트 브라우저를 설치한 뒤 같은 폴더에서 `npm test`를 실행합니다. 테스트는 별도의 임시 Chrome 프로필과 루프백 서버를 사용합니다.
 
 ## 시스템 시계를 바꾸지 않고 날짜 확인하기
 

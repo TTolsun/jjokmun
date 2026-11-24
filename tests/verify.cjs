@@ -297,7 +297,7 @@ async function run() {
   assert.equal(manifest.host_permissions,undefined);
   assert.equal(manifest.permissions,undefined);
   const tmpRoot=await fs.realpath(os.tmpdir());
-  const directory=await fs.mkdtemp(path.join(tmpRoot,'memo-alley-verify-'));
+  const directory=await fs.mkdtemp(path.join(tmpRoot,'jjokmun-verify-'));
   let session;
   try {
     const sourceProfile=path.join(directory,'source-profile');
@@ -319,7 +319,7 @@ async function run() {
   } finally {
     if (session) await session.context.close();
     const resolved=await fs.realpath(directory);
-    if (path.dirname(resolved)===tmpRoot && path.basename(resolved).startsWith('memo-alley-verify-')) {
+    if (path.dirname(resolved)===tmpRoot && path.basename(resolved).startsWith('jjokmun-verify-')) {
       await fs.rm(resolved,{recursive:true,force:true,maxRetries:3,retryDelay:100});
     }
   }

@@ -10,7 +10,7 @@ function loadChromium() {
   }
 }
 
-const installed = path.resolve(__dirname, '../memo-alley');
+const installed = path.resolve(__dirname, '../jjokmun');
 const extension = fs.existsSync(path.join(installed, 'manifest.json')) ? installed : path.resolve(__dirname, '../extension');
 async function launch(profile, extensionPath = extension) {
   const chromium = loadChromium();

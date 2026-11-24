@@ -57,7 +57,7 @@ const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value 
 
 export function validateBackup(value) {
   function require(condition) {
-    if (!condition) throw new Error('메모 골목에서 내보낸 올바른 JSON 백업 파일을 선택해 주세요.');
+    if (!condition) throw new Error('jjokmun에서 내보낸 올바른 JSON 백업 파일을 선택해 주세요.');
   }
   require(object(value) && value.version === VERSION
     && Array.isArray(value.memos) && value.memos.length <= 10_000

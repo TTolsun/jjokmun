@@ -22,7 +22,7 @@ function openDatabase() {
     };
     request.onblocked = () => {
       blocked = true;
-      reject(new Error('다른 메모 골목 탭을 모두 닫고 이 페이지를 새로고침해 주세요.'));
+      reject(new Error('다른 jjokmun 탭을 모두 닫고 이 페이지를 새로고침해 주세요.'));
     };
     request.onsuccess = () => {
       const db = request.result;

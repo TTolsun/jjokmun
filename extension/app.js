@@ -51,7 +51,7 @@ function clearSensitive(showLock) {
   header.hidden = true;
   element('lock-screen').hidden = !showLock;
   element('startup-status').hidden = showLock;
-  if (!showLock) setStatus('startup-status', '메모 골목을 여는 중입니다.');
+  if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input', 'import-backup']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
@@ -656,7 +656,7 @@ function downloadBackup(backup) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'memo-alley-' + today() + '.json';
+  link.download = 'jjokmun-' + today() + '.json';
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -781,7 +781,7 @@ element('import-backup').addEventListener('change', async (event) => {
     try {
       parsed = JSON.parse(await file.text());
     } catch {
-      throw new Error('JSON 파일을 읽지 못했습니다. 메모 골목 백업 파일을 선택해 주세요.');
+      throw new Error('JSON 파일을 읽지 못했습니다. jjokmun 백업 파일을 선택해 주세요.');
     }
     rejectStaleView(expected);
     if (parsed?.format === BACKUP_FORMAT) {
@@ -908,7 +908,7 @@ element('lock-vault').addEventListener('click', async () => {
   try {
     await lockVault();
   } catch {
-    setStatus('unlock-status', '잠금 상태를 저장하지 못했습니다. 열린 메모 골목 탭을 모두 닫아 주세요.');
+    setStatus('unlock-status', '잠금 상태를 저장하지 못했습니다. 열린 jjokmun 탭을 모두 닫아 주세요.');
   } finally {
     channel.postMessage('security');
     lockPending = false;

@@ -1,5 +1,5 @@
 {
-  "name": "memo-alley-browser-tests",
+  "name": "jjokmun-browser-tests",
   "private": true,
   "scripts": { "test": "node verify.cjs" },
   "devDependencies": { "playwright-core": "1.62.1" }
