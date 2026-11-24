@@ -108,6 +108,10 @@ export function mergeImport(state, backup, date) {
   const changed = Object.values(undo).some((entries) => entries.length > 0);
   if (backup.shop && !state.shop) {
     state.shop = structuredClone(backup.shop);
+    if (rejectedMemos.has(state.shop.displayMemoId)) {
+      delete state.shop.displayMemoId;
+      conflict(summary, '작성일이 충돌한 메모는 매대에 올리지 않았습니다.');
+    }
     // A backup from a clock set ahead should still finish a shift on this device.
     state.shop.openedAt = Math.min(state.shop.openedAt, Date.now());
     undo.shop = structuredClone(state.shop);
@@ -158,6 +162,8 @@ export function undoImport(state, undo, date) {
     if (delta.before && sameOriginal) {
       Object.assign(memo, delta.before);
       summary.originals += 1;
+    } else if (!delta.before && sameOriginal && !memo.replies.length && memo.id === state.shop?.displayMemoId) {
+      conflict(summary, '가져오기 뒤 매대에 올린 메모는 유지했습니다.');
     } else if (!delta.before && sameOriginal && !memo.replies.length) {
       memos.delete(memo.id);
       summary.memos += 1;

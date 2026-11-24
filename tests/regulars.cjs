@@ -55,7 +55,7 @@ async function checkRegulars(session) {
   const waitMatch = (tab, id, source) => tab.waitForFunction(([id, source]) =>
     new RegExp(source).test(document.getElementById(id).textContent), [id, source]);
   const monday = await session.tab('2031-05-12', folder);
-  let tuesday, wednesday;
+  let tuesday, wednesday, nextWeek;
   try {
     await monday.locator('#memo-input').fill('단골과 다시 읽을 메모');
     await monday.locator('#memo-save').click();
@@ -117,6 +117,27 @@ async function checkRegulars(session) {
     });
     assert.deepEqual(stored, {keys:['daily', 'memos', 'props', 'version'], shop:undefined}, 'bonds add no stored fields');
 
+    nextWeek = await session.tab('2031-05-19', folder);
+    await nextWeek.locator('#detail-close').click();
+    await nextWeek.locator('#roster-list button').first().click();
+    await nextWeek.locator('#display-memo').click();
+    await waitText(nextWeek, 'shop-book', '단골과 다시 읽을 메모');
+    const interested = nextWeek.locator('.shelf-reader.interested h4');
+    assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
+    await waitText(nextWeek, 'regular-title', '반가운 단골 · 정 7');
+    await nextWeek.locator('#shop-book').click();
+    await nextWeek.locator('#reply-input').fill('매대에서 다시 읽고 남긴 답장');
+    await nextWeek.locator('#reply-save').click();
+    await waitText(nextWeek, 'regular-title', '오랜 단골 · 정 10');
+    await waitText(monday, 'roster-tally', '오랜 단골 1명');
+    assert.deepEqual(await interested.allTextContents(), ['창가 단골', '문가 단골']);
+    await nextWeek.locator('#detail-replies article').filter({hasText:'매대에서 다시 읽고 남긴 답장'})
+      .getByRole('button', {name:'답장 삭제'}).click();
+    await nextWeek.locator('#reply-dialog-confirm').click();
+    await waitText(nextWeek, 'regular-title', '반가운 단골 · 정 7');
+    await waitText(monday, 'roster-tally', '반가운 단골 1명');
+    assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
+
     await monday.locator('#detail-close').click();
     await monday.locator('#detail-dialog').waitFor({state:'hidden'});
     await monday.locator('#roster-list button').first().click();
@@ -126,12 +147,15 @@ async function checkRegulars(session) {
     await monday.locator('#delete-confirm').click();
     await waitText(monday, 'roster-count', '0명');
     await waitText(wednesday, 'roster-count', '0명');
+    await waitText(nextWeek, 'shop-book', '첫 메모를 쓰면 진열할 수 있어요.');
+    assert.deepEqual(await interested.allTextContents(), []);
     assert.equal(await monday.locator('#roster-list button').count(), 0);
     console.log('PASS  regular card, signboard request, roster and tier-up messages');
   } finally {
     await monday.close();
     await tuesday?.close();
     await wednesday?.close();
+    await nextWeek?.close();
   }
 }
 

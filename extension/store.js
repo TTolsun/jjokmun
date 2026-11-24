@@ -110,6 +110,12 @@ export function validateBackup(value, { local = false } = {}) {
     return { kind: prop.kind, memoId: prop.memoId, replyId: prop.replyId };
   });
   const clean = { version: VERSION, memos, daily, props };
-  if (value.shop !== undefined) clean.shop = validateShop(value.shop);
+  if (value.shop !== undefined) {
+    clean.shop = validateShop(value.shop);
+    if (value.shop.displayMemoId !== undefined) {
+      require(memosById.has(value.shop.displayMemoId));
+      clean.shop.displayMemoId = value.shop.displayMemoId;
+    }
+  }
   return clean;
 }
