@@ -119,7 +119,7 @@ export function mergeImport(state, backup, date) {
 export function undoImport(state, undo, date) {
   const summary = { memos: 0, originals: 0, replies: 0, conflicts: 0, reasons: [] };
   if (undo.shop) {
-    if (Object.keys(undo.shop).every(key => state.shop?.[key] === undo.shop[key])) delete state.shop;
+    if (Object.keys(state.shop || {}).length === Object.keys(undo.shop).length && Object.keys(undo.shop).every(key => state.shop?.[key] === undo.shop[key])) delete state.shop;
     else conflict(summary, '가져오기 뒤 운영한 책방 기록은 유지했습니다.');
   }
   const importedProps = new Map(undo.props.map((prop) => [prop.kind, prop]));

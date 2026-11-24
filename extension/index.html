@@ -35,11 +35,7 @@
       <section id="shop" aria-labelledby="shop-title">
         <div class="section-heading">
           <h2 id="shop-title">골목 책방</h2>
-        </div>
-        <div class="shop-ledger">
-          <span>영업일 <strong id="shop-day"></strong></span>
-          <span>보유 잎전 <strong id="shop-coins"></strong></span>
-          <span>평판 <strong id="shop-hearts"></strong></span>
+          <span class="shop-time">영업일 <span id="shop-day"></span> · <time id="shop-clock" aria-label="현재 시간"></time></span>
         </div>
         <div class="shop-room" role="img" aria-label="서가, 열람석, 계산대가 있는 도트 책방 내부">
           <canvas id="shop-floor" width="256" height="152" aria-hidden="true"></canvas>
@@ -47,36 +43,6 @@
         </div>
         <div class="bestseller"><strong>베스트셀러</strong><span id="shop-book"></span></div>
         <p id="shop-crowd" role="status"></p>
-        <details id="shop-controls">
-          <summary>영업과 손님 수첩</summary>
-          <div class="shop-shift">
-            <strong id="shop-phase"></strong><span id="shop-sales"></span>
-          </div>
-          <progress id="shop-progress" aria-label="영업 진행률" max="100" value="0"></progress>
-          <section class="shop-visitors" aria-labelledby="shop-visitors-title">
-            <div class="shop-visitors-heading">
-              <h3 id="shop-visitors-title">손님 수첩</h3>
-              <button id="shop-motion" type="button" aria-pressed="false">움직임 줄이기</button>
-            </div>
-            <div id="shop-roster" role="group" aria-label="살펴볼 손님"></div>
-            <div class="shop-guest-note" aria-live="polite" aria-atomic="true">
-              <p id="shop-guests-status"></p>
-              <p id="shop-guest-note"></p>
-            </div>
-          </section>
-          <p id="shop-regular"></p>
-          <fieldset id="shop-setup">
-            <legend>영업 준비</legend>
-            <label>열람석 위치<select id="shop-seat"><option value="window">창가</option><option value="garden">화분 옆</option></select></label>
-            <label>운영 방침<select id="shop-plan"><option value="reading">느긋한 독서</option><option value="picks">추천 판매</option></select></label>
-          </fieldset>
-          <p id="shop-hint"></p>
-          <div class="shop-actions">
-            <button id="shop-primary" type="button"></button>
-            <button id="shop-upgrade" type="button"></button>
-          </div>
-          <p id="shop-message" role="status"></p>
-        </details>
       </section>
     </section>
     <aside class="archive panel" aria-labelledby="archive-title">
@@ -89,6 +55,13 @@
         <input id="archive-search" type="search" aria-label="원문과 답장 검색" placeholder="원문과 답장 검색">
       </label>
       <div id="archive-list" class="archive-list"></div>
+      <details id="folder-files" hidden>
+        <summary>폴더 파일</summary>
+        <div class="section-heading"><input id="file-search" type="search" aria-label="파일 경로 검색" placeholder="파일 경로 검색"><button id="scan-files" type="button">새로고침</button></div>
+        <p id="file-status" role="status"></p>
+        <ul id="file-list"></ul>
+        <button id="more-files" type="button" hidden>더 보기</button>
+      </details>
       <p class="status" id="archive-status" role="status"></p>
     </aside>
 
@@ -169,6 +142,16 @@
   <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
 
 
+  <div id="storage-recovery" hidden>
+    <button id="storage-reconnect" type="button">저장 폴더 다시 연결</button>
+    <button id="storage-relocate" type="button">기존 저장 폴더 찾아 열기</button>
+  </div>
+  <dialog id="file-dialog" aria-labelledby="file-title">
+    <div class="section-heading"><h2 id="file-title"></h2><button type="button" id="file-close">닫기</button></div>
+    <p id="file-info"></p><pre id="file-content"></pre>
+    <a id="file-download" download>원본 파일 저장</a>
+  </dialog>
+
   <dialog id="reply-dialog" aria-labelledby="reply-dialog-title">
     <div class="section-heading"><h2 id="reply-dialog-title"></h2></div>
     <form id="reply-dialog-form" autocomplete="off">
@@ -202,6 +185,16 @@
       <h2 id="settings-title">설정</h2>
       <button type="button" class="close" id="settings-close" aria-label="설정 닫기" autofocus>×</button>
     </div>
+    <form id="shop-name-form" autocomplete="off">
+      <label for="shop-name" class="field-label">책방 이름</label>
+      <div class="inline-form"><input id="shop-name" maxlength="40" required><button type="submit">이름 저장</button></div>
+    </form>
+    <section>
+      <h3>메모 저장 폴더</h3>
+      <p id="storage-location"></p>
+      <button id="choose-folder" type="button">저장 폴더 선택</button>
+      <p>선택한 폴더에 메모를 저장합니다. 하위 폴더의 파일은 전체 메모 아래에서 열 수 있습니다.</p>
+    </section>
     <section class="developer-info" aria-labelledby="developer-title">
       <h3 id="developer-title">개발자 정보</h3>
       <dl>

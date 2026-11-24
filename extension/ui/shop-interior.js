@@ -6,20 +6,23 @@ const FURNISHINGS = ['seat', 'table', 'plant', 'cabinet', 'counter'];
 const CELL_WIDTH = 48;
 const CELL_HEIGHT = 40;
 
-export async function loadFurnishingSheet() {
+async function loadSheet(filename, width, height) {
   try {
     const directory = await chrome.runtime.getPackageDirectoryEntry();
     const entry = await new Promise((resolve, reject) =>
-      directory.getFile('local-art/furnishings.png', {}, resolve, reject));
+      directory.getFile('local-art/' + filename, {}, resolve, reject));
     const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
     const sheet = await createImageBitmap(file);
-    if (sheet.width === CELL_WIDTH * FURNISHINGS.length && sheet.height === CELL_HEIGHT) return sheet;
+    if (sheet.width === width && sheet.height === height) return sheet;
     sheet.close();
   } catch {
     // A stock installation has no local artwork.
   }
   return null;
 }
+
+export const loadFurnishingSheet = () => loadSheet('furnishings.png', CELL_WIDTH * FURNISHINGS.length, CELL_HEIGHT);
+export const loadCharacterSheet = () => loadSheet('characters.png', 5 * 16, 2 * 16);
 
 // Small, hand-drawn shop signs and foliage use the same pixel grid as the cast.
 export function stamp(ctx, x, y, rows, palette) {

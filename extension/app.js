@@ -4,6 +4,10 @@ import { createTime, element, formatDate, longDate } from './ui/dom.js';
 import { newestMemos, renderArchive } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
+import { folderConnection, useFolder, reconnectFolder } from './vault.js';
+import { FolderAccessError } from './folder.js';
+import { DEFAULT_NAME, newShop } from './shop.js';
+import { bindFolderFiles } from './ui/folder-files.js';
 import { bindShop } from './ui/bookshop.js';
 
 const channel = new BroadcastChannel('memo-alley');
@@ -25,7 +29,8 @@ let renderedRevision = -1;
 const workspace = document.querySelector('.workspace');
 const header = document.querySelector('.site-header');
 const replyDialog = bindReplyDialog(change);
-const bookshop = bindShop(change);
+const bookshop = bindShop();
+const folderFiles = bindFolderFiles();
 
 function currentMemo() {
   return state.memos.find((memo) => memo.id === detailId);
@@ -46,6 +51,9 @@ function clearSensitive(showLock) {
   if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
   replyDialog.reset();
   bookshop.reset();
+  folderFiles.reset();
+  element('shop-name').value = '';
+  element('storage-recovery').hidden = true;
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
@@ -72,7 +80,7 @@ function renderPayload(result, date, storageMode = mode) {
   renderedRevision = result.revision;
   mode = storageMode;
   state = result.payload.state;
-  bookshop.update(state.shop, state.memos);
+  bookshop.update(state);
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;
@@ -83,8 +91,8 @@ function renderPayload(result, date, storageMode = mode) {
   element('disable-vault').hidden = mode !== 'encrypted';
   element('lock-vault').hidden = mode !== 'encrypted';
   setStatus('vault-state', mode === 'encrypted'
-    ? '이 프로필의 메모와 가져오기 되돌리기 기록을 암호화하고 있습니다.'
-    : '이 프로필의 메모는 현재 평문으로 저장됩니다.');
+    ? '현재 저장소의 메모와 가져오기 되돌리기 기록을 암호화하고 있습니다.'
+    : '현재 저장소의 메모는 현재 평문으로 저장됩니다.');
   render(date);
 }
 
@@ -108,10 +116,19 @@ function refresh() {
         selectDaily(draft, date);
       });
     }
-    if (expected === viewGeneration) renderPayload(result, date, security.mode);
+    const connection = await folderConnection();
+    if (expected === viewGeneration) {
+      element('storage-recovery').hidden = true;
+      renderPayload(result, date, security.mode);
+      folderFiles.update(connection);
+    }
   }).catch((error) => {
     if (expected !== viewGeneration) return;
-    if (error instanceof LockedError) {
+    if (error instanceof FolderAccessError) {
+      if (element('storage-recovery').hidden) clearSensitive(false);
+      element('storage-recovery').hidden = false;
+      setStatus('startup-status', error.message);
+    } else if (error instanceof LockedError) {
       if (!lockPending && element('lock-screen').hidden) {
         dropVaultKey();
         clearSensitive(true);
@@ -466,7 +483,46 @@ element('detail-dialog').addEventListener('keydown', (event) => {
 element('settings-close').addEventListener('click', () => element('settings-dialog').close());
 element('delete-cancel').addEventListener('click', () => element('delete-dialog').close());
 
+element('shop-name-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const name = element('shop-name').value.trim();
+  if (!name) {
+    setStatus('settings-status', '책방 이름을 입력해 주세요.');
+    element('shop-name').focus();
+    return;
+  }
+  try {
+    await change(draft => { (draft.shop ??= newShop()).name = name; });
+    setStatus('settings-status', '책방 이름을 저장했어요.');
+  } catch (error) { setStatus('settings-status', error.message); }
+});
+
+async function chooseFolder(button, reopen) {
+  const expected = viewGeneration;
+  button.disabled = true;
+  try {
+    const directory = await window.showDirectoryPicker({ id: 'jjokmun-storage', mode: 'readwrite' });
+    if (expected !== viewGeneration) return;
+    await useFolder(directory, { reopen });
+    clearSensitive(false);
+    channel.postMessage('folder');
+    await refresh();
+  } catch (error) {
+    if (error.name !== 'AbortError') setStatus(reopen ? 'startup-status' : 'settings-status', error.message);
+  } finally { button.disabled = false; }
+}
+
+element('choose-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
+element('storage-relocate').addEventListener('click', event => chooseFolder(event.currentTarget, true));
+element('storage-reconnect').addEventListener('click', async () => {
+  try {
+    await reconnectFolder();
+    await refresh();
+  } catch (error) { setStatus('startup-status', error.message); }
+});
+
 element('open-settings').addEventListener('click', () => {
+  element('shop-name').value = state.shop?.name || DEFAULT_NAME;
   setStatus('settings-status', '');
   element('settings-dialog').showModal();
 });
@@ -523,9 +579,9 @@ element('unlock-form').addEventListener('submit', async (event) => {
 });
 
 channel.addEventListener('message', (event) => {
-  if (event.data === 'security') {
+  if (event.data === 'security' || event.data === 'folder') {
     dropVaultKey();
-    clearSensitive(mode === 'encrypted');
+    clearSensitive(event.data === 'security' && mode === 'encrypted');
   }
   refresh();
 });

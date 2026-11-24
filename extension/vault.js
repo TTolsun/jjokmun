@@ -1,4 +1,5 @@
-import { emptyState } from './store.js';
+import { readVaultFile, writeVaultFile, FolderAccessError, VAULT_FILE } from './folder.js';
+import { emptyState, validateBackup } from './store.js';
 import { deriveKey, newSalt, requireNewPassword, seal, unseal } from './crypto.js';
 
 export class LockedError extends Error {
@@ -51,7 +52,7 @@ function normalize(record) {
   return { format: 2, revision: 0, epoch: 0, mode: 'plain', payload: { state: record ?? emptyState(), undo: null } };
 }
 
-async function access(write) {
+async function profileAccess(write) {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction('data', write ? 'readwrite' : 'readonly');
@@ -62,7 +63,7 @@ async function access(write) {
     request.onsuccess = () => {
       try {
         const current = normalize(request.result);
-        result = write ? write(current, store) : current;
+        result = write ? write(current, value => store.put(value, 'state')) : current;
       } catch (error) {
         cause = error;
         transaction.abort();
@@ -71,6 +72,81 @@ async function access(write) {
     transaction.oncomplete = () => resolve(result);
     transaction.onabort = () => reject(cause ?? transaction.error ?? new Error('저장 작업이 중단되었습니다.'));
   });
+}
+
+const locationKey = Symbol('storage location');
+const storageLock = 'jjokmun-storage';
+
+export async function folderConnection() {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction('data').objectStore('data').get('folder');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function fileRecord(connection) {
+  if (await connection.directory.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+    throw new FolderAccessError('메모를 열려면 저장 폴더의 읽기와 쓰기를 허용해 주세요.');
+  }
+  const record = await readVaultFile(connection.directory);
+  record[locationKey] = connection.id;
+  return record;
+}
+
+function access(write) {
+  return navigator.locks.request(storageLock, { mode: write ? 'exclusive' : 'shared' }, async () => {
+    const connection = await folderConnection();
+    if (!connection) return profileAccess(write);
+    const current = await fileRecord(connection);
+    if (!write) return current;
+    let replacement;
+    const result = write(current, value => { replacement = value; });
+    if (replacement) await writeVaultFile(connection.directory, replacement);
+    return result;
+  });
+}
+
+export function useFolder(directory, { reopen = false } = {}) {
+  const expected = generation;
+  return navigator.locks.request(storageLock, async () => {
+    const previous = await folderConnection();
+    if (previous && await previous.directory.isSameEntry(directory)) return;
+    let current;
+    if (!previous) current = await profileAccess();
+    else if (!reopen) current = await fileRecord(previous);
+    assertGeneration(expected);
+    const existing = await readVaultFile(directory, true);
+    if (existing) {
+      const state = current?.payload?.state;
+      if (!previous && (current.mode === 'encrypted' || state.memos.length || state.props.length || state.shop || current.payload.undo)) {
+        throw new Error('이 폴더에는 다른 쪽문 저장소가 있습니다. 현재 메모를 옮기려면 저장 파일이 없는 폴더를 선택해 주세요.');
+      }
+      if (existing.mode === 'plain') validateBackup(existing.payload.state);
+    } else {
+      if (!current) throw new Error('기존 ' + VAULT_FILE + ' 파일이 있는 폴더를 선택해 주세요.');
+      await writeVaultFile(directory, current, true);
+    }
+    assertGeneration(expected);
+    const db = await openDatabase();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('data', 'readwrite');
+      const store = tx.objectStore('data');
+      store.put({ id: crypto.randomUUID(), directory }, 'folder');
+      store.delete('state');
+      tx.oncomplete = resolve;
+      tx.onabort = () => reject(tx.error || new Error('폴더 연결을 저장하지 못했습니다.'));
+    });
+    dropVaultKey();
+  });
+}
+
+export async function reconnectFolder() {
+  const connection = await folderConnection();
+  if (connection && await connection.directory.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+    throw new FolderAccessError('저장 폴더의 읽기 및 쓰기를 허용해 주세요.');
+  }
 }
 
 export function dropVaultKey() {
@@ -83,22 +159,22 @@ function assertGeneration(expected) {
 }
 
 function assertEpoch(current, record) {
-  if (current.epoch !== record.epoch || current.mode !== record.mode) throw new LockedError();
+  if (current[locationKey] !== record[locationKey] || current.epoch !== record.epoch || current.mode !== record.mode) throw new LockedError();
 }
 
 async function saveCompared(record, replacement, expected) {
-  return access((current, store) => {
+  return access((current, put) => {
     assertGeneration(expected);
     assertEpoch(current, record);
     if (current.revision !== record.revision) return false;
-    store.put(replacement, 'state');
+    put(replacement);
     return true;
   });
 }
 
 export async function vaultStatus() {
   const record = await access();
-  const locked = record.mode === 'encrypted' && (!session || session.epoch !== record.epoch);
+  const locked = record.mode === 'encrypted' && (!session || (session.epoch !== record.epoch || session.location !== record[locationKey]));
   if (locked && session) dropVaultKey();
   return { mode: record.mode, locked };
 }
@@ -109,7 +185,7 @@ export async function readPayload(change) {
     const record = await access();
     assertGeneration(expected);
     const active = session;
-    if ((active && (active.epoch !== record.epoch || record.mode !== 'encrypted'))
+    if ((active && (active.location !== record[locationKey] || active.epoch !== record.epoch || record.mode !== 'encrypted'))
       || (record.mode === 'encrypted' && !active)) throw new LockedError();
     const payload = record.mode === 'plain' ? record.payload : await unseal(record, active.key, 'vault');
     assertGeneration(expected);
@@ -146,7 +222,7 @@ export async function enableVault(password) {
     };
     if (await saveCompared(record, replacement, expected)) {
       assertGeneration(expected);
-      session = { epoch: replacement.epoch, key };
+      session = { epoch: replacement.epoch, location: record[locationKey], key };
       generation += 1;
       return;
     }
@@ -163,7 +239,7 @@ export async function unlockVault(password) {
   await unseal(record, key, 'vault');
   assertEpoch(await access(), record);
   assertGeneration(expected);
-  session = { epoch: record.epoch, key };
+  session = { epoch: record.epoch, location: record[locationKey], key };
   generation += 1;
 }
 
@@ -190,9 +266,9 @@ export async function disableVault(password) {
 
 export async function lockVault() {
   dropVaultKey();
-  return access((current, store) => {
+  return access((current, put) => {
     if (current.mode === 'encrypted') {
-      store.put({ ...current, revision: current.revision + 1, epoch: current.epoch + 1 }, 'state');
+      put({ ...current, revision: current.revision + 1, epoch: current.epoch + 1 });
     }
   });
 }
