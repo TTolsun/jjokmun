@@ -139,9 +139,9 @@ export function paintPortrait(canvas, person) {
   pixelPerson(canvas.getContext('2d'), 9, 25, person);
 }
 
-export function paintRoom(canvas, shop) {
+export function paintRoom(canvas, shop, sheet) {
   return paintInterior(canvas, shop, seatPoint(shop), (ctx, x, y) =>
-    pixelPerson(ctx, x, y, { hair: '#6a5040', coat: '#608675' }));
+    pixelPerson(ctx, x, y, { hair: '#6a5040', coat: '#608675' }), sheet);
 }
 
 export function paintGuests(canvas, visitors, time, shop, still, street, selected, furniture = []) {

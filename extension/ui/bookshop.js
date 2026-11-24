@@ -1,6 +1,7 @@
 import { COLLECTOR_REPUTATION, newShop, operate, schedule, shiftSeconds, totals, upgradeCost } from '../shop.js';
 import { element } from './dom.js';
 import { guestPose, paintGuests, paintPortrait, paintRoom } from './shop-scene.js';
+import { loadFurnishingSheet } from './shop-interior.js';
 
 export function bindShop(change) {
   const dialog = element('shop-dialog');
@@ -15,6 +16,8 @@ export function bindShop(change) {
   let generation = 0;
   let selectedName;
   let roomLayout;
+  let sheet;
+  let loadingSheet;
   let furniture = [];
   let visibleGuests = [];
 
@@ -94,7 +97,7 @@ export function bindShop(change) {
     duration = shiftSeconds(visitors);
     const layout = [shop.seat, shop.level, shop.plan].join('/');
     if (layout !== roomLayout) {
-      furniture = paintRoom(element('shop-floor'), shop);
+      furniture = paintRoom(element('shop-floor'), shop, sheet);
       roomLayout = layout;
     }
     text('shop-day', (shop.days + 1) + '일차');
@@ -153,7 +156,16 @@ export function bindShop(change) {
   }
 
   element('open-shop').addEventListener('click', () => {
-    if (shop) { dialog.showModal(); sync(); }
+    if (!shop) return;
+    dialog.showModal();
+    sync();
+    loadingSheet ??= loadFurnishingSheet().then(result => {
+      sheet = result;
+      if (sheet && shop) {
+        furniture = paintRoom(element('shop-floor'), shop, sheet);
+        draw();
+      }
+    });
   });
   element('shop-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', sync);
