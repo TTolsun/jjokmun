@@ -182,7 +182,52 @@ h1 { font-family: var(--display); font-weight: 400; }
   text-align: center;
   color: var(--clay);
   font: 400 .94rem/1.4 var(--display);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
 }
+.bookshop-print figcaption small { display: block; color: var(--muted); font: 400 .71rem/1.4 system-ui, sans-serif; }
+#open-shop, .shop-actions button {
+  padding: 8px 13px; min-height: 40px; border: 1px solid var(--olive); border-radius: 18px;
+  background: var(--olive); color: white; font: 600 .84rem/1.35 system-ui, sans-serif;
+}
+.actor-layer { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+#shop-dialog { width: min(556px, calc(100% - 20px)); padding: clamp(10px, 2vw, 16px); overscroll-behavior: contain; border: 2px solid #594e3a; border-radius: 10px; background: #fff5df; }
+#shop-dialog .section-heading { margin-bottom: 5px; padding: 5px 9px; border-radius: 5px 5px 2px 2px; background: linear-gradient(#396553, #284d41); color: #fff3cb; border: 1px solid #513e2b; box-shadow: inset 0 0 0 2px #c8a565; }
+#shop-dialog .section-heading h2 { color: inherit; font: 750 1.1rem/1.3 system-ui, sans-serif; }
+#shop-dialog button, #shop-dialog select { touch-action: manipulation; }
+.shop-ledger { display: flex; flex-wrap: wrap; gap: 4px; font-size: .83rem; color: #f1e8d5; margin-bottom: 4px; }
+.shop-ledger span { display: flex; align-items: baseline; justify-content: space-between; gap: 3px; flex: 1 1 auto; padding: 4px 8px; border: 1px solid #b99864; color: #695030; border-radius: 3px; background: linear-gradient(#fff4d7, #efdbac); }
+.shop-ledger strong { color: #4d3925; font-variant-numeric: tabular-nums; }
+.shop-room { position: relative; max-width: 100%; overflow: hidden; border: 2px solid #76674c; border-radius: 3px; background: #343b37; }
+#shop-floor { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+#shop-guests { pointer-events: auto; }
+.shop-shift, .shop-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: center; margin-top: 12px; }
+.shop-shift { color: #374d40; font-size: .86rem; font-variant-numeric: tabular-nums; }
+#shop-progress { width: 100%; height: 6px; accent-color: var(--olive); }
+#shop-guests-status, #shop-hint, #shop-message, #shop-regular { font-size: .8rem; line-height: 1.45; margin: 6px 0; }
+#shop-roster { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+#shop-roster button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 4px 9px; min-height: 36px; color: var(--ink); }
+#shop-roster canvas { width: 19px; height: 21px; image-rendering: pixelated; }
+.shop-visitors { background: #fffaf0; border: 1px solid #d4bf98; border-radius: 5px; margin: 8px 0; padding: 7px 10px; }
+.shop-visitors-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
+.shop-visitors-heading h3 { font: 700 .85rem/1.4 system-ui, sans-serif; margin: 0; color: #534838; }
+#shop-motion { min-height: 28px; padding: 3px 8px; border: 1px solid #bca983; border-radius: 4px; color: #514831; background: #fff8e7; font: 500 .74rem/1.4 system-ui, sans-serif; }
+#shop-motion[aria-pressed="true"] { background: #415b4e; color: white; }
+#shop-dialog button:enabled:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.shop-guest-note { border-left: 3px solid #bf8d4e; padding: 1px 8px; margin-top: 8px; }
+#shop-guest-note { font-size: .82rem; margin: 2px 0; color: #534838; line-height: 1.45; }
+#shop-roster button[aria-pressed="true"] { border-color: var(--olive); color: var(--olive); background: var(--raised); font-weight: 700; }
+#shop-guests-status { min-height: 1.45em; font-weight: 700; margin: 0; }
+#shop-message:empty { display: none; }
+#shop-setup { display: flex; flex-wrap: wrap; gap: 8px; border: 1px solid var(--line); border-radius: 8px; margin: 12px 0 6px; padding: 8px 10px 10px; min-width: 0; }
+#shop-setup legend, #shop-setup label { font-size: .8rem; }
+#shop-setup label { flex: 1 1 100px; }
+#shop-setup select { display: block; width: 100%; min-height: 36px; margin-top: 4px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+.shop-actions { justify-content: flex-start; }
+#shop-upgrade { color: var(--olive); background: var(--surface); }
+#shop-dialog .shop-actions button { border-radius: 5px; box-shadow: inset 0 0 0 1px #c5a46e; }
 #memo-form, .inline-form { display: flex; align-items: stretch; gap: 7px; }
 #memo-form { width: min(100%, 465px); }
 #memo-form input { background: var(--surface); border: 1px solid var(--line); }

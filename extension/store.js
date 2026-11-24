@@ -1,3 +1,5 @@
+import { validateShop } from './shop.js';
+
 const VERSION = 1;
 export const NOTE_LIMIT = 2000;
 export const PROP_KINDS = ['chair', 'plant', 'books'];
@@ -103,5 +105,7 @@ export function validateBackup(value) {
     linkedReplies.add(key);
     return { kind: prop.kind, memoId: prop.memoId, replyId: prop.replyId };
   });
-  return { version: VERSION, memos, daily, props };
+  const clean = { version: VERSION, memos, daily, props };
+  if (value.shop !== undefined) clean.shop = validateShop(value.shop);
+  return clean;
 }

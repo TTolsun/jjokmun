@@ -35,6 +35,7 @@
       <figure class="bookshop-print" id="alley">
         <div class="scene">
           <canvas id="bookshop" width="144" height="108" role="img" aria-label="창문에 불이 켜진 도트 그림의 작은 책방"></canvas>
+          <canvas class="actor-layer" id="street-guests" width="144" height="108" aria-hidden="true"></canvas>
           <div class="scene-props">
             <button type="button" class="prop sprite chair" id="prop-chair" aria-label="창가의 의자에 얽힌 메모" hidden></button>
             <button type="button" class="prop sprite plant" id="prop-plant" aria-label="작은 화분에 얽힌 메모" hidden></button>
@@ -42,7 +43,7 @@
             <button type="button" id="scene-board" aria-label="그림 속 입간판의 오늘 메모 열기" hidden></button>
           </div>
         </div>
-        <figcaption>골목 책방</figcaption>
+        <figcaption><span>골목 책방 <small id="shop-front-status"></small></span><button id="open-shop" type="button" aria-haspopup="dialog">책방 운영</button></figcaption>
       </figure>
     </section>
     <aside class="archive panel" aria-labelledby="archive-title">
@@ -143,6 +144,49 @@
     <p class="status" role="status" id="unlock-status"></p>
   </main>
   <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
+
+  <dialog id="shop-dialog" aria-labelledby="shop-title">
+    <div class="section-heading">
+      <h2 id="shop-title">골목 책방</h2>
+      <button id="shop-close" type="button" class="close" aria-label="책방 운영 닫기" autofocus>×</button>
+    </div>
+    <div class="shop-ledger">
+      <span>영업일 <strong id="shop-day"></strong></span>
+      <span>보유 잎전 <strong id="shop-coins"></strong></span>
+      <span>평판 <strong id="shop-hearts"></strong></span>
+    </div>
+    <div class="shop-room" role="img" aria-label="서가, 열람석, 계산대가 있는 도트 책방 내부">
+      <canvas id="shop-floor" width="256" height="152" aria-hidden="true"></canvas>
+      <canvas id="shop-guests" class="actor-layer" width="256" height="152" aria-hidden="true"></canvas>
+    </div>
+    <div class="shop-shift">
+      <strong id="shop-phase"></strong><span id="shop-sales"></span>
+    </div>
+    <progress id="shop-progress" aria-label="영업 진행률" max="100" value="0"></progress>
+    <section class="shop-visitors" aria-labelledby="shop-visitors-title">
+      <div class="shop-visitors-heading">
+        <h3 id="shop-visitors-title">손님 수첩</h3>
+        <button id="shop-motion" type="button" aria-pressed="false">움직임 줄이기</button>
+      </div>
+      <div id="shop-roster" role="group" aria-label="살펴볼 손님"></div>
+      <div class="shop-guest-note" aria-live="polite" aria-atomic="true">
+        <p id="shop-guests-status"></p>
+        <p id="shop-guest-note"></p>
+      </div>
+    </section>
+    <p id="shop-regular"></p>
+    <fieldset id="shop-setup">
+      <legend>영업 준비</legend>
+      <label>열람석 위치<select id="shop-seat"><option value="window">창가</option><option value="garden">화분 옆</option></select></label>
+      <label>운영 방침<select id="shop-plan"><option value="reading">느긋한 독서</option><option value="picks">추천 판매</option></select></label>
+    </fieldset>
+    <p id="shop-hint"></p>
+    <div class="shop-actions">
+      <button id="shop-primary" type="button"></button>
+      <button id="shop-upgrade" type="button"></button>
+    </div>
+    <p id="shop-message" role="status"></p>
+  </dialog>
 
   <dialog id="reply-dialog" aria-labelledby="reply-dialog-title">
     <div class="section-heading"><h2 id="reply-dialog-title"></h2></div>
