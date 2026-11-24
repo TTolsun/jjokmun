@@ -52,28 +52,24 @@ export function useFolder(directory, { reopen = false } = {}) {
   return navigator.locks.request(storageLock, async () => {
     const previous = connection;
     if (previous && await previous.directory.isSameEntry(directory)) return;
-    const legacy = previous ? null : await legacySnapshot();
-    let current;
-    if (!previous) current = normalize(legacy?.state);
-    else if (!reopen) current = await fileRecord(previous);
-    assertGeneration(expected);
     const existing = await readVaultFile(directory, true);
     if (existing) {
-      if (legacy?.state && JSON.stringify(current) !== JSON.stringify(existing)) {
-        throw new Error('이 폴더에는 다른 쪽문 저장소가 있습니다. 현재 메모를 옮기려면 저장 파일이 없는 폴더를 선택해 주세요.');
-      }
       if (existing.mode === 'plain') validateBackup(existing.payload.state, { local: true });
     } else {
-      if (!current) throw new Error('기존 ' + VAULT_FILE + ' 파일이 있는 폴더를 선택해 주세요.');
+      if (reopen) throw new Error('기존 ' + VAULT_FILE + ' 파일이 있는 폴더를 선택해 주세요.');
+      const legacy = previous ? null : await legacySnapshot();
+      const current = previous ? await fileRecord(previous) : normalize(legacy?.state);
+      assertGeneration(expected);
       await writeVaultFile(directory, current, true);
+      if (legacy) {
+        if (legacy.state && JSON.stringify(await readVaultFile(directory)) !== JSON.stringify(current)) {
+          throw new Error('저장 파일을 확인하지 못했습니다. 이전 프로필의 기록을 유지합니다.');
+        }
+        assertGeneration(expected);
+        await removeMigratedProfile(legacy);
+      }
     }
     assertGeneration(expected);
-    if (legacy) {
-      if (legacy.state && JSON.stringify(await readVaultFile(directory)) !== JSON.stringify(current)) {
-        throw new Error('저장 파일을 확인하지 못했습니다. 이전 프로필의 기록을 유지합니다.');
-      }
-      await removeMigratedProfile(legacy);
-    }
     connection = { id: crypto.randomUUID(), directory };
     dropVaultKey();
   });

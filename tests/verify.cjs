@@ -168,9 +168,30 @@ async function checkReplyActions(session, a) {
 }
 
 async function createSource(session) {
+  const folder = '기존 책방';
+  const folderMemo = '폴더에만 있는 기록';
+  const setup = await session.tab(monday, folder);
+  await write(setup, folderMemo);
+  const plain = await rawRecord(setup);
+  await setup.close();
   await seedLegacy(session.worker);
+  const existing = await session.tab(monday, folder);
+  try {
+    await existing.locator('#detail-original').getByText(folderMemo, {exact:true}).waitFor();
+    assert.deepEqual(await rawRecord(existing), plain);
+    await existing.evaluate(async pass => (await import('./vault.js')).enableVault(pass), vaultPass);
+    const encrypted = await rawRecord(existing);
+    await existing.reload();
+    await selectFolder(existing, folder);
+    await assertLocked(existing);
+    assert.deepEqual(await rawRecord(existing), encrypted);
+    await unlock(existing);
+    assert.deepEqual((await readState(existing)).memos, plain.payload.state.memos);
+  } finally { await existing.close(); }
+  // The untouched profile can still be migrated into a separate, empty directory.
   const a = await session.tab(monday);
   await a.locator('#archive-list').getByText(legacyText,{exact:true}).waitFor();
+  console.log('PASS  selected plain and encrypted folder vaults take precedence over a different legacy profile');
   const native = await session.context.newPage();
   await native.goto('chrome://newtab/');
   assert.equal(await native.locator('#memo-input').count(),0);
