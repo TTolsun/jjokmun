@@ -1,6 +1,25 @@
 const WOOD = ['#c88a4d', '#694328', '#945c36'];
 const TRIM = ['#edbc78', '#93633b', '#c18b4e'];
 const BOOKS = ['#bd4d48', '#427785', '#dc9e37', '#776287', '#4e8463', '#db8554'];
+// One bottom-center-aligned cell per furnishing in the optional local PNG.
+const FURNISHINGS = ['seat', 'table', 'plant', 'cabinet', 'counter'];
+const CELL_WIDTH = 48;
+const CELL_HEIGHT = 40;
+
+export async function loadFurnishingSheet() {
+  try {
+    const directory = await chrome.runtime.getPackageDirectoryEntry();
+    const entry = await new Promise((resolve, reject) =>
+      directory.getFile('local-art/furnishings.png', {}, resolve, reject));
+    const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+    const sheet = await createImageBitmap(file);
+    if (sheet.width === CELL_WIDTH * FURNISHINGS.length && sheet.height === CELL_HEIGHT) return sheet;
+    sheet.close();
+  } catch {
+    // A stock installation has no local artwork.
+  }
+  return null;
+}
 
 // Small, hand-drawn shop signs and foliage use the same pixel grid as the cast.
 export function stamp(ctx, x, y, rows, palette) {
@@ -81,7 +100,7 @@ function planter(ctx, art, x, y) {
   stamp(ctx, px - 1, py - 9, leaves, greens);
 }
 
-export function paintInterior(canvas, shop, seat, drawClerk) {
+export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
   const ctx = canvas.getContext('2d');
   const { tile, box } = joinery(ctx);
   ctx.fillStyle = '#9eb681';
@@ -167,13 +186,20 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
 
   // Cache each furnishing so moving customers can pass both behind and in front of it.
   const pieces = [];
-  function furnish(x, y, paint) {
+  function furnish(x, y, paint, sprite) {
     const layer = document.createElement('canvas');
     layer.width = canvas.width;
     layer.height = canvas.height;
     const brush = layer.getContext('2d');
-    paint(joinery(brush), brush);
-    pieces.push({ depth: project(x, y)[1], layer });
+    const [px, py] = project(x, y);
+    if (sheet && sprite) {
+      const column = FURNISHINGS.indexOf(sprite);
+      brush.drawImage(sheet, column * CELL_WIDTH, 0, CELL_WIDTH, CELL_HEIGHT,
+        px - CELL_WIDTH / 2, py - CELL_HEIGHT + 4, CELL_WIDTH, CELL_HEIGHT);
+    } else {
+      paint(joinery(brush), brush);
+    }
+    pieces.push({ depth: py, layer });
   }
   for (let n = 0; n <= shop.level; n++) furnish(47 + 22 * n, 42, (art, brush) => shelf(art, brush, 36 + 22 * n, n));
   // A tall periodical rack fills the rear corner without obstructing an aisle.
@@ -211,7 +237,7 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
     }
     if (shop.plan === 'picks') box(49, 94, 9, 2, 9, 6, ['#f6dd88', '#aa7941', '#e5b95c']);
   });
-  furnish(...seat, art => chair(art, ...seat));
+  furnish(...seat, art => chair(art, ...seat), 'seat');
   furnish(seat[0] - 13, seat[1] + 5, ({ box, tile }) => {
     const x = seat[0] - 23, y = seat[1] + 1;
     box(x + 6, y + 4, 6, 4, 0, 8, WOOD);
@@ -219,7 +245,7 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
     tile(x + 2, y, 6, 13, 9, '#598a80');
     box(x + 9, y + 3, 3, 3, 9, 3, ['#875b40', '#e3cba0', '#fff2c8']);
     box(x + 4, y + 3, 3, 3, 9, 4, ['#ffd280', '#b86445', '#cc7951']);
-  });
+  }, 'table');
   furnish(seat[0] - 10, seat[1] - 5, ({ box }) => {
     const x = seat[0] - 13, y = seat[1] - 5;
     box(x, y, 3, 3, 0, 14, WOOD);
@@ -227,7 +253,7 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
     box(x - 1, y - 1, 5, 5, 16, 2, ['#ffedb3', '#c49c69', '#e5c37d']);
   });
   for (const [x, y] of [[15, 49], [171, 48], [184, 62]]) {
-    furnish(x, y, (art, brush) => planter(brush, art, x, y));
+    furnish(x, y, (art, brush) => planter(brush, art, x, y), 'plant');
   }
   // A glass-front case holds the collector's clothbound editions.
   furnish(151, 47, ({ box }) => {
@@ -239,7 +265,7 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
     }
     box(149, 46, 1, 1, 4, 9, TRIM);
     box(139, 35, 23, 13, 13, 2, TRIM);
-  });
+  }, 'cabinet');
   furnish(144, 76, (art, brush) => drawClerk(brush, ...project(144, 76)));
   furnish(143, 89, ({ box }) => {
     box(124, 80, 39, 12, 0, 9, WOOD);
@@ -250,7 +276,7 @@ export function paintInterior(canvas, shop, seat, drawClerk) {
     for (let x = 126; x < 161; x += 9) {
       box(x, 92, 7, 1, 2, 5, ['#bb8c59', '#875532', '#a76c43']);
     }
-  });
+  }, 'counter');
   furnish(72, 122, ({ box }, brush) => {
     box(66, 119, 10, 4, -3, 15, WOOD);
     box(67, 122, 8, 1, 0, 10, ['#efd298', '#6f573d', '#385849']);
