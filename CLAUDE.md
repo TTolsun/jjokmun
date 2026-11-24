@@ -59,6 +59,8 @@ folder.js  ── jjokmun-vault.json in the user-selected directory (File System
 
 `shop.js` holds pure logic (shop settings validation, `bookTraffic`/`visitsAt` deriving visitor timing from memo/reply timestamps, deterministic per-memo character appearance). `ui/bookshop.js` drives canvas rendering through `ui/shop-scene.js` and `ui/shop-interior.js`. Optional sprite sheets load from the git-ignored `extension/local-art/` via `chrome.runtime.getPackageDirectoryEntry`; size must match exactly or the built-in pixel stamps are used.
 
+Game progression is derived, never stored: regular bonds (`bondOf`/`bondRoster` in `shop.js`) and monthly goals, shop grade, and the year review (`season.js`) are recomputed from memo, reply, and signboard dates on every render. All of them count distinct days so repeated entries on one day add nothing, and folded signboard entries never count as requests (`requestDates`). The earned grade is passed to `bookshop.update(state, grade)` for shelf count only and is not written to `shop.level`. Prefer extending these derivations over adding stored counters, which would need backup validation, import merge, and undo support.
+
 ### Security constraints
 
 The manifest CSP is `default-src 'none'` with `connect-src 'none'`: no inline scripts/styles, no network, no remote assets. Render user text with DOM APIs (`textContent`), never `innerHTML`.
