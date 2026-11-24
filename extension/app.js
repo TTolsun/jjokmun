@@ -9,6 +9,7 @@ import { FolderAccessError } from './folder.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindShop } from './ui/bookshop.js';
+import { monthlyProgress, reviewYear, seasonOf, shopGrade, yearReview } from './season.js';
 
 const channel = new BroadcastChannel('memo-alley');
 const requestedDate = new URLSearchParams(location.search).get('date');
@@ -26,6 +27,7 @@ let mode;
 let viewGeneration = 0;
 let lockPending = false;
 let renderedRevision = -1;
+let seenGoals;
 const workspace = document.querySelector('.workspace');
 const header = document.querySelector('.site-header');
 const replyDialog = bindReplyDialog(change);
@@ -62,7 +64,8 @@ function clearSensitive(showLock) {
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
     'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
     'delete-message', 'vault-state', 'unlock-status', 'daily-request', 'roster-count', 'roster-tally', 'roster-list',
-    'regular-name', 'regular-title', 'regular-hint']) {
+    'regular-name', 'regular-title', 'regular-hint', 'season-name', 'season-shelf', 'goal-list', 'shop-grade',
+    'goal-status', 'review-title', 'review-stats']) {
     element(id).replaceChildren();
   }
   element('detail-date').removeAttribute('datetime');
@@ -71,6 +74,8 @@ function clearSensitive(showLock) {
   const portrait = element('regular-portrait');
   portrait.getContext('2d').clearRect(0, 0, portrait.width, portrait.height);
   element('daily-board').hidden = true;
+  element('year-review').hidden = true;
+  seenGoals = undefined;
   element('detail-dialog').hidden = true;
   element('edit-form').hidden = true;
   element('memo-count').textContent = '0';
@@ -88,7 +93,7 @@ function renderPayload(result, date, storageMode = mode) {
   renderedRevision = result.revision;
   mode = storageMode;
   state = result.payload.state;
-  bookshop.update(state);
+  bookshop.update(state, shopGrade(state, date).level);
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;
@@ -187,6 +192,9 @@ function render(date) {
     element('memo-input').focus();
   }
 
+  // Season and roster summarize all memos, so refresh them before the early
+  // return that closes a deleted memo's detail view.
+  renderSeason(date);
   renderRoster();
   const sorted = newestMemos(state.memos);
   if (initialView) {
@@ -200,6 +208,78 @@ function render(date) {
   }
   renderArchive(sorted, detailId, openDetail);
   renderSelection();
+}
+
+// Pick 이 or 가 from the final syllable's batchim.
+function withSubject(word) {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  return word + (code >= 0 && code < 11172 && code % 28 === 0 ? '가' : '이');
+}
+
+function renderSeason(date) {
+  const season = seasonOf(date);
+  const progress = monthlyProgress(state, date);
+  const grade = shopGrade(state, date);
+  element('shop').dataset.season = season.key;
+  element('season-name').textContent = Number(date.slice(5, 7)) + '월 · ' + season.name;
+  element('season-shelf').textContent = '이번 계절 진열대: ' + season.shelf;
+  element('goal-list').replaceChildren(...progress.goals.map((goal) => {
+    const item = document.createElement('li');
+    item.classList.toggle('done', goal.done);
+    const label = document.createElement('span');
+    label.textContent = goal.label;
+    const count = document.createElement('span');
+    count.className = 'goal-count';
+    count.textContent = Math.min(goal.count, goal.target) + '/' + goal.target + (goal.done ? ' 달성' : '');
+    const bar = document.createElement('progress');
+    bar.max = goal.target;
+    bar.value = Math.min(goal.count, goal.target);
+    bar.setAttribute('aria-label', goal.label + ' ' + goal.count + '/' + goal.target);
+    item.append(label, count, bar);
+    return item;
+  }));
+  element('shop-grade').textContent = '책방 등급: ' + grade.name + (grade.nextName
+    ? ' · 목표를 모두 이룬 달이 ' + grade.remaining + '번 더 있으면 ' + withSubject(grade.nextName) + ' 돼요.'
+    : ' · 가장 높은 등급이에요.');
+
+  // Announce only goals completed while this tab is open, not ones met earlier.
+  const done = new Set(progress.goals.filter((goal) => goal.done).map((goal) => goal.key));
+  if (seenGoals?.month === progress.month) {
+    const fresh = progress.goals.filter((goal) => goal.done && !seenGoals.done.has(goal.key));
+    if (progress.complete && fresh.length) {
+      setStatus('goal-status', '이달의 목표를 모두 이뤘어요. 책방 등급: ' + grade.name + '.');
+    } else if (fresh.length) {
+      setStatus('goal-status', '이달의 목표 달성: ' + fresh.map((goal) => goal.label).join(', ') + '.');
+    }
+  } else {
+    setStatus('goal-status', '');
+  }
+  seenGoals = { month: progress.month, done };
+  renderReview(date);
+}
+
+function renderReview(date) {
+  const year = reviewYear(date);
+  const review = year && yearReview(state, year);
+  element('year-review').hidden = !review;
+  if (!review) return;
+  element('review-title').textContent = review.year + '년 책방 결산';
+  const rows = [
+    ['새로 쓴 메모', review.memos + '편'],
+    ['메모를 쓴 날', review.writingDays + '일'],
+    ['다시 읽고 답장한 날', review.rereadingDays + '일'],
+    ['들어준 입간판 부탁', review.requests + '번'],
+    ['목표를 모두 이룬 달', review.completedMonths + '달']
+  ];
+  if (review.busiest) rows.push(['가장 부지런했던 달', Number(review.busiest.month.slice(5)) + '월 (' + review.busiest.days + '일)']);
+  if (review.favorite) rows.push(['올해의 단골', review.favorite.name + ' · ' + review.favorite.bond.title]);
+  element('review-stats').replaceChildren(...rows.flatMap(([term, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    return [dt, dd];
+  }));
 }
 
 const ROSTER_SIZE = 5;
