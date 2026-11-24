@@ -9,7 +9,7 @@ import { FolderAccessError } from './folder.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindShop } from './ui/bookshop.js';
-import { monthlyProgress, reviewYear, seasonOf, shopGrade, yearReview } from './season.js';
+import { activity, monthlyProgress, reviewYear, seasonOf, shopGrade, yearReview } from './season.js';
 
 const channel = new BroadcastChannel('memo-alley');
 const requestedDate = new URLSearchParams(location.search).get('date');
@@ -93,7 +93,9 @@ function renderPayload(result, date, storageMode = mode) {
   renderedRevision = result.revision;
   mode = storageMode;
   state = result.payload.state;
-  bookshop.update(state, date, shopGrade(state, date).level);
+  const months = activity(state, date);
+  const grade = shopGrade(state, date, months);
+  bookshop.update(state, date, grade.level);
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;
@@ -106,7 +108,7 @@ function renderPayload(result, date, storageMode = mode) {
   setStatus('vault-state', mode === 'encrypted'
     ? '현재 저장소의 메모와 가져오기 되돌리기 기록을 암호화하고 있습니다.'
     : '현재 저장소의 메모는 현재 평문으로 저장됩니다.');
-  render(date);
+  render(date, months, grade);
 }
 
 function refresh() {
@@ -171,7 +173,7 @@ async function change(mutator) {
   announce('changed');
 }
 
-function render(date) {
+function render(date, months, grade) {
   displayedDate = date;
   element('today-date').textContent = formatDate(date, longDate);
   const entry = state.daily.find((record) => record.date === date);
@@ -194,7 +196,7 @@ function render(date) {
 
   // Season and roster summarize all memos, so refresh them before the early
   // return that closes a deleted memo's detail view.
-  renderSeason(date);
+  renderSeason(date, months, grade);
   renderRoster();
   const sorted = newestMemos(state.memos);
   if (initialView) {
@@ -216,10 +218,9 @@ function withSubject(word) {
   return word + (code >= 0 && code < 11172 && code % 28 === 0 ? '가' : '이');
 }
 
-function renderSeason(date) {
+function renderSeason(date, months, grade) {
   const season = seasonOf(date);
-  const progress = monthlyProgress(state, date);
-  const grade = shopGrade(state, date);
+  const progress = monthlyProgress(state, date, months);
   element('shop').dataset.season = season.key;
   element('season-name').textContent = Number(date.slice(5, 7)) + '월 · ' + season.name;
   element('season-shelf').textContent = '이번 계절 진열대: ' + season.shelf;
@@ -250,17 +251,19 @@ function renderSeason(date) {
       setStatus('goal-status', '이달의 목표를 모두 이뤘어요. 책방 등급: ' + grade.name + '.');
     } else if (fresh.length) {
       setStatus('goal-status', '이달의 목표 달성: ' + fresh.map((goal) => goal.label).join(', ') + '.');
+    } else if ([...seenGoals.done].some(key => !done.has(key))) {
+      setStatus('goal-status', '');
     }
   } else {
     setStatus('goal-status', '');
   }
   seenGoals = { month: progress.month, done };
-  renderReview(date);
+  renderReview(date, months);
 }
 
-function renderReview(date) {
+function renderReview(date, months) {
   const year = reviewYear(date);
-  const review = year && yearReview(state, year);
+  const review = year && yearReview(state, year, date, months);
   element('year-review').hidden = !review;
   if (!review) return;
   element('review-title').textContent = review.year + '년 책방 결산';

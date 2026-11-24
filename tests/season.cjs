@@ -31,6 +31,8 @@ async function checkSeasonRules() {
   assert.deepEqual(progress.goals.map(goal => goal.count), [8, 6, 2]);
   assert.ok(progress.goals.every((goal, i) => goal.target === MONTHLY_GOALS[i].target && goal.done));
   assert.ok(progress.complete);
+  assert.deepEqual(monthlyProgress(state, '2031-11-02').goals.map(goal => goal.count), [2, 0, 0]);
+  assert.equal(shopGrade(state, '2031-11-02').level, 1);
   assert.equal(monthlyProgress(state, '2031-12-01').goals[0].count, 0);
 
   state.memos.push({id:'same-day', text:'같은 날 두 번째', createdOn:day(11, 1), createdAt:0, updatedAt:0, replies:[
@@ -56,6 +58,10 @@ async function checkSeasonRules() {
   assert.deepEqual(review.busiest, {month:'2031-11', days:8});
   assert.equal(review.favorite.memo.id, 'm11-1', 'ties go to the newer memo');
   assert.equal(yearReview(september, 2030), null);
+  const priorMemo = {...state.memos[0], createdOn:'2030-12-31'};
+  const boundary = {memos:[priorMemo], daily:[]};
+  assert.equal(yearReview(boundary, 2030).favorite, null);
+  assert.equal(yearReview(boundary, 2031).favorite.memo.id, priorMemo.id);
   console.log('PASS  monthly goals, shop grade, seasons and year review derive from distinct days');
 }
 

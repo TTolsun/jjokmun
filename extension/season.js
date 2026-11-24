@@ -33,7 +33,7 @@ export function seasonOf(date) {
   return SEASONS.find((season) => season.months.includes(month));
 }
 
-function activity(state) {
+export function activity(state, through) {
   const months = new Map();
   const bucket = (day) => {
     const key = monthOf(day);
@@ -42,9 +42,11 @@ function activity(state) {
   };
   const requested = requestDates(state.daily);
   for (const memo of state.memos) {
+    if (memo.createdOn > through) continue;
     bucket(memo.createdOn).writing.add(memo.createdOn);
     const asked = requested.get(memo.id);
     for (const reply of memo.replies) {
+      if (reply.createdOn > through) continue;
       if (asked?.has(reply.createdOn)) bucket(reply.createdOn).requests.add(reply.createdOn);
       if (reply.createdOn !== memo.createdOn) bucket(reply.createdOn).rereading.add(reply.createdOn);
     }
@@ -60,16 +62,16 @@ function progressOf(month, days) {
   return { month, goals, complete: goals.every((goal) => goal.done) };
 }
 
-export function monthlyProgress(state, date) {
+export function monthlyProgress(state, date, months = activity(state, date)) {
   const month = monthOf(date);
-  return progressOf(month, activity(state).get(month));
+  return progressOf(month, months.get(month));
 }
 
 // Months after the displayed date are ignored so a tab opened with ?date= sees
 // the grade it would have had on that day.
-export function shopGrade(state, date) {
+export function shopGrade(state, date, months = activity(state, date)) {
   const current = monthOf(date);
-  const completed = [...activity(state)]
+  const completed = [...months]
     .filter(([month, days]) => month <= current && progressOf(month, days).complete)
     .map(([month]) => month).sort();
   let grade = SHOP_GRADES[0];
@@ -87,15 +89,18 @@ export function reviewYear(date) {
   return null;
 }
 
-export function yearReview(state, year) {
+export function yearReview(state, year, through = year + '-12-31', activityByMonth = activity(state, through)) {
   const prefix = year + '-';
-  const months = [...activity(state)].filter(([month]) => month.startsWith(prefix));
+  const months = [...activityByMonth].filter(([month]) => month.startsWith(prefix));
   if (!months.length) return null;
   const total = (key) => months.reduce((sum, [, days]) => sum + days[key].size, 0);
   const busiest = months.map(([month, days]) => ({ month, days: days.writing.size }))
     .sort((a, b) => b.days - a.days || a.month.localeCompare(b.month))[0];
-  const memos = state.memos.filter((memo) => memo.createdOn.startsWith(prefix));
-  const favorite = bondRoster({ memos, daily: state.daily })[0];
+  const memos = state.memos.filter((memo) => memo.createdOn <= through && memo.createdOn.startsWith(prefix));
+  const activeMemos = state.memos.filter(memo => memo.createdOn <= through)
+    .map(memo => ({ ...memo, replies: memo.replies.filter(reply => reply.createdOn.startsWith(prefix) && reply.createdOn <= through) }))
+    .filter(memo => memo.replies.length);
+  const favorite = bondRoster({ memos: activeMemos, daily: state.daily })[0];
   return {
     year,
     memos: memos.length,
