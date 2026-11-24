@@ -4,6 +4,7 @@ import { createTime, element, formatDate, longDate } from './ui/dom.js';
 import { newestMemos, renderArchive } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
+import { bindShop } from './ui/bookshop.js';
 
 const channel = new BroadcastChannel('memo-alley');
 const requestedDate = new URLSearchParams(location.search).get('date');
@@ -24,6 +25,7 @@ let renderedRevision = -1;
 const workspace = document.querySelector('.workspace');
 const header = document.querySelector('.site-header');
 const replyDialog = bindReplyDialog(change);
+const bookshop = bindShop(change);
 
 function currentMemo() {
   return state.memos.find((memo) => memo.id === detailId);
@@ -43,6 +45,7 @@ function clearSensitive(showLock) {
   element('startup-status').hidden = showLock;
   if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
   replyDialog.reset();
+  bookshop.reset();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
@@ -79,6 +82,7 @@ function renderPayload(result, date, storageMode = mode) {
   renderedRevision = result.revision;
   mode = storageMode;
   state = result.payload.state;
+  bookshop.update(state.shop);
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;

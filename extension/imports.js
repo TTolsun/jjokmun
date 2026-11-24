@@ -106,11 +106,22 @@ export function mergeImport(state, backup, date) {
   summary.props = undo.props.length;
 
   const changed = Object.values(undo).some((entries) => entries.length > 0);
-  return { summary, undo: changed ? structuredClone(undo) : null };
+  if (backup.shop && !state.shop) {
+    state.shop = structuredClone(backup.shop);
+    // A backup from a clock set ahead should still finish a shift on this device.
+    state.shop.openedAt = Math.min(state.shop.openedAt, Date.now());
+    undo.shop = structuredClone(state.shop);
+    summary.shop = 1;
+  }
+  return { summary, undo: changed || undo.shop ? structuredClone(undo) : null };
 }
 
 export function undoImport(state, undo, date) {
   const summary = { memos: 0, originals: 0, replies: 0, conflicts: 0, reasons: [] };
+  if (undo.shop) {
+    if (Object.keys(undo.shop).every(key => state.shop?.[key] === undo.shop[key])) delete state.shop;
+    else conflict(summary, '가져오기 뒤 운영한 책방 기록은 유지했습니다.');
+  }
   const importedProps = new Map(undo.props.map((prop) => [prop.kind, prop]));
   state.props = state.props.filter((prop) => {
     const imported = importedProps.get(prop.kind);
