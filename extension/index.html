@@ -55,6 +55,7 @@
         <input id="archive-search" type="search" aria-label="원문과 답장 검색" placeholder="원문과 답장 검색">
       </label>
       <div id="archive-list" class="archive-list"></div>
+      <button id="archive-more" type="button" hidden>메모 더 보기</button>
       <details id="folder-files" hidden>
         <summary>폴더 파일</summary>
         <div class="section-heading"><input id="file-search" type="search" aria-label="파일 경로 검색" placeholder="파일 경로 검색"><button id="scan-files" type="button">새로고침</button></div>
@@ -142,6 +143,13 @@
   <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
 
 
+  <main id="storage-start" class="lock-screen panel" hidden aria-labelledby="start-title">
+    <img src="icon-32.png" width="36" height="36" alt="">
+    <h1 id="start-title">어느 폴더에 책방을 열까요?</h1>
+    <p>메모와 답장을 보관할 폴더를 선택하세요. 기존 폴더를 고르면 쓰던 책방이 열립니다.</p>
+    <button id="choose-first-folder" type="button">메모 저장 폴더 선택</button>
+    <p id="folder-start-status" class="status" role="status"></p>
+  </main>
   <div id="storage-recovery" hidden>
     <button id="storage-reconnect" type="button">저장 폴더 다시 연결</button>
     <button id="storage-relocate" type="button">기존 저장 폴더 찾아 열기</button>

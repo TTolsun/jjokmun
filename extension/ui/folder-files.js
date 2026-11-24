@@ -104,7 +104,7 @@ export function bindFolderFiles() {
   element('more-files').addEventListener('click', () => { limit += 100; render(); });
   search.addEventListener('input', () => { limit = 100; render(); });
   return { reset, update(next) {
-    element('storage-location').textContent = next ? next.directory.name + ' / ' + VAULT_FILE : '현재 Chrome 프로필에 저장 중입니다.';
+    element('storage-location').textContent = next ? next.directory.name + ' / ' + VAULT_FILE : '저장 폴더를 선택해 주세요.';
     if (connection?.id === next?.id) return;
     reset();
     connection = next;

@@ -1,7 +1,7 @@
 import { localDate, validDate, emptyState, selectDaily } from './store.js';
 import { LockedError, readPayload, vaultStatus, dropVaultKey, lockVault, unlockVault } from './vault.js';
 import { createTime, element, formatDate, longDate } from './ui/dom.js';
-import { newestMemos, renderArchive } from './ui/archive.js';
+import { newestMemos, renderArchive, resetArchive } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
 import { folderConnection, useFolder, reconnectFolder } from './vault.js';
@@ -52,8 +52,11 @@ function clearSensitive(showLock) {
   replyDialog.reset();
   bookshop.reset();
   folderFiles.reset();
+  resetArchive();
+  element('folder-start-status').textContent = '';
   element('shop-name').value = '';
   element('storage-recovery').hidden = true;
+  element('storage-start').hidden = true;
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
@@ -100,6 +103,11 @@ function refresh() {
   let expected;
   pendingRefresh = pendingRefresh.then(async () => {
     if (lockPending) return;
+    if (!folderConnection()) {
+      element('storage-start').hidden = false;
+      element('startup-status').hidden = true;
+      return;
+    }
     const date = today();
     expected = viewGeneration;
     const security = await vaultStatus();
@@ -116,7 +124,7 @@ function refresh() {
         selectDaily(draft, date);
       });
     }
-    const connection = await folderConnection();
+    const connection = folderConnection();
     if (expected === viewGeneration) {
       element('storage-recovery').hidden = true;
       renderPayload(result, date, security.mode);
@@ -150,7 +158,7 @@ async function change(mutator) {
   });
   if (expected !== viewGeneration) throw new LockedError();
   renderPayload(result, date);
-  channel.postMessage('changed');
+  announce('changed');
 }
 
 function render(date) {
@@ -501,17 +509,20 @@ async function chooseFolder(button, reopen) {
   const expected = viewGeneration;
   button.disabled = true;
   try {
-    const directory = await window.showDirectoryPicker({ id: 'jjokmun-storage', mode: 'readwrite' });
+    const directory = await window.showDirectoryPicker({ mode: 'readwrite' });
     if (expected !== viewGeneration) return;
     await useFolder(directory, { reopen });
     clearSensitive(false);
-    channel.postMessage('folder');
     await refresh();
   } catch (error) {
-    if (error.name !== 'AbortError') setStatus(reopen ? 'startup-status' : 'settings-status', error.message);
+    if (error.name !== 'AbortError') {
+      if (!folderConnection()) element('folder-start-status').textContent = error.message;
+      else setStatus(reopen ? 'startup-status' : 'settings-status', error.message);
+    }
   } finally { button.disabled = false; }
 }
 
+element('choose-first-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('choose-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('storage-relocate').addEventListener('click', event => chooseFolder(event.currentTarget, true));
 element('storage-reconnect').addEventListener('click', async () => {
@@ -531,7 +542,7 @@ const clearBackupDialogs = bindBackupDialogs({
   activeView: () => workspaceReady && !lockPending ? viewGeneration : undefined,
   today,
   setStatus,
-  channel,
+  announce,
   refresh,
   renderResult: renderPayload
 });
@@ -546,7 +557,7 @@ element('lock-vault').addEventListener('click', async () => {
   } catch {
     setStatus('unlock-status', '잠금 상태를 저장하지 못했습니다. 열린 jjokmun 탭을 모두 닫아 주세요.');
   } finally {
-    channel.postMessage('security');
+    announce('security');
     lockPending = false;
     element('unlock-submit').disabled = false;
     element('unlock-password').focus();
@@ -578,10 +589,17 @@ element('unlock-form').addEventListener('submit', async (event) => {
   }
 });
 
-channel.addEventListener('message', (event) => {
-  if (event.data === 'security' || event.data === 'folder') {
+function announce(type) {
+  const active = folderConnection();
+  if (active) channel.postMessage({ type, directory: active.directory });
+}
+
+channel.addEventListener('message', async ({ data }) => {
+  const active = folderConnection();
+  if (!active || !data?.directory || !await active.directory.isSameEntry(data.directory) || active !== folderConnection()) return;
+  if (data.type === 'security') {
     dropVaultKey();
-    clearSensitive(event.data === 'security' && mode === 'encrypted');
+    clearSensitive(mode === 'encrypted');
   }
   refresh();
 });
@@ -595,12 +613,12 @@ window.addEventListener('pagehide', () => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 setInterval(async () => {
-  if (lockPending) return;
+  if (lockPending || !folderConnection()) return;
   try {
     const security = await vaultStatus();
     if (today() !== displayedDate || security.mode !== mode || (security.locked && workspaceReady)) refresh();
-  } catch {
-    // The initial refresh owns database startup messages.
+  } catch (error) {
+    if (workspaceReady && error instanceof FolderAccessError) refresh();
   }
 }, 5000);
 refresh();

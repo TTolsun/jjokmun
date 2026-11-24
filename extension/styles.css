@@ -404,6 +404,7 @@ dialog p { margin: 8px 0 13px; font-size: .9rem; line-height: 1.6; color: var(--
 }
 .lock-screen h1 { margin: 9px 0; }
 .lock-screen > p { color: var(--muted); }
+#choose-first-folder { margin-block: 15px 4px; padding: 10px 18px; border: 0; border-radius: 6px; background: var(--olive); color: white; font: inherit; cursor: pointer; }
 .lock-screen form { margin-top: 19px; }
 .lock-screen input, #backup-password-form input, #reply-edit-input {
   color: var(--ink);

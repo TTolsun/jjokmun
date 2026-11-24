@@ -9,3 +9,4 @@ jjokmun-*.json
 test-results/
 playwright-report/
 /extension/local-art/
+/dist/

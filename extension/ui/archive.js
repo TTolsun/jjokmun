@@ -23,16 +23,39 @@ function showMatchingText(container, value, query) {
     normalized.slice(hit + query.length, end) + (end < normalized.length ? '…' : ''));
 }
 
+const PAGE_SIZE = 100;
+let visibleLimit = PAGE_SIZE;
+
+export function resetArchive() {
+  visibleLimit = PAGE_SIZE;
+  const more = element('archive-more');
+  more.onclick = null;
+  more.hidden = true;
+}
+
 export function renderArchive(memos, selectedId, openDetail) {
   const list = element('archive-list');
   const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.memoId : undefined;
   const query = searchText(element('archive-search').value.trim());
   element('memo-count').textContent = memos.length;
   list.replaceChildren();
+  const more = element('archive-more');
+  more.hidden = true;
+  more.onclick = null;
   let focusTarget;
   for (const memo of memos) {
     const matchedReply = query ? memo.replies.findLast((reply) => searchText(reply.text).includes(query)) : undefined;
     if (query && !matchedReply && !searchText(memo.text).includes(query)) continue;
+    if (list.childElementCount >= visibleLimit) {
+      more.hidden = false;
+      more.onclick = () => {
+        const previous = visibleLimit;
+        visibleLimit += PAGE_SIZE;
+        renderArchive(memos, selectedId, openDetail);
+        list.children[previous]?.focus();
+      };
+      break;
+    }
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'archive-entry';
@@ -74,6 +97,7 @@ window.addEventListener('keydown', (event) => {
     focusSearch();
   }
 });
+element('archive-search').addEventListener('input', () => { visibleLimit = PAGE_SIZE; });
 element('archive-search').addEventListener('keydown', (event) => {
   if (event.isComposing || event.keyCode === 229) return;
   const first = element('archive-list').firstElementChild;

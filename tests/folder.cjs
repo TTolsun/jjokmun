@@ -1,7 +1,14 @@
+const {selectFolder} = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkFolder(session) {
-  const page = await session.tab();
+  const page = await session.tab(undefined, null);
+  await page.locator('#choose-first-folder').waitFor();
+  await page.evaluate(() => { window.showDirectoryPicker = () => Promise.reject(new DOMException('취소', 'AbortError')); });
+  await page.locator('#choose-first-folder').click();
+  assert.equal(await page.locator('.workspace').isVisible(), false);
+  assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
+  await selectFolder(page);
   try {
     await page.locator('#memo-input').fill('옮길 메모');
     await page.locator('#memo-save').click();
@@ -41,9 +48,15 @@ async function checkFolder(session) {
     assert.deepEqual(await require('node:fs/promises').readFile(await (await downloaded).path()), Buffer.from([0,255,17]));
     await page.locator('#file-close').click();
     await page.reload();
+    await page.locator('#choose-first-folder').waitFor();
+    assert.equal(await page.locator('#shop').isVisible(), false);
+    assert.equal(await page.evaluate(async () => {
+      try { await (await import('./vault.js')).transact(); return true; } catch { return false; }
+    }), false);
+    await selectFolder(page, '내 책장');
     await page.locator('#file-list button').nth(5).waitFor();
     await page.locator('#detail-original').getByText('옮길 메모').waitFor();
-    const another = await session.tab();
+    const another = await session.tab(undefined, '내 책장');
     try {
       await another.locator('#memo-input').waitFor();
       const write = (tab, text) => tab.evaluate(async text => {
@@ -82,15 +95,7 @@ async function checkFolder(session) {
       const handle = await folder.directory.getFileHandle('jjokmun-vault.json');
       const read = async () => JSON.parse(await (await handle.getFile()).text());
       const titles = (await read()).payload.state.memos.map(m => m.text);
-      const database = await new Promise(resolve => {
-        const request = indexedDB.open('memo-alley');
-        request.onsuccess = () => resolve(request.result);
-      });
-      const profileState = await new Promise(resolve => {
-        const request = database.transaction('data').objectStore('data').get('state');
-        request.onsuccess = () => resolve(request.result);
-      });
-      database.close();
+      const profileState = (await indexedDB.databases()).find(db => db.name === 'memo-alley');
       await vault.enableVault('sample folder password');
       const encrypted = await read();
       await vault.lockVault();

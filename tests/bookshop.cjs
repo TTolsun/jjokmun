@@ -29,6 +29,7 @@ async function checkBookshop(session) {
     await page.locator('#shop-name-form button').click();
     await waitText(second, 'shop-title', '달빛 서점');
     await page.reload();
+    await require('./browser.cjs').selectFolder(page);
     await waitText(page, 'shop-title', '달빛 서점');
     await page.setViewportSize({ width: 360, height: 740 });
     assert.ok(await page.evaluate(() => {
@@ -50,6 +51,20 @@ async function checkBookshop(session) {
       fresh.shop.name = '수정한 이름';
       if (!undoImport(fresh, undo, '2031-05-12').conflicts || !fresh.shop) throw Error('shop undo');
     });
+    const population = await page.evaluate(async () => {
+      const {bookTraffic, visitsAt} = await import('./shop.js');
+      const memos = Array.from({length:50000}, (_, i) => ({id:'memo-' + i, text:String(i), replies:[]}));
+      const traffic = bookTraffic(memos, 25000);
+      const look = memo => visitsAt(bookTraffic([memo], 25000), 25000)[0].person;
+      const before = look(memos[100]);
+      const styles = new Set(memos.slice(0, 1000).map(memo => JSON.stringify(look(memo))));
+      const after = look({...memos[100], text:'수정됨'});
+      return {size:traffic.readers.length, visible:visitsAt(traffic, 25000).length,
+        variants:styles.size, stable:JSON.stringify(before) === JSON.stringify(after)};
+    });
+    assert.equal(population.size, 50000);
+    assert.ok(population.visible <= 15 && population.visible > 0);
+    assert.ok(population.variants > 950 && population.stable);
     const frames = await page.evaluate(async () => {
       const { paintGuests } = await import('./ui/shop-scene.js');
       const canvas = document.createElement('canvas');
@@ -68,9 +83,15 @@ async function checkBookshop(session) {
         draw(source, ...args);
       };
       for (const now of [1400, 8000, 16600]) paintGuests(canvas, visitors, now, false, [], sheet);
+      sheet.width = 360;
+      sheet.height = 64;
+      for (const now of [600, 1000, 1400, 8000]) paintGuests(canvas, visitors, now, false, [], sheet);
+      paintGuests(canvas, visitors, 600, true, [], sheet);
       return cells;
     });
-    assert.deepEqual(frames, [[48,16], [48,0], [48,0]]);
+    assert.deepEqual(frames.slice(0, 3), [[48,16], [48,0], [48,0]]);
+    assert.ok(new Set(frames.slice(3, 6).map(cell => cell[0])).size > 1);
+    assert.deepEqual(frames.slice(-2), [[216,0], [216,0]]);
     for (let count = 2; count > 0; count--) {
       await page.locator('#archive-list button').first().click();
       await page.locator('#delete-memo').click();

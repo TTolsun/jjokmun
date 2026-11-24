@@ -4,7 +4,7 @@ import { validateBackup } from '../store.js';
 import { LockedError, disableVault, enableVault, readPayload } from '../vault.js';
 import { element } from './dom.js';
 
-export function bindBackupDialogs({ activeView, today, setStatus, channel, refresh, renderResult }) {
+export function bindBackupDialogs({ activeView, today, setStatus, announce, refresh, renderResult }) {
   const passwordDialog = element('backup-password-dialog');
   const previewDialog = element('import-preview-dialog');
   const undoDialog = element('undo-dialog');
@@ -147,7 +147,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, channel, refre
       } else {
         if (action === 'enable') await enableVault(password);
         else await disableVault(password);
-        channel.postMessage('security');
+        announce('security');
         rejectStaleView(expected);
         passwordDialog.close();
         await refresh();
@@ -237,7 +237,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, channel, refre
       }
       previewDialog.close();
       renderResult(result, date);
-      if (imported) channel.postMessage('changed');
+      if (imported) announce('changed');
       setStatus('settings-status', imported ? '백업을 가져왔어요.' : '추가하거나 바꿀 기록이 없습니다.');
     } catch (error) {
       if (expected === activeView()) setStatus('import-status', error.message || '가져오지 못했습니다. 기존 기록은 그대로입니다.');
@@ -277,7 +277,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, channel, refre
       rejectStaleView(expected);
       undoDialog.close();
       renderResult(result, date);
-      channel.postMessage('changed');
+      announce('changed');
       const message = '가져오기를 되돌렸어요. 제거한 메모 ' + summary.memos + '개, 복원한 원문 '
         + summary.originals + '개, 제거한 답장 ' + summary.replies + '개.';
       setStatus('undo-result', summary.conflicts ? message + ' 충돌 ' + summary.conflicts + '건. ' + summary.reasons.join(' ') : message);

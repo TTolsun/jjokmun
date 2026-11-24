@@ -21,8 +21,14 @@ async function loadSheet(filename, width, height) {
   return null;
 }
 
-export const loadFurnishingSheet = () => loadSheet('furnishings.png', CELL_WIDTH * FURNISHINGS.length, CELL_HEIGHT);
-export const loadCharacterSheet = () => loadSheet('characters.png', 5 * 16, 2 * 16);
+export const loadFurnishingSheet = () => loadSheet('bookshop-furnishings.png', CELL_WIDTH * FURNISHINGS.length, CELL_HEIGHT);
+export const WALK_WIDTH = 24;
+export const WALK_HEIGHT = 32;
+export async function loadCharacterSheet() {
+  // Each character has three foot poses per facing, aligned at bottom center.
+  return await loadSheet('bookshop-walk.png', 5 * 3 * WALK_WIDTH, 2 * WALK_HEIGHT)
+    ?? loadSheet('bookshop-faces.png', 5 * 16, 2 * 16);
+}
 
 // Small, hand-drawn shop signs and foliage use the same pixel grid as the cast.
 export function stamp(ctx, x, y, rows, palette) {
@@ -88,19 +94,24 @@ function shelf({ box }, brush, x, n) {
 }
 
 function chair({ box }, x, y) {
-  for (const dx of [-7, 5]) box(x + dx, y - 4, 3, 8, 0, 5, WOOD);
-  box(x - 8, y - 8, 16, 3, 4, 10, WOOD);
-  box(x - 7, y - 6, 14, 2, 8, 5, ['#e69c6d', '#883e37', '#bd6650']);
-  box(x - 8, y - 6, 16, 12, 4, 3, ['#d78460', '#813f37', '#a85041']);
+  const teal = ['#8bb6a0', '#3d655f', '#527c71'];
+  for (const dx of [-7, 5]) box(x + dx, y - 4, 3, 9, 0, 5, WOOD);
+  box(x - 8, y - 7, 16, 3, 4, 13, WOOD);
+  box(x - 7, y - 5, 14, 2, 8, 8, teal);
+  for (const dx of [-4, 0, 4]) box(x + dx, y - 3, 1, 1, 9, 6, TRIM);
+  box(x - 8, y - 5, 16, 12, 4, 3, teal);
+  box(x - 8, y - 5, 2, 11, 7, 2, TRIM);
+  box(x + 6, y - 5, 2, 11, 7, 2, TRIM);
 }
 
 function planter(ctx, art, x, y) {
   art.box(x - 4, y - 4, 8, 8, 0, 6, ['#b87953', '#965b46', '#b97754']);
   art.box(x - 5, y - 5, 10, 10, 5, 2, ['#795c46', '#b37655', '#cf9465']);
   const [px, py] = project(x, y, 6);
-  stamp(ctx, px - 5, py - 16, leaves, greens);
-  stamp(ctx, px - 8, py - 11, leaves, greens);
-  stamp(ctx, px - 1, py - 9, leaves, greens);
+  const fronds = ['......v.....h..','.....vh...hhv..','..hh.vh..hvv...','...vhvh.hvv....',
+    'hv..vhvhvv..hh.','.vh..vvvh.hhvv.','..vv..vvvhvv...','....v.vvvv.....','.....vvvv..hv..',
+    '...hh.vvvvvv...','..hvv..vvv.....','......vvv......','.......vv......'];
+  stamp(ctx, px - 7, py - 13, fronds, {v:'#3e6b52', h:'#96b86b'});
 }
 
 export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
@@ -224,6 +235,17 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
     box(104, 62, 2, 10, 4, 9, TRIM);
     box(121, 62, 2, 10, 4, 9, TRIM);
     box(104, 62, 20, 11, 9, 2, ['#dbb67e', '#825637', '#a66d42']);
+    // The cart has a lower shelf of pocket books and a striped canvas canopy.
+    for (let i = 0; i < 4; i++) {
+      const color = BOOKS[(i + 2) % BOOKS.length];
+      box(106 + i * 3, 71, 3, 2, 4, 4, [TRIM[0], color, color]);
+    }
+    for (const post of [105, 122]) box(post, 62, 1, 2, 11, 11, WOOD);
+    for (let i = 0; i < 5; i++) {
+      const stripe = i % 2 ? ['#f7e8bb','#bc9b75','#dabd91'] : ['#91b4a0','#456e61','#648e7d'];
+      box(103 + i * 4, 60, 4, 10, 21, 2, stripe);
+      box(103 + i * 4, 69, 4, 1, 20, 2, stripe);
+    }
     const [x,y] = project(111, 68, 11);
     stamp(brush, x - 4, y - 7, ['....gg...', '.p.ggh.pg','ppp.g.ppp','.pgggg.p.', '...ggg...', '...avv...', '...vva...'],
       {p:'#d8766c', g:'#49734b', h:'#a4b759', a:'#e9c185', v:'#668e92'});
@@ -248,6 +270,8 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
     box(x + 6, y + 4, 6, 4, 0, 8, WOOD);
     box(x, y, 19, 13, 7, 2, ['#e9c59a', '#995f39', '#b57d4c']);
     tile(x + 2, y, 6, 13, 9, '#598a80');
+    box(x + 6, y + 8, 7, 4, 9, 1, ['#fff0c7','#b9a684','#aa684f']);
+    tile(x + 9, y + 8, 1, 4, 10, '#c5ac83');
     box(x + 9, y + 3, 3, 3, 9, 3, ['#875b40', '#e3cba0', '#fff2c8']);
     box(x + 4, y + 3, 3, 3, 9, 4, ['#ffd280', '#b86445', '#cc7951']);
   }, 'table');
@@ -275,6 +299,9 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
   furnish(143, 89, ({ box }) => {
     box(124, 80, 39, 12, 0, 9, WOOD);
     box(123, 79, 41, 14, 9, 2, TRIM);
+    box(143, 79, 11, 14, 11, 1, ['#83a696','#496e62','#567e72']);
+    box(144, 92, 9, 1, 4, 7, ['#83a696','#496e62','#567e72']);
+    for (let x = 145; x < 153; x += 3) box(x, 93, 1, 1, 3, 2, TRIM);
     box(128, 82, 10, 7, 11, 3, ['#839f95', '#474d47', '#5e6b61']);
     box(129, 82, 8, 2, 14, 4, ['#668581', '#515f54', '#aac7b2']);
     box(148, 81, 9, 6, 11, 2, ['#fff1cf', '#ba956c', '#bb7258']);

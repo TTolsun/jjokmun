@@ -1,10 +1,43 @@
-const REGULARS = [
-  { sprite: 0, hair: '#903f3d', highlight: '#d47757', coat: '#b54e51', shade: '#78383e', style: 'ribbon' },
-  { sprite: 1, hair: '#54342d', highlight: '#96634a', coat: '#5588ad', shade: '#345b77', style: 'cap' },
-  { sprite: 2, hair: '#815036', highlight: '#c79153', coat: '#c99c48', shade: '#8a6535', style: 'satchel' },
-  { sprite: 3, hair: '#b58f52', highlight: '#f1d794', coat: '#9772a4', shade: '#634971', style: 'glasses' },
-  { sprite: 4, hair: '#41363f', highlight: '#74545c', coat: '#618e68', shade: '#3e604f', style: 'bun' }
+const HAIR = [
+  ['#59413a','#997157'], ['#3e414d','#727587'], ['#90543b','#c98654'],
+  ['#775249','#b98370'], ['#6a605d','#b0a39a'], ['#9b783f','#d8b166']
 ];
+const SKIN = [
+  ['#ffd7aa','#dc9c73'], ['#edbd90','#c68864'], ['#ca9269','#a46c51'], ['#a97355','#84553f']
+];
+const styles = ['bob', 'crop', 'bun', 'waves', 'sidepart'];
+const layers = ['vest', 'cardigan', 'apron', 'jacket'];
+const accessories = ['none', 'scarf', 'satchel', 'glasses', 'ribbon', 'cap'];
+const appearances = new Map();
+
+function identity(id) {
+  let hash = 2166136261;
+  for (const ch of id) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
+  return (hash ^ hash >>> 16) >>> 0;
+}
+
+function appearance(seed) {
+  if (appearances.has(seed)) return appearances.get(seed);
+  let bits = seed;
+  const pick = count => {
+    const value = bits % count;
+    bits = Math.floor(bits / count);
+    return value;
+  };
+  const sprite = pick(styles.length);
+  const [hair, highlight] = HAIR[pick(HAIR.length)];
+  const [skin, cheek] = SKIN[pick(SKIN.length)];
+  const garment = layers[pick(layers.length)];
+  const style = accessories[pick(accessories.length)];
+  const hue = pick(180) * 2;
+  const light = 45 + pick(12);
+  const person = {sprite, hair, highlight, skin, cheek, haircut:styles[sprite], garment, style,
+    coat:'hsl(' + hue + ' 40% ' + light + '%)', shade:'hsl(' + hue + ' 34% ' + (light - 17) + '%)',
+    trim:'hsl(' + ((hue + 25) % 360) + ' 48% 75%)'};
+  if (appearances.size >= 32) appearances.delete(appearances.keys().next().value);
+  appearances.set(seed, person);
+  return person;
+}
 
 export function newShop() {
   return { days: 0, coins: 0, hearts: 0, level: 1, seat: 'window', plan: 'reading', openedAt: 0, decor: 0 };
@@ -17,15 +50,14 @@ export function bookTraffic(memos, now = Date.now()) {
   let featured;
   let latestActivity = 0;
   const readers = memos.map(memo => {
-    let seed = 0;
-    for (const ch of memo.id) seed = (Math.imul(seed, 31) + ch.charCodeAt(0)) >>> 0;
+    const seed = identity(memo.id);
     const at = memo.replies.reduce((latest, reply) => Math.max(latest, reply.createdAt), memo.createdAt || 0);
     latestActivity = Math.max(latestActivity, at);
     const newer = !featured || memo.createdOn > featured.createdOn ||
       (memo.createdOn === featured.createdOn && (memo.createdAt || 0) >= (featured.createdAt || 0));
     if (!featured || memo.replies.length > featured.replies.length ||
       (memo.replies.length === featured.replies.length && newer)) featured = memo;
-    return { at, seed, person: REGULARS[seed % REGULARS.length] };
+    return { at, seed };
   });
   const recent = readers.filter(reader => reader.at >= now - VISIT_MS).sort((a, b) => b.at - a.at).slice(0, 9);
   return { readers, recent, featured, latestActivity };
@@ -46,7 +78,7 @@ export function visitsAt(traffic, now) {
     if (reader.at <= now && now - reader.at < VISIT_MS) arrivals.set(reader, reader.at);
   }
   const bestseller = now >= latestActivity && now - latestActivity < VISIT_MS;
-  return Array.from(arrivals, ([reader, at]) => ({ ...reader, at, bestseller }));
+  return Array.from(arrivals, ([reader, at]) => ({ ...reader, person: appearance(reader.seed), at, bestseller }));
 }
 
 export function validateShop(shop) {
