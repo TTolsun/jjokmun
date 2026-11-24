@@ -1,11 +1,18 @@
 import { selectDaily } from './store.js';
 
-const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const core = (memo) => ({ text: memo.text, updatedAt: memo.updatedAt });
 const link = (memoId, replyId) => memoId + '/' + replyId;
 
-function stat() {
-  return { newMemos: 0, updatedMemos: 0, newReplies: 0, daily: 0, props: 0, conflicts: 0, reasons: [] };
+function sameReply(a, b) {
+  return a.id === b.id && a.text === b.text && a.createdOn === b.createdOn && a.createdAt === b.createdAt;
+}
+
+function sameDaily(a, b) {
+  return a?.date === b.date && a.memoId === b.memoId && a.folded === b.folded;
+}
+
+function sameProp(a, b) {
+  return a?.kind === b.kind && a.memoId === b.memoId && a.replyId === b.replyId;
 }
 
 function conflict(summary, reason) {
@@ -14,7 +21,7 @@ function conflict(summary, reason) {
 }
 
 export function mergeImport(state, backup, date) {
-  const summary = stat();
+  const summary = { newMemos: 0, updatedMemos: 0, newReplies: 0, daily: 0, props: 0, conflicts: 0, reasons: [] };
   const undo = { memos: [], daily: [], props: [] };
   const memos = new Map(state.memos.map((memo) => [memo.id, memo]));
   const rejectedMemos = new Set();
@@ -55,7 +62,7 @@ export function mergeImport(state, backup, date) {
         existing.replies.push(reply);
         delta.replies.push(reply);
         summary.newReplies += 1;
-      } else if (!equal(current, reply)) {
+      } else if (!sameReply(current, reply)) {
         rejectedReplies.add(link(existing.id, reply.id));
         conflict(summary, 'ID는 같지만 내용이 다른 답장은 기존 기록을 유지합니다.');
       }
@@ -73,7 +80,7 @@ export function mergeImport(state, backup, date) {
     const existing = byDate.get(incoming.date);
     if (!existing) state.daily.push({ ...incoming });
     else if (existing.date === date && existing.memoId === null && !existing.folded) Object.assign(existing, incoming);
-    else if (!equal(existing, incoming)) conflict(summary, '같은 날짜의 입간판은 기존 기록을 유지합니다.');
+    else if (!sameDaily(existing, incoming)) conflict(summary, '같은 날짜의 입간판은 기존 기록을 유지합니다.');
   }
   const today = state.daily.find((entry) => entry.date === date);
   if (today?.memoId === null && !today.folded && summary.newMemos) {
@@ -82,7 +89,7 @@ export function mergeImport(state, backup, date) {
   if (summary.newMemos) selectDaily(state, date);
   for (const entry of state.daily) {
     const before = beforeByDate.get(entry.date) ?? null;
-    if (!equal(before, entry)) undo.daily.push({ date: entry.date, before, after: entry });
+    if (!sameDaily(before, entry)) undo.daily.push({ date: entry.date, before, after: entry });
   }
   summary.daily = undo.daily.length;
 
@@ -92,7 +99,7 @@ export function mergeImport(state, backup, date) {
     if (!existing && !rejectedMemos.has(prop.memoId) && !rejectedReplies.has(link(prop.memoId, prop.replyId))) {
       state.props.push(prop);
       undo.props.push(prop);
-    } else if (!equal(existing, prop)) {
+    } else if (!sameProp(existing, prop)) {
       conflict(summary, '이미 사용 중이거나 충돌한 답장을 가리키는 소품은 건너뜁니다.');
     }
   }
@@ -108,7 +115,7 @@ export function undoImport(state, undo, date) {
   state.props = state.props.filter((prop) => {
     const imported = importedProps.get(prop.kind);
     if (!imported) return true;
-    if (equal(imported, prop)) return false;
+    if (sameProp(imported, prop)) return false;
     conflict(summary, '가져오기 뒤 다른 답장과 연결한 소품은 유지했습니다.');
     return true;
   });
@@ -128,7 +135,7 @@ export function undoImport(state, undo, date) {
     memo.replies = memo.replies.filter((reply) => {
       const imported = importedReplies.get(reply.id);
       if (!imported) return true;
-      if (equal(imported, reply) && !linked.has(link(memo.id, reply.id))) {
+      if (sameReply(imported, reply) && !linked.has(link(memo.id, reply.id))) {
         summary.replies += 1;
         return false;
       }
@@ -136,7 +143,7 @@ export function undoImport(state, undo, date) {
       return true;
     });
     if (!delta.after) continue;
-    const sameOriginal = equal(core(memo), delta.after);
+    const sameOriginal = memo.text === delta.after.text && memo.updatedAt === delta.after.updatedAt;
     if (delta.before && sameOriginal) {
       Object.assign(memo, delta.before);
       summary.originals += 1;
@@ -151,7 +158,7 @@ export function undoImport(state, undo, date) {
   const appliedDates = new Map(undo.daily.map((entry) => [entry.date, entry]));
   state.daily = state.daily.flatMap((entry) => {
     const change = appliedDates.get(entry.date);
-    if (change && equal(entry, change.after)) {
+    if (change && sameDaily(entry, change.after)) {
       return change.before && (change.before.memoId === null || memos.has(change.before.memoId))
         ? [change.before] : [];
     }

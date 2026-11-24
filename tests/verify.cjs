@@ -123,6 +123,58 @@ async function copyText(p, selector, expected, keyboard = false) {
   await input.fill('');
 }
 
+async function checkReplyActions(session, a) {
+  const original = '두 번째 답장의 원문';
+  const updated = '두 번째 답장을 수정한 내용';
+  await a.locator('#reply-input').fill(original);
+  await a.locator('#reply-save').click();
+  await a.locator('#prop-plant').waitFor();
+  const before = await readState(a);
+  const memo = before.memos.find(item => item.text === note);
+  const target = memo.replies.find(item => item.text === original);
+  const row = `article[data-reply-id="${target.id}"]`;
+  const b = await session.tab(monday);
+  try {
+    await b.locator(row).getByRole('button', {name: '답장 수정'}).click();
+    await b.locator('#reply-edit-input').fill('다른 탭의 초안');
+    await a.locator(row).getByRole('button', {name: '답장 수정'}).click();
+    await a.locator('#reply-edit-input').fill('   ');
+    await a.locator('#reply-dialog-confirm').click();
+    assert.match(await a.locator('#reply-dialog-status').innerText(), /한 줄/);
+    await a.locator('#reply-edit-input').fill(updated);
+    await a.locator('#reply-edit-input').press('Enter');
+    await a.locator('#reply-dialog').waitFor({state: 'hidden'});
+    await b.locator('#reply-dialog-confirm').click();
+    await b.getByText('다른 탭에서 답장이 바뀌었습니다.', {exact: false}).waitFor();
+    await b.locator('#reply-dialog-cancel').click();
+    await b.locator('#archive-search').fill(updated);
+    await b.locator('#archive-list mark').waitFor();
+    await b.locator('#prop-plant').click();
+    assert.equal(await b.locator('.linked-reply p').innerText(), updated);
+    const edited = await readState(b);
+    assert.deepEqual(edited.memos.find(item => item.id === memo.id).replies[1], {...target, text: updated});
+    assert.deepEqual(edited.props, before.props);
+    await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
+    assert.equal(await b.locator('#reply-delete-text').innerText(), updated);
+    assert.match(await b.locator('#reply-delete-message').innerText(), /소품/);
+    await b.keyboard.press('Escape');
+    assert.deepEqual(await readState(b), edited);
+    await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
+    await b.locator('#reply-dialog-confirm').click();
+    await a.locator(row).waitFor({state: 'detached'});
+    await b.locator('#prop-plant').waitFor({state: 'hidden'});
+    await b.getByText('검색 결과가 없습니다.').waitFor();
+    await a.reload();
+    await a.locator('#prop-chair').waitFor();
+    const after = await readState(a);
+    assert.deepEqual(after.memos.find(item => item.id === memo.id).replies, [memo.replies[0]]);
+    assert.deepEqual(after.props, before.props.filter(prop => prop.kind !== 'plant'));
+    console.log('PASS  reply edit, search, concurrent edit protection, delete confirmation and linked prop cleanup');
+  } finally {
+    await b.close();
+  }
+}
+
 async function createSource(session) {
   await seedLegacy(session.worker);
   const a = await session.tab(monday);
@@ -142,10 +194,19 @@ async function createSource(session) {
   await a.locator('#reply-input').fill(reply);
   await a.locator('#reply-save').click();
   await a.locator('#prop-chair').waitFor();
+  await checkReplyActions(session, a);
   await a.keyboard.press('Control+k');
+  await a.locator('#archive-search').fill('일치하지 않는 검색어');
+  assert.equal(await a.locator('#archive-list button').count(), 0);
+  assert.equal(await a.locator('#archive-status').innerText(), '검색 결과가 없습니다.');
   await a.locator('#archive-search').fill('창문 옆에');
   await a.locator('#archive-list mark').waitFor();
+  await a.locator('#archive-search').press('ArrowDown');
+  assert.ok(await a.locator('#archive-list button').first().evaluate(row => row === document.activeElement));
+  await a.keyboard.press('ArrowUp');
+  assert.ok(await a.locator('#archive-search').evaluate(input => input === document.activeElement));
   await a.locator('#archive-search').press('Enter');
+  assert.equal(await a.locator('.linked-reply p').innerText(), reply);
   await a.setViewportSize({width:390,height:840});
   await copyText(a,'#copy-memo',note);
   await copyText(a,'.copy-reply',reply,true);
@@ -166,6 +227,10 @@ async function checkVault(session, a) {
   const b = await session.tab(monday);
   const before = await rawRecord(a);
   await settings(a);
+  const developer = a.getByRole('region', {name: '개발자 정보'});
+  assert.ok(await developer.getByText('KH', {exact: true}).isVisible());
+  const email = developer.getByRole('link', {name: 'baboess@gmail.com'});
+  assert.equal(await email.getAttribute('href'), 'mailto:baboess@gmail.com');
   await a.locator('#enable-vault').click();
   await forceNextWriteToFail(a);
   await password(a,vaultPass);
@@ -180,9 +245,21 @@ async function checkVault(session, a) {
   await unlock(b);
   await b.locator('#archive-search').fill('미저장 비밀 문장');
   await b.locator('#memo-input').fill('미저장 비밀 문장');
+  await settings(b);
+  await upload(b, Buffer.from(JSON.stringify(await readState(b))));
+  await b.locator('#import-preview-dialog').waitFor();
+  const editor = await session.tab(monday);
+  await unlock(editor);
+  await editor.getByRole('button', {name: '답장 수정'}).click();
+  await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   await settings(a);
   await a.locator('#lock-vault').click();
-  await Promise.all([assertLocked(a),assertLocked(b)]);
+  await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor)]);
+  assert.equal(await editor.locator('#reply-dialog').isVisible(), false);
+  assert.equal(await editor.locator('#reply-edit-input').inputValue(), '');
+  await editor.close();
+  assert.equal(await b.locator('dialog[open]').count(), 0);
+  assert.equal(await b.locator('#import-summary').textContent(), '');
   const newTab = await session.tab();
   await assertLocked(newTab);
   const locked = await rawRecord(a);
@@ -292,6 +369,7 @@ async function checkRecovery(session, bytes, initial) {
 
 async function run() {
   await require('./undo.cjs').checkPlainJournal();
+  await require('./undo.cjs').checkLegacyFieldOrder();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));
   assert.equal(manifest.chrome_url_overrides,undefined);
   assert.equal(manifest.host_permissions,undefined);

@@ -22,6 +22,29 @@
   </header>
 
   <main class="workspace" hidden>
+    <section class="writing" aria-labelledby="writing-title">
+      <div class="writing-copy">
+        <p id="today-date" class="today-date"></p>
+        <h1 id="writing-title"><label for="memo-input">오늘 남겨둘 생각은?</label></h1>
+        <form id="memo-form" autocomplete="off">
+          <input id="memo-input" type="text" maxlength="2000" placeholder="새 메모를 한 줄로 적어 보세요" required>
+          <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
+        </form>
+        <p class="status" id="home-status" role="status"></p>
+      </div>
+      <figure class="bookshop-print" id="alley">
+        <div class="scene">
+          <canvas id="bookshop" width="144" height="108" role="img" aria-label="창문에 불이 켜진 도트 그림의 작은 책방"></canvas>
+          <div class="scene-props">
+            <button type="button" class="prop sprite chair" id="prop-chair" aria-label="창가의 의자에 얽힌 메모" hidden></button>
+            <button type="button" class="prop sprite plant" id="prop-plant" aria-label="작은 화분에 얽힌 메모" hidden></button>
+            <button type="button" class="prop sprite books" id="prop-books" aria-label="책 더미에 얽힌 메모" hidden></button>
+            <button type="button" id="scene-board" aria-label="그림 속 입간판의 오늘 메모 열기" hidden></button>
+          </div>
+        </div>
+        <figcaption>골목 책방</figcaption>
+      </figure>
+    </section>
     <aside class="archive panel" aria-labelledby="archive-title">
       <div class="section-heading">
         <h2 id="archive-title">전체 메모</h2>
@@ -35,17 +58,7 @@
       <p class="status" id="archive-status" role="status"></p>
     </aside>
 
-    <section class="notebook panel" aria-label="메모 작성과 읽기">
-      <div class="writing">
-        <p id="today-date" class="today-date"></p>
-        <h1><label for="memo-input">오늘 남겨둘 생각은?</label></h1>
-        <form id="memo-form" autocomplete="off">
-          <input id="memo-input" type="text" maxlength="2000" placeholder="새 메모를 한 줄로 적어 보세요" required>
-          <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
-        </form>
-        <p class="status" id="home-status" role="status"></p>
-      </div>
-
+    <section class="notebook panel" aria-label="메모 읽기">
       <div class="note-empty" id="note-empty">
         <span class="paper-icon" aria-hidden="true"><i></i></span>
         <h2 id="empty-title">아직 남긴 메모가 없어요</h2>
@@ -73,6 +86,13 @@
           </div>
         </form>
         <div id="detail-replies" class="replies"></div>
+        <template id="reply-actions-template">
+          <div class="detail-actions">
+            <button type="button" class="copy-button copy-reply" data-action="copy" aria-label="답장 복사"><span class="copy-icon" aria-hidden="true"></span></button>
+            <button type="button" data-action="edit" aria-label="답장 수정">수정</button>
+            <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
+          </div>
+        </template>
         <form id="reply-form" autocomplete="off">
           <label class="field-label" for="reply-input">답장 남기기</label>
           <div class="inline-form">
@@ -85,21 +105,7 @@
       </section>
     </section>
 
-    <aside class="alley panel" id="alley" aria-labelledby="alley-title">
-      <div class="section-heading">
-        <h2 id="alley-title">골목 책방</h2>
-        <span class="scene-light" aria-hidden="true"></span>
-      </div>
-      <div class="scene">
-        <canvas id="bookshop" width="144" height="108" role="img" aria-label="창문에 불이 켜진 도트 그림의 작은 책방"></canvas>
-        <div class="scene-props">
-          <button type="button" class="prop sprite chair" id="prop-chair" aria-label="창가의 의자에 얽힌 메모" hidden></button>
-          <button type="button" class="prop sprite plant" id="prop-plant" aria-label="작은 화분에 얽힌 메모" hidden></button>
-          <button type="button" class="prop sprite books" id="prop-books" aria-label="책 더미에 얽힌 메모" hidden></button>
-          <button type="button" id="scene-board" aria-label="그림 속 입간판의 오늘 메모 열기" hidden></button>
-        </div>
-      </div>
-
+    <aside class="alley panel" aria-label="책방 입간판과 소품">
       <section class="daily" aria-labelledby="daily-title">
         <div class="section-heading"><h3 id="daily-title">오늘의 입간판</h3><span class="board-icon" aria-hidden="true"></span></div>
         <p id="daily-empty">지난날의 메모가 여기에 걸려요.</p>
@@ -138,6 +144,25 @@
   </main>
   <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
 
+  <dialog id="reply-dialog" aria-labelledby="reply-dialog-title">
+    <div class="section-heading"><h2 id="reply-dialog-title"></h2></div>
+    <form id="reply-dialog-form" autocomplete="off">
+      <div id="reply-edit-field">
+        <label class="field-label" for="reply-edit-input">답장 내용</label>
+        <input id="reply-edit-input" type="text" maxlength="2000" required>
+      </div>
+      <div id="reply-delete-preview" hidden>
+        <blockquote id="reply-delete-text"></blockquote>
+        <p id="reply-delete-message"></p>
+      </div>
+      <div class="confirm-actions">
+        <button id="reply-dialog-cancel" type="button">취소</button>
+        <button id="reply-dialog-confirm" type="submit"></button>
+      </div>
+    </form>
+    <p id="reply-dialog-status" class="status" role="status"></p>
+  </dialog>
+
   <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-message">
     <div class="section-heading"><h2 id="delete-title">메모를 삭제할까요?</h2></div>
     <p id="delete-message"></p>
@@ -152,6 +177,13 @@
       <h2 id="settings-title">설정</h2>
       <button type="button" class="close" id="settings-close" aria-label="설정 닫기" autofocus>×</button>
     </div>
+    <section class="developer-info" aria-labelledby="developer-title">
+      <h3 id="developer-title">개발자 정보</h3>
+      <dl>
+        <dt>이름</dt><dd>KH</dd>
+        <dt>이메일</dt><dd><a href="mailto:baboess@gmail.com">baboess@gmail.com</a></dd>
+      </dl>
+    </section>
     <h3>메모 백업</h3>
     <p>새 백업에는 비밀번호가 필요합니다. 이전에 내보낸 평문 JSON도 가져올 수 있습니다.</p>
     <div class="backup-actions">
