@@ -25,8 +25,9 @@ async function checkBondRules() {
   memo.replies.push(reply('d', '2031-05-14'));
   const request = bondOf(memo, daily);
   assert.deepEqual([request.points, request.tier, request.requests, request.remaining], [6, 2, 1, 3]);
-  assert.match(bondHint(request), /^오랜 단골까지 정 3 남았어요/);
-  assert.match(bondHint(request, {requestedToday:true}), /정 \+3/);
+  assert.equal(bondHint(request), '오랜 단골까지 정 3 남았어요. 메모를 쓴 날이 아닌 다른 날 답장하면 정 +2.');
+  assert.equal(bondHint(request, {requestedToday:true}), '오늘 입간판에 걸린 책이에요. 지금 답장하면 정 +3.');
+  assert.equal(bondOf(memo, [{...daily[0], folded:true}]).points, 5);
   assert.match(bondHint(request, {repliedToday:true}), /다른 날 다시 들러 주세요/);
 
   for (let day = 16; day <= 20; day++) memo.replies.push(reply('e' + day, '2031-05-' + day));
@@ -75,7 +76,7 @@ async function checkRegulars(session) {
     tuesday = await session.tab('2031-05-13', folder);
     await waitText(tuesday, 'daily-request', name + '이 이 책을 다시 찾아요');
     await tuesday.locator('#daily-memo').click();
-    await waitMatch(tuesday, 'regular-hint', '지금 답장하면 정 \\+3');
+    await waitText(tuesday, 'regular-hint', '오늘 입간판에 걸린 책이에요. 지금 답장하면 정 +3.');
     await tuesday.locator('#reply-input').fill('입간판을 보고 남긴 답장');
     await tuesday.locator('#reply-save').click();
     await waitText(tuesday, 'detail-status', '답장을 저장했어요. ' + name + '과 한층 가까워졌어요: 낯익은 단골.');
@@ -107,7 +108,7 @@ async function checkRegulars(session) {
       };
       return [count(1), count(2)];
     });
-    assert.deepEqual(hearts.map(Boolean), [false, true], 'only close regulars show a heart');
+    assert.deepEqual(hearts, [0, 6], 'only close regulars show all six pink pixels of the heart');
 
     const stored = await wednesday.evaluate(async () => {
       const {directory} = (await import('./vault.js')).folderConnection();
@@ -116,10 +117,16 @@ async function checkRegulars(session) {
     });
     assert.deepEqual(stored, {keys:['daily', 'memos', 'props', 'version'], shop:undefined}, 'bonds add no stored fields');
 
-    await monday.locator('#memo-input').focus();
+    await monday.locator('#detail-close').click();
+    await monday.locator('#detail-dialog').waitFor({state:'hidden'});
     await monday.locator('#roster-list button').first().click();
     await monday.locator('#detail-title').waitFor();
     assert.equal(await monday.locator('#detail-original').textContent(), '단골과 다시 읽을 메모');
+    await monday.locator('#delete-memo').click();
+    await monday.locator('#delete-confirm').click();
+    await waitText(monday, 'roster-count', '0명');
+    await waitText(wednesday, 'roster-count', '0명');
+    assert.equal(await monday.locator('#roster-list button').count(), 0);
     console.log('PASS  regular card, signboard request, roster and tier-up messages');
   } finally {
     await monday.close();

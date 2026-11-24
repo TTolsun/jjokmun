@@ -67,7 +67,7 @@ export function regularOf(memoId) {
 function requestDates(daily) {
   const dates = new Map();
   for (const entry of daily) {
-    if (!entry.memoId) continue;
+    if (!entry.memoId || entry.folded) continue;
     if (!dates.has(entry.memoId)) dates.set(entry.memoId, new Set());
     dates.get(entry.memoId).add(entry.date);
   }

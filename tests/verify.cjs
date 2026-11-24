@@ -76,6 +76,7 @@ async function forceNextWriteToFail(p) {
 }
 async function assertLocked(p) {
   await p.locator('#lock-screen').waitFor();
+  assert.deepEqual(await p.locator('#regular-progress').evaluate(bar => [bar.value, bar.max]), [0, 1]);
   for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#daily-memo', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
