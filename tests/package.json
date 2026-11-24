@@ -1,0 +1,6 @@
+{
+  "name": "memo-alley-browser-tests",
+  "private": true,
+  "scripts": { "test": "node verify.cjs" },
+  "devDependencies": { "playwright-core": "1.62.1" }
+}

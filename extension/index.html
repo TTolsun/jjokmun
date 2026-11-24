@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메모 골목</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+  <script type="module" src="scene.js"></script>
+</head>
+<body>
+  <header class="site-header" hidden>
+    <div class="brand">
+      <img src="icon-32.png" width="30" height="30" alt="">
+      <span>메모 골목</span>
+    </div>
+    <nav aria-label="작업 화면 이동">
+      <button type="button" id="open-archive"><span class="search-icon" aria-hidden="true"></span> 메모 찾기 <kbd>Ctrl K</kbd></button>
+      <a href="#alley" class="jump-alley">책방 보기</a>
+      <button type="button" id="open-settings">설정</button>
+    </nav>
+  </header>
+
+  <main class="workspace" hidden>
+    <aside class="archive panel" aria-labelledby="archive-title">
+      <div class="section-heading">
+        <h2 id="archive-title">전체 메모</h2>
+        <span id="memo-count" class="count" aria-label="메모 수">0</span>
+      </div>
+      <label class="search-field">
+        <span class="search-icon" aria-hidden="true"></span>
+        <input id="archive-search" type="search" aria-label="원문과 답장 검색" placeholder="원문과 답장 검색">
+      </label>
+      <div id="archive-list" class="archive-list"></div>
+      <p class="status" id="archive-status" role="status"></p>
+    </aside>
+
+    <section class="notebook panel" aria-label="메모 작성과 읽기">
+      <div class="writing">
+        <p id="today-date" class="today-date"></p>
+        <h1><label for="memo-input">오늘 남겨둘 생각은?</label></h1>
+        <form id="memo-form" autocomplete="off">
+          <input id="memo-input" type="text" maxlength="2000" placeholder="새 메모를 한 줄로 적어 보세요" required>
+          <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
+        </form>
+        <p class="status" id="home-status" role="status"></p>
+      </div>
+
+      <div class="note-empty" id="note-empty">
+        <span class="paper-icon" aria-hidden="true"><i></i></span>
+        <h2 id="empty-title">아직 남긴 메모가 없어요</h2>
+        <p id="empty-text">위에 한 줄을 저장하면 원문과 답장을 이곳에서 읽을 수 있어요.</p>
+      </div>
+
+      <section id="detail-dialog" class="note-detail" aria-labelledby="detail-title" hidden>
+        <div class="section-heading detail-heading">
+          <h2 id="detail-title" tabindex="-1">메모</h2>
+          <div class="detail-actions">
+            <button type="button" id="copy-memo" class="copy-button" aria-label="메모 원문 복사"><span class="copy-icon" aria-hidden="true"></span></button>
+            <button type="button" id="edit-memo">수정</button>
+            <button type="button" id="delete-memo">삭제</button>
+            <button type="button" id="detail-close" class="close" aria-label="메모 선택 해제">×</button>
+          </div>
+        </div>
+        <time id="detail-date"></time>
+        <p class="original" id="detail-original"></p>
+        <form id="edit-form" hidden>
+          <label class="field-label" for="edit-input">원문 수정</label>
+          <input id="edit-input" type="text" maxlength="2000" required>
+          <div class="inline-form edit-actions">
+            <button id="edit-save" type="submit">수정 저장</button>
+            <button id="edit-cancel" type="button">취소</button>
+          </div>
+        </form>
+        <div id="detail-replies" class="replies"></div>
+        <form id="reply-form" autocomplete="off">
+          <label class="field-label" for="reply-input">답장 남기기</label>
+          <div class="inline-form">
+            <input type="text" id="reply-input" placeholder="이 메모를 지금 읽고 든 생각" maxlength="2000" required>
+            <button type="submit" id="reply-save">답장 저장</button>
+          </div>
+        </form>
+        <p class="status" id="detail-status" role="status"></p>
+        <p class="status" id="copy-status" role="status"></p>
+      </section>
+    </section>
+
+    <aside class="alley panel" id="alley" aria-labelledby="alley-title">
+      <div class="section-heading">
+        <h2 id="alley-title">골목 책방</h2>
+        <span class="scene-light" aria-hidden="true"></span>
+      </div>
+      <div class="scene">
+        <canvas id="bookshop" width="144" height="108" role="img" aria-label="창문에 불이 켜진 도트 그림의 작은 책방"></canvas>
+        <div class="scene-props">
+          <button type="button" class="prop sprite chair" id="prop-chair" aria-label="창가의 의자에 얽힌 메모" hidden></button>
+          <button type="button" class="prop sprite plant" id="prop-plant" aria-label="작은 화분에 얽힌 메모" hidden></button>
+          <button type="button" class="prop sprite books" id="prop-books" aria-label="책 더미에 얽힌 메모" hidden></button>
+          <button type="button" id="scene-board" aria-label="그림 속 입간판의 오늘 메모 열기" hidden></button>
+        </div>
+      </div>
+
+      <section class="daily" aria-labelledby="daily-title">
+        <div class="section-heading"><h3 id="daily-title">오늘의 입간판</h3><span class="board-icon" aria-hidden="true"></span></div>
+        <p id="daily-empty">지난날의 메모가 여기에 걸려요.</p>
+        <div id="daily-board" hidden>
+          <button type="button" id="daily-memo">
+            <span id="daily-excerpt"></span>
+            <span class="daily-read" aria-hidden="true">메모 열기 ↗</span>
+          </button>
+          <button type="button" id="defer-memo">오늘은 접어두기</button>
+        </div>
+      </section>
+
+      <section class="collection" aria-labelledby="collection-title">
+        <div class="section-heading"><h3 id="collection-title">책방 소품</h3><span class="count" id="prop-count">0 / 3</span></div>
+        <progress id="prop-progress" aria-label="소품 수집 진행" max="3" value="0"></progress>
+        <div class="collection-slots">
+          <button class="collection-slot" id="collection-chair" type="button" disabled><span class="sprite chair" aria-hidden="true"></span><span>의자</span></button>
+          <button class="collection-slot" id="collection-plant" type="button" disabled><span class="sprite plant" aria-hidden="true"></span><span>화분</span></button>
+          <button class="collection-slot" id="collection-books" type="button" disabled><span class="sprite books" aria-hidden="true"></span><span>책 더미</span></button>
+        </div>
+        <p id="collection-hint">메모에 답장을 남기면 소품이 하나씩 열려요.</p>
+      </section>
+    </aside>
+  </main>
+
+  <main class="lock-screen panel" id="lock-screen" hidden>
+    <img src="icon-32.png" width="36" height="36" alt="">
+    <h1>메모 골목 열기</h1>
+    <p>이 저장소를 열려면 비밀번호를 입력하세요.</p>
+    <form id="unlock-form" autocomplete="off">
+      <label class="field-label" for="unlock-password">저장소 비밀번호</label>
+      <input id="unlock-password" type="password" maxlength="256" required>
+      <button type="submit" id="unlock-submit">잠금 해제</button>
+    </form>
+    <p class="status" role="status" id="unlock-status"></p>
+  </main>
+  <p id="startup-status" class="startup-status" role="status">메모 골목을 여는 중입니다.</p>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-message">
+    <div class="section-heading"><h2 id="delete-title">메모를 삭제할까요?</h2></div>
+    <p id="delete-message"></p>
+    <div class="confirm-actions">
+      <button id="delete-cancel" type="button" autofocus>취소</button>
+      <button id="delete-confirm" type="button">삭제</button>
+    </div>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="section-heading">
+      <h2 id="settings-title">설정</h2>
+      <button type="button" class="close" id="settings-close" aria-label="설정 닫기" autofocus>×</button>
+    </div>
+    <h3>메모 백업</h3>
+    <p>새 백업에는 비밀번호가 필요합니다. 이전에 내보낸 평문 JSON도 가져올 수 있습니다.</p>
+    <div class="backup-actions">
+      <button type="button" id="export-backup">암호화 백업 내보내기</button>
+      <button type="button" id="choose-backup">JSON 가져오기</button>
+      <input type="file" id="import-backup" accept=".json,application/json" hidden>
+      <button type="button" id="undo-import" disabled>최근 가져오기 되돌리기</button>
+    </div>
+    <p class="status" id="undo-result" role="status"></p>
+    <section class="vault-settings">
+      <h3>이 기기의 저장소</h3>
+      <p id="vault-state"></p>
+      <p>비밀번호를 잊으면 암호화한 메모를 다시 열 수 없습니다.</p>
+      <div class="backup-actions">
+        <button type="button" id="enable-vault">저장소 암호화</button>
+        <button type="button" id="disable-vault" hidden>저장소 암호화 해제</button>
+        <button type="button" id="lock-vault" hidden>모든 탭 잠그기</button>
+      </div>
+    </section>
+    <p class="status" id="settings-status" role="status"></p>
+  </dialog>
+
+  <dialog id="backup-password-dialog" aria-labelledby="password-title">
+    <div class="section-heading"><h2 id="password-title"></h2></div>
+    <p id="password-description"></p>
+    <form id="backup-password-form" autocomplete="off">
+      <label for="backup-password" class="field-label">비밀번호</label>
+      <input id="backup-password" type="password" maxlength="256" required autofocus>
+      <div id="confirm-password-field" hidden>
+        <label for="backup-password-confirm" class="field-label">비밀번호 확인</label>
+        <input id="backup-password-confirm" type="password" maxlength="256">
+      </div>
+      <div class="confirm-actions">
+        <button type="button" id="backup-password-cancel">취소</button>
+        <button type="submit" id="backup-password-submit">계속</button>
+      </div>
+    </form>
+    <p class="status" id="password-status" role="status"></p>
+  </dialog>
+
+  <dialog id="import-preview-dialog" aria-labelledby="import-title">
+    <div class="section-heading"><h2 id="import-title">가져오기 미리보기</h2></div>
+    <div id="import-summary" aria-live="polite"></div>
+    <p id="import-status" role="status"></p>
+    <div class="confirm-actions">
+      <button type="button" id="import-cancel" autofocus>취소</button>
+      <button type="button" id="import-confirm">가져오기</button>
+    </div>
+  </dialog>
+
+  <dialog id="undo-dialog" aria-labelledby="undo-title">
+    <div class="section-heading"><h2 id="undo-title">최근 가져오기를 되돌릴까요?</h2></div>
+    <p>그때 추가하거나 바꾼 기록만 되돌립니다. 이후에 남긴 메모와 답장은 유지됩니다.</p>
+    <div class="confirm-actions">
+      <button type="button" id="undo-cancel" autofocus>취소</button>
+      <button type="button" id="undo-confirm">되돌리기</button>
+    </div>
+  </dialog>
+</body>
+</html>

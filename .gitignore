@@ -1,0 +1,9 @@
+node_modules/
+*.log
+*.pem
+.env
+.env.*
+!.env.example
+memo-alley-*.json
+test-results/
+playwright-report/
