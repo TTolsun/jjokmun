@@ -268,6 +268,8 @@ async function checkVault(session, a) {
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
+  await owner.locator('#display-memo').click();
+  await owner.waitForFunction(() => !document.querySelector('#shop-book').disabled);
   await settings(owner);
   await owner.locator('#shop-name').fill('저녁의 서점');
   await owner.locator('#shop-name-form button').click();
@@ -278,6 +280,7 @@ async function checkVault(session, a) {
   assert.equal(await owner.locator('#shop').isVisible(), false);
   assert.equal(await owner.locator('#shop-title').textContent(), '');
   assert.equal(await owner.locator('#shop-book').textContent(), '');
+  assert.deepEqual(await owner.locator('.regular-reaction').allTextContents(), ['', '']);
   await unlock(owner);
   assert.equal((await readState(owner)).shop.name, '저녁의 서점');
   await owner.close();

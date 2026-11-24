@@ -88,7 +88,7 @@ function renderPayload(result, date, storageMode = mode) {
   renderedRevision = result.revision;
   mode = storageMode;
   state = result.payload.state;
-  bookshop.update(state);
+  bookshop.update(state, date);
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;
@@ -443,6 +443,9 @@ function renderSelection() {
   element('detail-dialog').hidden = !hasMemo;
   element('note-empty').hidden = hasMemo;
   if (hasMemo) {
+    const displayed = detailId === state.shop?.displayMemoId;
+    element('display-memo').disabled = displayed;
+    element('display-memo').textContent = displayed ? '매대에 진열 중' : '매대에 올리기';
     renderDetail();
   } else if (state.memos.length) {
     element('empty-title').textContent = '메모를 골라 주세요';
@@ -452,6 +455,36 @@ function renderSelection() {
     element('empty-text').textContent = '위에 한 줄을 저장하면 원문과 답장을 이곳에서 읽을 수 있어요.';
   }
 }
+
+element('choose-display').addEventListener('click', () => {
+  const search = element('archive-search');
+  search.value = '';
+  search.dispatchEvent(new Event('input'));
+  search.focus();
+  setStatus('archive-status', '메모를 열고 ‘매대에 올리기’를 눌러 주세요.');
+});
+
+element('shop-book').addEventListener('click', event => {
+  if (state.shop?.displayMemoId) openDetail(state.shop.displayMemoId, undefined, event.currentTarget);
+});
+
+element('display-memo').addEventListener('click', async () => {
+  const id = detailId;
+  const button = element('display-memo');
+  button.disabled = true;
+  try {
+    await change(draft => {
+      findMemo(draft, id);
+      (draft.shop ??= newShop()).displayMemoId = id;
+    });
+    if (detailId === id && state.shop?.displayMemoId === id) element('shop-book').focus();
+  } catch (error) {
+    if (workspaceReady && detailId === id) {
+      button.disabled = id === state.shop?.displayMemoId;
+      setStatus('detail-status', error.message || '매대에 올리지 못했어요. 다시 시도해 주세요.');
+    }
+  }
+});
 
 function closeDetail(restoreFocus = true) {
   replyDialog.reset();
@@ -530,6 +563,7 @@ element('delete-confirm').addEventListener('click', async () => {
         return false;
       }
       draft.memos = draft.memos.filter((memo) => memo.id !== id);
+      if (draft.shop?.displayMemoId === id) delete draft.shop.displayMemoId;
       draft.props = draft.props.filter((prop) => prop.memoId !== id);
       for (const entry of draft.daily) {
         if (entry.memoId !== id) continue;

@@ -122,27 +122,37 @@ export function newShop() {
 export const DEFAULT_NAME = '골목 책방';
 export const VISIT_MS = 18000;
 
+export const REGULARS = [
+  { id: 'window', person: appearance(identity('window-reader')), name: '창가 단골',
+    wish: '쓴 지 일주일은 된 글을 읽고 싶어요.' },
+  { id: 'door', person: appearance(identity('door-reader')), name: '문가 단골',
+    wish: '오늘 답장이 달린 글을 읽고 싶어요.' }
+];
+
+export function shelfReactions(memo, date) {
+  if (!memo) return REGULARS.map(() => ({ interested: false, reason: '' }));
+  const age = (Date.parse(date) - Date.parse(memo.createdOn)) / 86400000;
+  const continued = memo.replies.some(reply => reply.createdOn === date);
+  return [
+    { interested: age >= 7, reason: age >= 7 ? `${age}일 전의 글이네요. 그때 이야기를 읽어 볼게요.` : '조금 더 오래된 글을 기다릴게요.' },
+    { interested: continued, reason: continued ? '오늘 새 답장이 왔네요. 뒷이야기가 궁금해요.' : '이 글에는 오늘 달린 답장이 없네요.' }
+  ];
+}
+
 export function bookTraffic(memos, now = Date.now(), daily = []) {
   const requested = requestDates(daily);
-  let featured;
-  let latestActivity = 0;
   const readers = memos.map(memo => {
     const seed = identity(memo.id);
     const at = memo.replies.reduce((latest, reply) => Math.max(latest, reply.createdAt), memo.createdAt || 0);
-    latestActivity = Math.max(latestActivity, at);
-    const newer = !featured || memo.createdOn > featured.createdOn ||
-      (memo.createdOn === featured.createdOn && (memo.createdAt || 0) >= (featured.createdAt || 0));
-    if (!featured || memo.replies.length > featured.replies.length ||
-      (memo.replies.length === featured.replies.length && newer)) featured = memo;
     return { at, seed, tier: scoreBond(memo, requested.get(memo.id)).tier };
   });
   const recent = readers.filter(reader => reader.at >= now - VISIT_MS).sort((a, b) => b.at - a.at).slice(0, 9);
-  return { readers, recent, featured, latestActivity };
+  return { readers, recent };
 }
 
 // One reader per memo. Reconstruct arrivals from wall time so returning tabs agree.
 export function visitsAt(traffic, now) {
-  const { readers, latestActivity } = traffic;
+  const { readers } = traffic;
   if (!readers.length) return [];
   const arrivals = new Map();
   const interval = Math.max(3200, Math.ceil(25000 / readers.length));
@@ -154,8 +164,7 @@ export function visitsAt(traffic, now) {
   for (const reader of traffic.recent) {
     if (reader.at <= now && now - reader.at < VISIT_MS) arrivals.set(reader, reader.at);
   }
-  const bestseller = now >= latestActivity && now - latestActivity < VISIT_MS;
-  return Array.from(arrivals, ([reader, at]) => ({ ...reader, person: appearance(reader.seed), at, bestseller }));
+  return Array.from(arrivals, ([reader, at]) => ({ ...reader, person: appearance(reader.seed), at }));
 }
 
 export function validateShop(shop) {

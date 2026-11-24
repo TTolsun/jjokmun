@@ -1,5 +1,5 @@
 import { paintInterior, project, stamp, WALK_WIDTH, WALK_HEIGHT } from './shop-interior.js';
-import { REGULAR_TIER, VISIT_MS } from '../shop.js';
+import { REGULARS, REGULAR_TIER, VISIT_MS } from '../shop.js';
 
 const seatPoint = shop => shop.seat === 'window' ? [29, 78] : [173, 78];
 const entrance = [94, 119];
@@ -101,14 +101,22 @@ export function paintRoom(canvas, shop, furnishings, characters) {
     pixelPerson(ctx, x, y, clerk, { left: true }, characters), furnishings);
 }
 
-const displaySpots = [[44, 112], [65, 102], [43, 88], [28, 112], [62, 88], [61, 114], [25, 88], [76, 103], [76, 115]];
+const regularRoutes = [
+  [[28, 67], [18, 84], [18, 112], [38, 112]],
+  [[102, 114], [78, 111], [66, 103]]
+];
 
-export function paintGuests(canvas, arrivals, now, still, furniture, characters) {
+export function regularProgress(visit, now) {
+  const distance = Math.max(0, (now - visit.changedAt) / 1400);
+  return visit.interested ? Math.min(1, visit.from + distance) : Math.max(0, visit.from - distance);
+}
+
+export function paintGuests(canvas, arrivals, now, still, furniture, characters, regulars = []) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const guests = arrivals.map(({ at, seed, person, bestseller, tier = 0 }, i) => {
+  const guests = arrivals.map(({ at, seed, person, tier = 0 }) => {
     const age = now - at;
-    const spot = bestseller ? displaySpots[i % displaySpots.length] : [42 + seed % 4 * 24, 56 + seed % 2 * 10];
+    const spot = [42 + seed % 4 * 24, 56 + seed % 2 * 10];
     const route = [entrance, [80, 117], [80, spot[1]], spot];
     const progress = Math.min(1, age / 3200, (VISIT_MS - age) / 3200);
     const {x, y, dx, dy, distance} = walkRoute(route, still ? 1 : progress);
@@ -117,6 +125,16 @@ export function paintGuests(canvas, arrivals, now, still, furniture, characters)
     const step = browsing ? 0 : [0, 1, 0, -1][Math.floor(distance / 4) % 4];
     return { x, y, depth: y, person, step, left: browsing ? seed % 2 === 0 : dx * facing < 0,
       back: !browsing && dy * facing < 0, reading: browsing, fond: browsing && tier >= REGULAR_TIER };
+  });
+  regulars.forEach((visit, index) => {
+    const progress = still ? Number(visit.interested) : regularProgress(visit, now);
+    const { x, y, dx, dy, distance } = walkRoute(regularRoutes[index], progress);
+    const moving = progress > 0 && progress < 1;
+    const direction = visit.interested ? 1 : -1;
+    guests.push({ x, y, depth: y, person: REGULARS[index].person,
+      step: moving ? [0, 1, 0, -1][Math.floor(distance / 4) % 4] : 0,
+      left: moving ? dx * direction < 0 : index === 1, back: moving && dy * direction < 0,
+      reading: progress === 1 });
   });
   for (const item of [...furniture, ...guests].sort((a, b) => a.depth - b.depth)) {
     if (item.layer) ctx.drawImage(item.layer, 0, 0);
