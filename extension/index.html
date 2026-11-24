@@ -41,8 +41,19 @@
           <canvas id="shop-floor" width="256" height="152" aria-hidden="true"></canvas>
           <canvas id="shop-guests" class="actor-layer" width="256" height="152" aria-hidden="true"></canvas>
         </div>
-        <div class="bestseller"><strong>베스트셀러</strong><span id="shop-book"></span></div>
-        <p id="shop-crowd" role="status"></p>
+        <p id="shop-crowd"></p>
+        <div class="display-shelf">
+          <div><h3>한 칸 매대</h3><button id="shop-book" type="button"></button></div>
+          <button id="choose-display" type="button">메모 고르기</button>
+        </div>
+        <div id="shop-regulars" aria-label="단골의 취향과 반응" role="group" aria-live="polite"></div>
+        <template id="shelf-reader-template">
+          <article class="shelf-reader">
+            <div class="shelf-reader-heading"><canvas width="24" height="32" aria-hidden="true"></canvas><h4></h4></div>
+            <p class="regular-wish"></p>
+            <p class="regular-reaction"></p>
+          </article>
+        </template>
       </section>
     </section>
     <aside class="archive panel" aria-labelledby="archive-title">
@@ -83,7 +94,7 @@
             <button type="button" id="detail-close" class="close" aria-label="메모 선택 해제">×</button>
           </div>
         </div>
-        <time id="detail-date"></time>
+        <div class="note-byline"><time id="detail-date"></time><button type="button" id="display-memo">매대에 올리기</button></div>
         <p class="original" id="detail-original"></p>
         <form id="edit-form" hidden>
           <label class="field-label" for="edit-input">원문 수정</label>

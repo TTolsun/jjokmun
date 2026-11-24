@@ -254,11 +254,10 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
   furnish(42, 103, ({ box }, brush) => {
     box(24, 95, 37, 12, 1, 6, WOOD);
     box(23, 94, 39, 14, 7, 2, TRIM);
-    for (const [i, color] of BOOKS.slice(0, 3).entries()) {
-      const x = 26 + i * 11;
-      box(x, 96, 8, 8, 9, 2, ['#f4e3b2', '#ad8f6b', '#f4e3b2']);
-      box(x, 96, 8, 8, 11, 1, [color, color, color]);
-      box(x + 2, 98, 4, 2, 12, 0, ['#f9dfa4', color, color]);
+    if (shop.displayMemoId) {
+      box(34, 96, 11, 8, 9, 2, ['#f4e3b2', '#ad8f6b', '#f4e3b2']);
+      box(34, 96, 11, 8, 11, 1, ['#a25346', '#89473f', '#a25346']);
+      box(36, 98, 6, 2, 12, 0, ['#f9dfa4', '#a25346', '#a25346']);
     }
     box(49, 94, 10, 2, 9, 8, ['#ffe7a6', '#aa7941', '#cb874a']);
     const [px, py] = project(53, 97, 16);
