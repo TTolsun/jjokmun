@@ -53,8 +53,10 @@ export function bindShop() {
   motion.addEventListener('change', sync);
 
   return {
-    update(state) {
-      shop = state.shop || newShop();
+    update(state, grade = 1) {
+      // The earned grade only adds shelves; it is never written back to the stored shop.
+      const stored = state.shop || newShop();
+      shop = { ...stored, level: Math.max(stored.level, grade) };
       traffic = bookTraffic(state.memos, Date.now(), state.daily);
       closeRegularCount = traffic.readers.filter(reader => reader.tier >= REGULAR_TIER).length;
       firstDate = state.daily.reduce((first, item) => item.date < first ? item.date : first, localDate());

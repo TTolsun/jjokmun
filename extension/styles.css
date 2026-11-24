@@ -474,3 +474,21 @@ dialog button:disabled, #unlock-submit:disabled { opacity: .56; }
 #import-summary dl { display: grid; grid-template-columns: 1fr auto; gap: 7px 18px; font-size: .88rem; }
 #import-summary dd { margin: 0; color: var(--ink); }
 #import-summary ul { padding-left: 19px; color: var(--muted); font-size: .83rem; line-height: 1.55; }
+
+.season { margin-top: 22px; }
+.season h3, .year-review h3 { font-size: .89rem; }
+#season-shelf, #shop-grade { color: var(--muted); margin: 6px 0 0; font-size: .72rem; line-height: 1.5; }
+#goal-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+#goal-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: .74rem; }
+#goal-list progress { grid-column: span 2; width: 100%; height: 5px; accent-color: var(--olive); }
+.goal-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+#goal-list .done .goal-count { color: var(--olive); font-weight: 650; }
+#goal-status:empty { display: none; }
+.year-review { margin-top: 22px; padding: 10px 12px; border: 1px solid #c8a565; border-radius: 10px; background: #fff5df; }
+#review-stats { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 8px 0 0; font-size: .74rem; }
+#review-stats dt { color: var(--muted); }
+#review-stats dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+#shop[data-season="spring"] .section-heading { background: linear-gradient(#6f8f4f, #4f7040); }
+#shop[data-season="summer"] .section-heading { background: linear-gradient(#2f7a74, #1f5a56); }
+#shop[data-season="autumn"] .section-heading { background: linear-gradient(#9a5a32, #74401f); }
+#shop[data-season="winter"] .section-heading { background: linear-gradient(#3e5a78, #2a4058); }
