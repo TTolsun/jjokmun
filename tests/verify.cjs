@@ -253,18 +253,18 @@ async function checkVault(session, a) {
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
-  await owner.locator('#shop-controls summary').click();
-  await owner.getByRole('button', {name: '가게 열기'}).click();
-  await owner.waitForFunction(() => document.querySelector('#shop-phase').textContent.startsWith('영업 중'));
-  const opening = (await readState(owner)).shop.openedAt;
+  await settings(owner);
+  await owner.locator('#shop-name').fill('저녁의 서점');
+  await owner.locator('#shop-name-form button').click();
+  await owner.waitForFunction(() => document.querySelector('#shop-title').textContent === '저녁의 서점');
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
   assert.equal(await owner.locator('#shop').isVisible(), false);
-  assert.equal(await owner.locator('#shop-roster').textContent(), '');
+  assert.equal(await owner.locator('#shop-title').textContent(), '');
   assert.equal(await owner.locator('#shop-book').textContent(), '');
   await unlock(owner);
-  assert.equal((await readState(owner)).shop.openedAt, opening);
+  assert.equal((await readState(owner)).shop.name, '저녁의 서점');
   await owner.close();
   assert.equal(await editor.locator('#reply-dialog').isVisible(), false);
   assert.equal(await editor.locator('#reply-edit-input').inputValue(), '');
@@ -407,7 +407,10 @@ async function run() {
     assert.deepEqual(session.external,[]);
     console.log('PASS  no external HTTP(S) requests in normal application workflows');
     await checkPolicy(session);
+    await session.context.close();
+    session = await launch(path.join(directory, 'bookshop-profile'));
     await require('./bookshop.cjs').checkBookshop(session);
+    await require('./folder.cjs').checkFolder(session);
     assert.deepEqual(session.external,[]);
   } finally {
     if (session) await session.context.close();

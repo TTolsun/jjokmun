@@ -1,115 +1,87 @@
 const assert = require('node:assert/strict');
 
 async function checkBookshop(session) {
-  const a = await session.tab();
-  const b = await session.tab();
-  const start = new Date('2031-05-12T10:00:00Z');
-  const shopState = page => page.evaluate(async () => (await (await import('./vault.js')).transact()).shop);
+  const page = await session.tab();
+  const second = await session.tab();
+  const start = Date.parse('2031-05-12T14:59:55Z');
+  const waitText = (tab, id, value) => tab.waitForFunction(([id, value]) =>
+    document.getElementById(id).textContent === value, [id, value]);
   try {
-    for (const page of [a, b]) {
-      await page.clock.setFixedTime(start);
-      await page.locator('#shop-controls summary').click();
+    await page.bringToFront();
+    await page.clock.setFixedTime(start);
+    await waitText(page, 'shop-crowd', '단골 0명 · 방문 중 0명');
+    await waitText(page, 'shop-clock', '23:59:55');
+    for (const [index, name] of ['봄의 기록', '겨울의 기록'].entries()) {
+      await page.locator('#memo-input').fill(name);
+      await page.locator('#memo-save').click();
+      await waitText(page, 'shop-crowd', '단골 ' + (index + 1) + '명 · 방문 중 ' + (index + 1) + '명');
     }
-    assert.equal(await a.locator('#shop-floor').isVisible(), true);
-    assert.equal(await a.getByRole('button', {name:'책방 운영'}).count(), 0);
-    const title = '파란 창문 너머의 서점';
-    await a.locator('#memo-input').fill(title);
-    await a.locator('#memo-save').click();
-    await a.locator('#detail-original').getByText(title,{exact:true}).waitFor();
-    await a.locator('#reply-input').fill('다시 읽고 싶은 책');
-    await a.locator('#reply-save').click();
-    await a.locator('#detail-replies').getByText('다시 읽고 싶은 책',{exact:true}).waitFor();
-    await a.locator('#reply-input').fill('다음 모임에서 소개할 책');
-    await a.locator('#reply-save').click();
-    await a.locator('#detail-replies').getByText('다음 모임에서 소개할 책',{exact:true}).waitFor();
-    for (const page of [a,b]) {
-      await page.bringToFront();
-      await page.clock.setFixedTime(new Date(start.getTime()+1800));
-      await page.waitForFunction(() => document.querySelector('#shop-crowd').textContent.includes('7명'));
-      assert.equal(await page.locator('#shop-book').textContent(), title);
-    }
-    await a.bringToFront();
-    await a.clock.setFixedTime(start);
-    assert.equal(await a.locator('#shop-upgrade').isDisabled(), true);
-    await a.locator('#shop-seat').selectOption('garden');
-    await b.waitForFunction(() => document.querySelector('#shop-seat').value === 'garden');
-    await a.locator('#shop-plan').selectOption('picks');
-    await b.waitForFunction(() => document.querySelector('#shop-plan').value === 'picks');
-    assert.match(await b.locator('#shop-hint').textContent(), /추천대를 찾을 손님 1명.*열람석을 이용할 손님 2명/);
-    await a.getByRole('button', {name: '가게 열기'}).click();
-    await b.bringToFront();
-    await b.waitForFunction(() => document.querySelector('#shop-phase').textContent.startsWith('영업 중'));
-    await b.clock.setFixedTime(new Date(start.getTime() + 6500));
-    await b.getByRole('button', {name: '도담', exact: true}).focus();
-    await b.keyboard.press('Enter');
-    assert.match(await b.locator('#shop-guests-status').textContent(), /도담.*추천 도서 고르는 중/);
-    await b.emulateMedia({reducedMotion:'reduce'});
-    await b.waitForFunction(() => document.querySelector('#shop-motion').getAttribute('aria-pressed') === 'true');
-    await b.locator('#shop-motion').click();
-    assert.equal(await b.locator('#shop-motion').getAttribute('aria-pressed'), 'false');
-    await b.getByRole('button', {name: '유리', exact: true}).click();
-    await b.clock.setFixedTime(new Date(start.getTime() + 8000));
-    await b.waitForFunction(() => document.querySelector('#shop-guests-status').textContent.includes('독서 중'));
-    await b.getByRole('button', {name: '도담', exact: true}).click();
-    assert.match(await b.locator('#shop-guest-note').textContent(), /화분 옆/);
-    const seatPixel = await b.evaluate(async () => {
-      const {project} = await import('./ui/shop-interior.js');
-      const [x, y] = project(173, 78);
-      const canvas = document.querySelector('#shop-guests');
-      return {x: x * canvas.clientWidth / canvas.width, y: (y - 8) * canvas.clientHeight / canvas.height};
-    });
-    await b.locator('#shop-guests').click({position: seatPixel});
-    assert.equal(await b.getByRole('button', {name: '유리', exact: true}).getAttribute('aria-pressed'), 'true');
-    assert.equal(await b.locator('#shop-seat').isDisabled(), true);
-    await b.reload();
-    await b.locator('#shop-controls summary').click();
-    assert.equal((await shopState(b)).openedAt, start.getTime());
-    for (const page of [a, b]) {
-      await page.bringToFront();
-      await page.clock.setFixedTime(new Date(start.getTime() + 60000));
-      await page.getByRole('button', {name: '오늘 매출 정산'}).waitFor();
-    }
-    const sales = await a.locator('#shop-sales').textContent();
-    const earned = Number(/매출 (\d+)잎전/.exec(sales)[1]);
-    await a.getByRole('button', {name: '도담', exact: true}).click();
-    assert.match(await a.locator('#shop-guest-note').textContent(), /구매 \d+잎전.*평판 \+\d+.*운영 방침/);
-    await Promise.all([a, b].map(page => page.evaluate(() => {
-      const button = document.querySelector('#shop-primary');
-      if (button.textContent === '오늘 매출 정산') button.click();
-    })));
-    await b.waitForFunction(() => document.querySelector('#shop-day').textContent === '2일차');
-    const closed = await shopState(b);
-    assert.equal(closed.days, 1);
-    assert.equal(closed.coins, earned);
-    await b.locator('#shop-upgrade').click();
-    await a.bringToFront();
-    await a.waitForFunction(() => document.querySelector('#shop-sales').textContent.includes('4명'));
-    assert.equal((await shopState(a)).coins, earned - 18);
-
-    await a.evaluate(async () => {
-      const {emptyState, validateBackup} = await import('./store.js');
-      const {mergeImport, undoImport} = await import('./imports.js');
-      const {transact} = await import('./vault.js');
-      const backup = validateBackup({...emptyState(), shop: (await transact()).shop});
+    await page.locator('#reply-input').fill('좋은 책');
+    await page.locator('#reply-save').click();
+    await page.locator('#detail-replies').getByText('좋은 책').waitFor();
+    assert.equal(await page.locator('#shop-book').textContent(), '겨울의 기록');
+    const day = parseInt(await page.locator('#shop-day').textContent(), 10);
+    await page.clock.setFixedTime(start + 10000);
+    await waitText(page, 'shop-clock', '00:00:05');
+    await waitText(page, 'shop-day', (day + 1) + '일차');
+    await page.locator('#open-settings').click();
+    await page.locator('#shop-name').fill('달빛 서점');
+    await page.locator('#shop-name-form button').click();
+    await waitText(second, 'shop-title', '달빛 서점');
+    await page.reload();
+    await waitText(page, 'shop-title', '달빛 서점');
+    await page.setViewportSize({ width: 360, height: 740 });
+    assert.ok(await page.evaluate(() => {
+      const name = document.querySelector('#shop-title').getBoundingClientRect();
+      const time = document.querySelector('#shop-clock').getBoundingClientRect();
+      return name.right <= time.left && time.top < name.bottom && time.right <= innerWidth;
+    }));
+    await page.evaluate(async () => {
+      const { bookTraffic, visitsAt, newShop } = await import('./shop.js');
+      const { validateBackup, emptyState } = await import('./store.js');
+      const { mergeImport, undoImport } = await import('./imports.js');
+      const traffic = bookTraffic([{id:'old', text:'old', replies:[]}], 0);
+      for (const t of [25000, 50000, 75000]) {
+        if (visitsAt(traffic, t).length !== 1 || visitsAt(traffic, t + 19000).length) throw Error('return visits');
+      }
+      const legacy = validateBackup({...emptyState(), shop:newShop()});
       const fresh = emptyState();
-      const day = '2031-05-12';
-      const {undo} = mergeImport(fresh, backup, day);
-      if (fresh.shop.level !== 2) throw Error('shop restore');
-      undoImport(fresh, undo, day);
-      if (fresh.shop !== undefined) throw Error('shop undo');
-      const next = mergeImport(fresh, backup, day);
-      fresh.shop.seat = 'window';
-      if (!undoImport(fresh, next.undo, day).conflicts || fresh.shop.seat !== 'window') throw Error('lost newer shop');
-      if (mergeImport(fresh, backup, day).undo) throw Error('overwrote existing shop');
-      const {schedule, newShop, COLLECTOR_REPUTATION} = await import('./shop.js');
-      const popular = newShop();
-      popular.hearts = COLLECTOR_REPUTATION;
-      if (schedule(popular).at(-1).person.name !== '헌책 수집가 별') throw Error('missing regular');
+      const {undo} = mergeImport(fresh, legacy, '2031-05-12');
+      fresh.shop.name = '수정한 이름';
+      if (!undoImport(fresh, undo, '2031-05-12').conflicts || !fresh.shop) throw Error('shop undo');
     });
-    console.log('PASS  shop layout and policy sync, guest activity, resume, single settlement, expansion, backup and selective undo');
+    const frames = await page.evaluate(async () => {
+      const { paintGuests } = await import('./ui/shop-scene.js');
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 152;
+      const sheet = document.createElement('canvas');
+      sheet.width = 80;
+      sheet.height = 32;
+      const person = { sprite: 3, hair:'#544', highlight:'#975', coat:'#788', shade:'#455' };
+      const visitors = [{ person, at:0, seed:0, bestseller:false }];
+      const ctx = canvas.getContext('2d');
+      const draw = ctx.drawImage.bind(ctx);
+      const cells = [];
+      ctx.drawImage = (source, ...args) => {
+        if (source === sheet) cells.push(args.slice(0, 2));
+        draw(source, ...args);
+      };
+      for (const now of [1400, 8000, 16600]) paintGuests(canvas, visitors, now, false, [], sheet);
+      return cells;
+    });
+    assert.deepEqual(frames, [[48,16], [48,0], [48,0]]);
+    for (let count = 2; count > 0; count--) {
+      await page.locator('#archive-list button').first().click();
+      await page.locator('#delete-memo').click();
+      await page.locator('#delete-confirm').click();
+      await waitText(page, 'memo-count', String(count - 1));
+    }
+    await waitText(page, 'shop-crowd', '단골 0명 · 방문 중 0명');
+    console.log('PASS  real local midnight, recurring memo guests, empty shop, bestseller and custom shop name');
   } finally {
-    await a.close();
-    await b.close();
+    await page.close();
+    await second.close();
   }
 }
 
