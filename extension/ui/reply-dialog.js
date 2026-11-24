@@ -1,0 +1,97 @@
+import { element } from './dom.js';
+
+export function bindReplyDialog(change) {
+  const dialog = element('reply-dialog');
+  const input = element('reply-edit-input');
+  const confirm = element('reply-dialog-confirm');
+  const cancel = element('reply-dialog-cancel');
+  const status = element('reply-dialog-status');
+  let target;
+
+  function reset() {
+    target = undefined;
+    input.value = '';
+    element('reply-delete-text').textContent = '';
+    element('reply-delete-message').textContent = '';
+    status.textContent = '';
+    if (dialog.open) dialog.close();
+  }
+
+  function open(action, memoId, reply, props) {
+    const editing = action === 'edit';
+    const prop = props.find(item => item.memoId === memoId && item.replyId === reply.id);
+    target = { action, memoId, replyId: reply.id, original: reply.text, propKind: prop?.kind };
+    element('reply-dialog-title').textContent = editing ? '답장 수정' : '답장을 삭제할까요?';
+    element('reply-edit-field').hidden = !editing;
+    element('reply-delete-preview').hidden = editing;
+    input.disabled = !editing;
+    input.value = editing ? reply.text : '';
+    element('reply-delete-text').textContent = editing ? '' : reply.text;
+    element('reply-delete-message').textContent = prop
+      ? '이 답장에 연결된 책방 소품도 함께 사라집니다. 삭제한 답장은 되돌릴 수 없습니다.'
+      : '삭제한 답장은 되돌릴 수 없습니다.';
+    confirm.textContent = editing ? '수정 저장' : '삭제';
+    confirm.classList.toggle('danger', !editing);
+    status.textContent = '';
+    dialog.showModal();
+    (editing ? input : cancel).focus();
+  }
+
+  function closeAndFocus() {
+    const { replyId, action } = target;
+    reset();
+    const row = element('detail-replies').querySelector(`[data-reply-id="${CSS.escape(replyId)}"]`);
+    (row?.querySelector(`[data-action="${action}"]`) || element('reply-input')).focus();
+  }
+
+  cancel.addEventListener('click', closeAndFocus);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    if (!confirm.disabled && target) closeAndFocus();
+  });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && (event.isComposing || event.keyCode === 229)) event.preventDefault();
+  });
+  element('reply-dialog-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!target || confirm.disabled) return;
+    const pending = target;
+    const editing = pending.action === 'edit';
+    const text = input.value.trim();
+    if (editing && !text) {
+      status.textContent = '답장을 한 줄로 적어 주세요.';
+      input.focus();
+      return;
+    }
+    confirm.disabled = true;
+    cancel.disabled = true;
+    input.readOnly = true;
+    try {
+      await change(draft => {
+        const memo = draft.memos.find(item => item.id === pending.memoId);
+        const reply = memo?.replies.find(item => item.id === pending.replyId);
+        if (!reply) throw new Error('이미 삭제된 답장입니다.');
+        if (reply.text !== pending.original) throw new Error('다른 탭에서 답장이 바뀌었습니다. 취소한 뒤 최신 내용을 확인해 주세요.');
+        if (editing) {
+          reply.text = text;
+        } else {
+          const prop = draft.props.find(item => item.memoId === memo.id && item.replyId === reply.id);
+          if (prop?.kind !== pending.propKind) throw new Error('연결된 소품이 바뀌었습니다. 취소한 뒤 다시 확인해 주세요.');
+          memo.replies = memo.replies.filter(item => item.id !== reply.id);
+          if (prop) draft.props = draft.props.filter(item => item !== prop);
+        }
+      });
+      if (target === pending) {
+        closeAndFocus();
+        element('detail-status').textContent = editing ? '답장을 수정했어요.' : '답장을 삭제했어요.';
+      }
+    } catch (error) {
+      if (target === pending) status.textContent = error.message || '저장하지 못했습니다. 다시 시도해 주세요.';
+    } finally {
+      confirm.disabled = false;
+      cancel.disabled = false;
+      input.readOnly = false;
+    }
+  });
+  return { open, reset };
+}

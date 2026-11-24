@@ -1,16 +1,13 @@
-import { localDate, validDate, emptyState, selectDaily, PROP_KINDS, validateBackup } from './store.js';
-import { BACKUP_FORMAT, MAX_BACKUP_BYTES, encryptBackup, decryptBackup } from './crypto.js';
-import { mergeImport, undoImport } from './imports.js';
-import { LockedError, readPayload, vaultStatus, dropVaultKey, enableVault, disableVault, lockVault, unlockVault } from './vault.js';
+import { localDate, validDate, emptyState, selectDaily, PROP_KINDS } from './store.js';
+import { LockedError, readPayload, vaultStatus, dropVaultKey, lockVault, unlockVault } from './vault.js';
+import { createTime, element, formatDate, longDate } from './ui/dom.js';
+import { newestMemos, renderArchive } from './ui/archive.js';
+import { bindBackupDialogs } from './ui/backup-dialogs.js';
+import { bindReplyDialog } from './ui/reply-dialog.js';
 
-const element = (id) => document.getElementById(id);
 const channel = new BroadcastChannel('memo-alley');
 const requestedDate = new URLSearchParams(location.search).get('date');
 const today = () => validDate(requestedDate) ? requestedDate : localDate();
-const longDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'UTC' });
-const shortDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'UTC' });
-const formatDate = (date, formatter = shortDate) => formatter.format(new Date(date + 'T00:00:00Z'));
-
 let state = emptyState();
 let displayedDate;
 let detailId;
@@ -18,17 +15,15 @@ let linkedReply;
 let returnFocus;
 let confirmedReplyCount;
 let initialView = true;
-let sceneRefresh = Promise.resolve();
+let pendingRefresh = Promise.resolve();
 let workspaceReady = false;
 let mode;
 let viewGeneration = 0;
-let passwordAction;
-let preview;
-let backupEnvelope;
 let lockPending = false;
 let renderedRevision = -1;
 const workspace = document.querySelector('.workspace');
 const header = document.querySelector('.site-header');
+const replyDialog = bindReplyDialog(change);
 
 function currentMemo() {
   return state.memos.find((memo) => memo.id === detailId);
@@ -39,11 +34,6 @@ function setStatus(id, message) {
   element(id).textContent = message;
 }
 
-function clearPasswords() {
-  element('backup-password-form').reset();
-  element('unlock-form').reset();
-}
-
 function clearSensitive(showLock) {
   viewGeneration += 1;
   workspaceReady = false;
@@ -52,11 +42,12 @@ function clearSensitive(showLock) {
   element('lock-screen').hidden = !showLock;
   element('startup-status').hidden = showLock;
   if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
+  replyDialog.reset();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
-  for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input', 'import-backup']) element(id).value = '';
+  for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
-    'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status', 'password-status',
-    'import-status', 'import-summary', 'undo-result', 'delete-message', 'vault-state', 'unlock-status']) {
+    'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
+    'delete-message', 'vault-state', 'unlock-status']) {
     element(id).replaceChildren();
   }
   element('detail-date').removeAttribute('datetime');
@@ -65,7 +56,7 @@ function clearSensitive(showLock) {
   element('detail-dialog').hidden = true;
   element('edit-form').hidden = true;
   element('memo-count').textContent = '0';
-  element('prop-count').textContent = '0 / 3';
+  element('prop-count').textContent = `0 / ${PROP_KINDS.length}`;
   element('prop-progress').value = 0;
   for (const kind of PROP_KINDS) {
     for (const node of [element('prop-' + kind), element('collection-' + kind).querySelector('.sprite')]) {
@@ -74,11 +65,8 @@ function clearSensitive(showLock) {
     element('prop-' + kind).hidden = true;
     element('collection-' + kind).disabled = true;
   }
-  clearPasswords();
-  backupEnvelope = undefined;
-  passwordAction = undefined;
-  preview = undefined;
-  undoToken = undefined;
+  element('unlock-form').reset();
+  clearBackupDialogs();
   state = emptyState();
   renderedRevision = -1;
   detailId = linkedReply = returnFocus = confirmedReplyCount = displayedDate = undefined;
@@ -86,10 +74,10 @@ function clearSensitive(showLock) {
   if (showLock && !lockPending) element('unlock-password').focus();
 }
 
-function renderPayload(result, security, date) {
+function renderPayload(result, date, storageMode = mode) {
   if (result.revision < renderedRevision) return;
   renderedRevision = result.revision;
-  mode = security.mode;
+  mode = storageMode;
   state = result.payload.state;
   workspaceReady = true;
   workspace.hidden = false;
@@ -108,7 +96,7 @@ function renderPayload(result, security, date) {
 
 function refresh() {
   let expected;
-  sceneRefresh = sceneRefresh.then(async () => {
+  pendingRefresh = pendingRefresh.then(async () => {
     if (lockPending) return;
     const date = today();
     expected = viewGeneration;
@@ -126,7 +114,7 @@ function refresh() {
         selectDaily(draft, date);
       });
     }
-    if (expected === viewGeneration) renderPayload(result, security, date);
+    if (expected === viewGeneration) renderPayload(result, date, security.mode);
   }).catch((error) => {
     if (expected !== viewGeneration) return;
     if (error instanceof LockedError) {
@@ -138,7 +126,7 @@ function refresh() {
       setStatus(workspaceReady ? 'home-status' : 'startup-status', error.message || '메모를 불러오지 못했습니다.');
     }
   });
-  return sceneRefresh;
+  return pendingRefresh;
 }
 
 async function change(mutator) {
@@ -150,9 +138,8 @@ async function change(mutator) {
     selectDaily(draft, date);
   });
   if (expected !== viewGeneration) throw new LockedError();
-  renderPayload(result, { mode }, date);
+  renderPayload(result, date);
   channel.postMessage('changed');
-  return state;
 }
 
 function render(date) {
@@ -185,15 +172,17 @@ function render(date) {
     ? '소품을 모두 모았어요. 소품을 눌러 그때의 답장을 읽어 보세요.'
     : '메모에 답장을 남기면 소품이 하나씩 열려요.';
 
+  const sorted = newestMemos(state.memos);
   if (initialView) {
     initialView = false;
-    if (!detailId) detailId = newestMemos()[0]?.id;
+    if (!detailId) detailId = sorted[0]?.id;
   }
   if (detailId && !currentMemo()) {
     element('delete-dialog').close();
     closeDetail(element('detail-dialog').contains(document.activeElement));
+    return;
   }
-  renderArchive();
+  renderArchive(sorted, detailId, openDetail);
   renderSelection();
 }
 
@@ -301,13 +290,6 @@ bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (tex
   return '메모를 수정했어요.';
 });
 
-function createTime(date) {
-  const time = document.createElement('time');
-  time.dateTime = date;
-  time.textContent = formatDate(date);
-  return time;
-}
-
 function renderDetail() {
   const memo = currentMemo();
   const time = element('detail-date');
@@ -316,7 +298,7 @@ function renderDetail() {
   element('detail-original').textContent = memo.text;
   const replies = [...memo.replies].sort((a, b) => a.createdOn.localeCompare(b.createdOn) || a.createdAt - b.createdAt);
   const container = element('detail-replies');
-  const focusedReply = container.contains(document.activeElement) ? document.activeElement.dataset.replyId : undefined;
+  const focused = container.contains(document.activeElement) ? document.activeElement : undefined;
   container.replaceChildren();
   if (!replies.length) return;
   const label = document.createElement('h3');
@@ -324,6 +306,7 @@ function renderDetail() {
   container.append(label);
   for (const reply of replies) {
     const article = document.createElement('article');
+    article.dataset.replyId = reply.id;
     if (reply.id === linkedReply) {
       article.className = 'linked-reply';
       const tag = document.createElement('span');
@@ -335,20 +318,20 @@ function renderDetail() {
     text.textContent = reply.text;
     const header = document.createElement('div');
     header.className = 'reply-heading';
-    const copy = document.createElement('button');
-    copy.type = 'button';
-    copy.className = 'copy-button copy-reply';
-    copy.dataset.replyId = reply.id;
-    copy.setAttribute('aria-label', '답장 복사');
-    const icon = document.createElement('span');
-    icon.className = 'copy-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    copy.append(icon);
-    copy.addEventListener('click', () => copyText(reply.text));
-    header.append(createTime(reply.createdOn), copy);
+    const actions = element('reply-actions-template').content.cloneNode(true);
+    for (const button of actions.querySelectorAll('button')) {
+      const action = button.dataset.action;
+      button.addEventListener('click', () => {
+        if (action === 'copy') copyText(reply.text);
+        else replyDialog.open(action, memo.id, reply, state.props);
+      });
+    }
+    header.append(createTime(reply.createdOn), actions);
     article.append(header, text);
     container.append(article);
-    if (reply.id === focusedReply) copy.focus({ preventScroll: true });
+    if (reply.id === focused?.closest('article')?.dataset.replyId && focused.dataset.action) {
+      article.querySelector(`[data-action="${focused.dataset.action}"]`).focus({ preventScroll: true });
+    }
   }
 }
 
@@ -375,9 +358,16 @@ element('copy-memo').addEventListener('click', () => {
   if (memo) copyText(memo.text);
 });
 
+function refreshArchive() {
+  if (workspaceReady) renderArchive(newestMemos(state.memos), detailId, openDetail);
+}
+
+element('archive-search').addEventListener('input', refreshArchive);
+
 function openDetail(id, replyId, source) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
+    replyDialog.reset();
     element('reply-input').value = '';
     element('edit-form').hidden = true;
     setStatus('detail-status', '');
@@ -387,7 +377,7 @@ function openDetail(id, replyId, source) {
   linkedReply = replyId;
   returnFocus = source;
   renderSelection();
-  renderArchive();
+  refreshArchive();
   if (source) element('detail-title').focus();
 }
 
@@ -407,6 +397,7 @@ function renderSelection() {
 }
 
 function closeDetail(restoreFocus = true) {
+  replyDialog.reset();
   if (restoreFocus && returnFocus?.dataset.memoId) {
     const row = [...element('archive-list').children].find((item) => item.dataset.memoId === detailId);
     (row || element('archive-search')).focus();
@@ -423,71 +414,7 @@ function closeDetail(restoreFocus = true) {
   setStatus('detail-status', '');
   setStatus('copy-status', '');
   renderSelection();
-  renderArchive();
-}
-
-function searchText(text) {
-  return text.normalize('NFC').toLocaleLowerCase('ko-KR');
-}
-
-function newestMemos() {
-  return [...state.memos].reverse().sort((a, b) => b.createdOn.localeCompare(a.createdOn));
-}
-
-function showMatchingText(container, value, query) {
-  const normalized = value.normalize('NFC');
-  const hit = query ? searchText(normalized).indexOf(query) : -1;
-  if (hit === -1) {
-    container.textContent = value;
-    return;
-  }
-  const start = Math.max(0, hit - 5);
-  const end = Math.min(normalized.length, hit + query.length + 32);
-  const match = document.createElement('mark');
-  match.textContent = normalized.slice(hit, hit + query.length);
-  container.append((start ? '…' : '') + normalized.slice(start, hit), match,
-    normalized.slice(hit + query.length, end) + (end < normalized.length ? '…' : ''));
-}
-
-function renderArchive() {
-  const list = element('archive-list');
-  const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.memoId : undefined;
-  const query = searchText(element('archive-search').value.trim());
-  const matches = newestMemos().filter((memo) => searchText(memo.text).includes(query)
-    || memo.replies.some((reply) => searchText(reply.text).includes(query)));
-  element('memo-count').textContent = state.memos.length;
-  list.replaceChildren();
-  let focusTarget;
-  for (const memo of matches) {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'archive-entry';
-    row.dataset.memoId = memo.id;
-    if (memo.id === detailId) row.setAttribute('aria-current', 'true');
-    const text = document.createElement('span');
-    text.className = 'archive-text';
-    showMatchingText(text, memo.text, query);
-    const meta = document.createElement('span');
-    meta.className = 'archive-meta';
-    meta.append(createTime(memo.createdOn));
-    if (memo.replies.length) meta.append(` · 답장 ${memo.replies.length}개`);
-    row.append(text, meta);
-    const matchedReply = query && [...memo.replies].reverse().find((reply) => searchText(reply.text).includes(query));
-    if (matchedReply) {
-      const snippet = document.createElement('span');
-      snippet.className = 'archive-snippet';
-      snippet.append('↳ 답장 ');
-      const matchText = document.createElement('span');
-      showMatchingText(matchText, matchedReply.text, query);
-      snippet.append(matchText);
-      row.append(snippet);
-    }
-    row.addEventListener('click', () => openDetail(memo.id, matchedReply?.id, row));
-    list.append(row);
-    if (memo.id === focusedId) focusTarget = row;
-  }
-  if (focusedId) (focusTarget || element('archive-search')).focus();
-  setStatus('archive-status', matches.length ? '' : query ? '검색 결과가 없습니다.' : '아직 남긴 메모가 없습니다.');
+  refreshArchive();
 }
 
 for (const id of ['daily-memo', 'scene-board']) {
@@ -515,36 +442,6 @@ for (const kind of PROP_KINDS) {
     });
   }
 }
-
-function focusSearch() {
-  element('archive-search').focus();
-  element('archive-search').select();
-}
-element('open-archive').addEventListener('click', focusSearch);
-window.addEventListener('keydown', (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
-    event.preventDefault();
-    focusSearch();
-  }
-});
-element('archive-search').addEventListener('input', renderArchive);
-element('archive-search').addEventListener('keydown', (event) => {
-  if (event.isComposing || event.keyCode === 229) return;
-  const first = element('archive-list').firstElementChild;
-  if (!first || !['ArrowDown', 'Enter'].includes(event.key)) return;
-  event.preventDefault();
-  if (event.key === 'Enter') first.click();
-  else first.focus();
-});
-element('archive-list').addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    event.target.nextElementSibling?.focus();
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    (event.target.previousElementSibling || element('archive-search')).focus();
-  }
-});
 
 element('edit-memo').addEventListener('click', () => {
   element('edit-input').value = currentMemo().text;
@@ -621,283 +518,13 @@ element('open-settings').addEventListener('click', () => {
   element('settings-dialog').showModal();
 });
 
-const passwordDialog = element('backup-password-dialog');
-const previewDialog = element('import-preview-dialog');
-const undoDialog = element('undo-dialog');
-let undoToken;
-
-const passwordPrompts = {
-  export: ['암호화 백업 내보내기', '이 파일을 복원할 때 사용할 비밀번호를 정하세요.', true],
-  import: ['암호화 백업 열기', '이 백업을 만들 때 정한 비밀번호를 입력하세요.', false],
-  enable: ['저장소 암호화', '이 비밀번호가 있어야 저장소를 다시 열 수 있습니다. 이전에 만든 평문 백업 파일은 별도로 관리해 주세요.', true],
-  disable: ['저장소 암호화 해제', '계속하면 이 기기에 남은 기록과 되돌리기 기록을 평문으로 저장합니다.', false]
-};
-
-function askPassword(action) {
-  if (!workspaceReady) return;
-  passwordAction = action;
-  const [title, description, confirm] = passwordPrompts[action];
-  element('password-title').textContent = title;
-  element('password-description').textContent = description;
-  element('confirm-password-field').hidden = !confirm;
-  element('backup-password-confirm').required = confirm;
-  element('backup-password-form').reset();
-  setStatus('password-status', '');
-  passwordDialog.showModal();
-}
-
-function rejectStaleView(expected) {
-  if (expected !== viewGeneration || !workspaceReady || lockPending) throw new LockedError();
-}
-
-function downloadBackup(backup) {
-  const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-  if (blob.size > MAX_BACKUP_BYTES) throw new Error('백업이 가져오기 제한인 8 MiB를 넘습니다.');
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'jjokmun-' + today() + '.json';
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function createPreview(backup, expected) {
-  const result = await readPayload();
-  rejectStaleView(expected);
-  const date = today();
-  const { summary } = mergeImport(result.payload.state, backup, date);
-  return { backup, summary, revision: result.revision, date };
-}
-
-function showPreview(next) {
-  preview = next;
-  const summary = next.summary;
-  const list = document.createElement('dl');
-  for (const [label, field] of [
-    ['추가할 메모', 'newMemos'], ['바뀔 원문', 'updatedMemos'], ['새 답장', 'newReplies'],
-    ['입간판 기록', 'daily'], ['추가할 소품', 'props'], ['충돌', 'conflicts']
-  ]) {
-    const term = document.createElement('dt');
-    term.textContent = label;
-    const value = document.createElement('dd');
-    value.textContent = summary[field] + '개';
-    list.append(term, value);
-  }
-  const reasons = document.createElement('ul');
-  for (const reason of summary.reasons) {
-    const item = document.createElement('li');
-    item.textContent = reason;
-    reasons.append(item);
-  }
-  element('import-summary').replaceChildren(list);
-  if (reasons.children.length) element('import-summary').append(reasons);
-  if (!previewDialog.open) {
-    setStatus('import-status', '');
-    previewDialog.showModal();
-  }
-}
-
-element('export-backup').addEventListener('click', () => askPassword('export'));
-element('enable-vault').addEventListener('click', () => askPassword('enable'));
-element('disable-vault').addEventListener('click', () => askPassword('disable'));
-element('backup-password-cancel').addEventListener('click', () => passwordDialog.close());
-passwordDialog.addEventListener('cancel', (event) => {
-  if (element('backup-password-submit').disabled) event.preventDefault();
-});
-passwordDialog.addEventListener('close', () => {
-  if (!passwordDialog.open) {
-    element('backup-password-form').reset();
-    passwordAction = undefined;
-    backupEnvelope = undefined;
-  }
-});
-
-element('backup-password-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const button = element('backup-password-submit');
-  if (!workspaceReady || button.disabled || !passwordAction) return;
-  const expected = viewGeneration;
-  const action = passwordAction;
-  const password = element('backup-password').value;
-  if (passwordPrompts[action][2] && password !== element('backup-password-confirm').value) {
-    setStatus('password-status', '비밀번호 확인이 일치하지 않습니다.');
-    return;
-  }
-  const envelope = backupEnvelope;
-  element('backup-password-form').reset();
-  button.disabled = true;
-  element('backup-password-cancel').disabled = true;
-  setStatus('password-status', '처리 중입니다.');
-  try {
-    if (action === 'export') {
-      const result = await readPayload();
-      rejectStaleView(expected);
-      const backup = await encryptBackup(validateBackup(result.payload.state), password);
-      await vaultStatus();
-      await readPayload();
-      rejectStaleView(expected);
-      downloadBackup(backup);
-      setStatus('settings-status', '암호화 백업을 내보냈어요.');
-    } else if (action === 'import') {
-      const backup = validateBackup(await decryptBackup(envelope, password));
-      const next = await createPreview(backup, expected);
-      passwordDialog.close();
-      showPreview(next);
-    } else {
-      if (action === 'enable') await enableVault(password);
-      else await disableVault(password);
-      channel.postMessage('security');
-      rejectStaleView(expected);
-      passwordDialog.close();
-      await refresh();
-      setStatus('settings-status', action === 'enable' ? '저장소를 암호화했어요.' : '저장소 암호화를 해제했어요.');
-    }
-    if (action === 'export') passwordDialog.close();
-  } catch (error) {
-    if (expected === viewGeneration) setStatus('password-status', error.message || '요청을 처리하지 못했습니다.');
-  } finally {
-    button.disabled = false;
-    element('backup-password-cancel').disabled = false;
-  }
-});
-
-element('choose-backup').addEventListener('click', () => {
-  if (workspaceReady) element('import-backup').click();
-});
-element('import-backup').addEventListener('change', async (event) => {
-  const input = event.currentTarget;
-  const file = input.files[0];
-  const expected = viewGeneration;
-  if (!workspaceReady || !file) return;
-  if (file.size > MAX_BACKUP_BYTES) {
-    input.value = '';
-    setStatus('settings-status', '8 MiB 이하의 백업 파일을 선택해 주세요.');
-    return;
-  }
-  const button = element('choose-backup');
-  button.disabled = true;
-  try {
-    let parsed;
-    try {
-      parsed = JSON.parse(await file.text());
-    } catch {
-      throw new Error('JSON 파일을 읽지 못했습니다. jjokmun 백업 파일을 선택해 주세요.');
-    }
-    rejectStaleView(expected);
-    if (parsed?.format === BACKUP_FORMAT) {
-      backupEnvelope = parsed;
-      askPassword('import');
-    } else {
-      showPreview(await createPreview(validateBackup(parsed), expected));
-    }
-  } catch (error) {
-    if (expected === viewGeneration) setStatus('settings-status', error.message || '백업을 읽지 못했습니다.');
-  } finally {
-    input.value = '';
-    button.disabled = false;
-  }
-});
-
-element('import-cancel').addEventListener('click', () => previewDialog.close());
-previewDialog.addEventListener('cancel', (event) => {
-  if (element('import-confirm').disabled) event.preventDefault();
-});
-previewDialog.addEventListener('close', () => {
-  if (!previewDialog.open) {
-    preview = undefined;
-    element('import-summary').replaceChildren();
-  }
-});
-element('import-confirm').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  const pending = preview;
-  if (!workspaceReady || !pending || button.disabled) return;
-  const expected = viewGeneration;
-  const date = today();
-  const token = crypto.randomUUID();
-  let revised;
-  let imported;
-  button.disabled = true;
-  element('import-cancel').disabled = true;
-  try {
-    const result = await readPayload((draft, payload, revision) => {
-      revised = imported = undefined;
-      if (revision !== pending.revision || date !== pending.date) {
-        const { summary } = mergeImport(structuredClone(draft), pending.backup, date);
-        revised = { backup: pending.backup, summary, revision, date };
-        return false;
-      }
-      const plan = mergeImport(draft, pending.backup, date);
-      if (!plan.undo) return false;
-      validateBackup(draft);
-      payload.undo = { token, ...plan.undo };
-      imported = plan.summary;
-    });
-    rejectStaleView(expected);
-    if (revised) {
-      showPreview(revised);
-      setStatus('import-status', '미리보기 이후 저장된 기록이 바뀌었습니다. 다시 확인해 주세요.');
-      return;
-    }
-    previewDialog.close();
-    renderPayload(result, { mode }, date);
-    if (imported) channel.postMessage('changed');
-    setStatus('settings-status', imported ? '백업을 가져왔어요.' : '추가하거나 바꿀 기록이 없습니다.');
-  } catch (error) {
-    if (expected === viewGeneration) setStatus('import-status', error.message || '가져오지 못했습니다. 기존 기록은 그대로입니다.');
-  } finally {
-    button.disabled = false;
-    element('import-cancel').disabled = false;
-  }
-});
-
-element('undo-import').addEventListener('click', async () => {
-  if (!workspaceReady) return;
-  const expected = viewGeneration;
-  try {
-    const result = await readPayload();
-    rejectStaleView(expected);
-    undoToken = result.payload.undo?.token;
-    if (undoToken && !undoDialog.open) undoDialog.showModal();
-  } catch (error) {
-    if (expected === viewGeneration) setStatus('undo-result', error.message);
-  }
-});
-element('undo-cancel').addEventListener('click', () => undoDialog.close());
-undoDialog.addEventListener('cancel', (event) => {
-  if (element('undo-confirm').disabled) event.preventDefault();
-});
-element('undo-confirm').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  if (!workspaceReady || button.disabled || !undoToken) return;
-  const expected = viewGeneration;
-  const token = undoToken;
-  const date = today();
-  let summary;
-  button.disabled = true;
-  element('undo-cancel').disabled = true;
-  try {
-    const result = await readPayload((draft, payload) => {
-      if (payload.undo?.token !== token) throw new Error('다른 탭에서 가져오기 기록이 바뀌었습니다. 다시 확인해 주세요.');
-      summary = undoImport(draft, payload.undo, date);
-      payload.undo = null;
-    });
-    rejectStaleView(expected);
-    undoDialog.close();
-    renderPayload(result, { mode }, date);
-    channel.postMessage('changed');
-    const message = '가져오기를 되돌렸어요. 제거한 메모 ' + summary.memos + '개, 복원한 원문 '
-      + summary.originals + '개, 제거한 답장 ' + summary.replies + '개.';
-    setStatus('undo-result', summary.conflicts ? message + ' 충돌 ' + summary.conflicts + '건. ' + summary.reasons.join(' ') : message);
-  } catch (error) {
-    if (expected === viewGeneration) {
-      undoDialog.close();
-      setStatus('undo-result', error.message || '가져오기를 되돌리지 못했습니다.');
-    }
-  } finally {
-    button.disabled = false;
-    element('undo-cancel').disabled = false;
-  }
+const clearBackupDialogs = bindBackupDialogs({
+  activeView: () => workspaceReady && !lockPending ? viewGeneration : undefined,
+  today,
+  setStatus,
+  channel,
+  refresh,
+  renderResult: renderPayload
 });
 
 element('lock-vault').addEventListener('click', async () => {

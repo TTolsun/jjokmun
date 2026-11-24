@@ -10,6 +10,7 @@ export class LockedError extends Error {
 let database;
 let session;
 let generation = 0;
+const MAX_WRITE_ATTEMPTS = 14;
 
 function openDatabase() {
   if (database) return database;
@@ -104,7 +105,7 @@ export async function vaultStatus() {
 
 export async function readPayload(change) {
   const expected = generation;
-  for (let retry = 0; retry < 14; retry += 1) {
+  for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
     const record = await access();
     assertGeneration(expected);
     const active = session;
@@ -112,26 +113,16 @@ export async function readPayload(change) {
       || (record.mode === 'encrypted' && !active)) throw new LockedError();
     const payload = record.mode === 'plain' ? record.payload : await unseal(record, active.key, 'vault');
     assertGeneration(expected);
-    if (!change) {
-      assertEpoch(await access(), record);
-      assertGeneration(expected);
-      return { payload, revision: record.revision };
+    let revision = record.revision;
+    if (change && change(payload.state, payload, revision) !== false) {
+      const contents = record.mode === 'plain' ? { payload } : await seal(payload, active.key, record.salt, 'vault');
+      revision += 1;
+      const replacement = { format: 2, revision, epoch: record.epoch, mode: record.mode, ...contents };
+      if (!await saveCompared(record, replacement, expected)) continue;
     }
-    const changed = change(payload.state, payload, record.revision);
-    if (changed === false) {
-      assertEpoch(await access(), record);
-      assertGeneration(expected);
-      return { payload, revision: record.revision };
-    }
-    const contents = record.mode === 'plain' ? { payload } : await seal(payload, active.key, record.salt, 'vault');
-    const replacement = {
-      format: 2, revision: record.revision + 1, epoch: record.epoch, mode: record.mode, ...contents
-    };
-    if (await saveCompared(record, replacement, expected)) {
-      assertEpoch(await access(), record);
-      assertGeneration(expected);
-      return { payload, revision: replacement.revision };
-    }
+    assertEpoch(await access(), record);
+    assertGeneration(expected);
+    return { payload, revision };
   }
   throw new Error('다른 탭에서 저장 작업이 진행 중입니다. 다시 시도해 주세요.');
 }
@@ -145,7 +136,7 @@ export async function enableVault(password) {
   const expected = generation;
   const salt = newSalt();
   const key = await deriveKey(password, salt);
-  for (let retry = 0; retry < 14; retry += 1) {
+  for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
     const record = await access();
     assertGeneration(expected);
     if (record.mode !== 'plain') throw new LockedError();
@@ -182,7 +173,7 @@ export async function disableVault(password) {
   if (first.mode !== 'encrypted' || session?.epoch !== first.epoch) throw new LockedError();
   if (!password || password.length > 256) throw new Error('저장소 비밀번호를 입력해 주세요.');
   const key = await deriveKey(password, first.salt);
-  for (let retry = 0; retry < 14; retry += 1) {
+  for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
     const record = await access();
     assertGeneration(expected);
     assertEpoch(record, first);
