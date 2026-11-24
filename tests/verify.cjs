@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const {launch, checkPolicy, extension} = require('./browser.cjs');
+const {launch, checkPolicy, extension, selectFolder} = require('./browser.cjs');
 
 const monday = '2031-05-12';
 const tuesday = '2031-05-13';
@@ -30,17 +30,10 @@ async function readState(p) {
   return p.evaluate(async () => (await import('./vault.js')).transact());
 }
 async function rawRecord(p) {
-  return p.evaluate(() => new Promise((resolve, reject) => {
-    const open = indexedDB.open('memo-alley');
-    open.onsuccess = () => {
-      const db = open.result;
-      const tx = db.transaction('data');
-      const read = tx.objectStore('data').get('state');
-      tx.oncomplete = () => { db.close(); resolve(read.result); };
-      tx.onabort = () => { db.close(); reject(tx.error); };
-    };
-    open.onerror = () => reject(open.error);
-  }));
+  return p.evaluate(async () => {
+    const {directory} = (await import('./vault.js')).folderConnection();
+    return JSON.parse(await (await (await directory.getFileHandle('jjokmun-vault.json')).getFile()).text());
+  });
 }
 async function password(p, value) {
   await p.bringToFront();
@@ -74,9 +67,9 @@ async function unlock(p, pass = vaultPass) {
 }
 async function forceNextWriteToFail(p) {
   await p.evaluate(() => {
-    const original = IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put = function(...args) {
-      IDBObjectStore.prototype.put = original;
+    const original = FileSystemFileHandle.prototype.createWritable;
+    FileSystemFileHandle.prototype.createWritable = function(...args) {
+      FileSystemFileHandle.prototype.createWritable = original;
       throw new DOMException('Synthetic test write failure','QuotaExceededError');
     };
   });
@@ -163,7 +156,7 @@ async function checkReplyActions(session, a) {
     await b.locator('#reply-dialog-confirm').click();
     await a.locator(row).waitFor({state: 'detached'});
     await b.getByText('검색 결과가 없습니다.').waitFor();
-    await a.reload();
+    await a.reload(); await selectFolder(a);
     await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
     const after = await readState(a);
     assert.deepEqual(after.memos.find(item => item.id === memo.id).replies, [memo.replies[0]]);
@@ -351,7 +344,7 @@ async function checkRecovery(session, bytes, initial) {
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');
   await b.locator('#edit-save').click();
   await b.waitForFunction(()=>document.querySelector('#detail-original').textContent==='가져오기 뒤 수정한 원문');
-  await a.reload();
+  await a.reload(); await selectFolder(a);
   await unlock(a);
   await settings(a);
   await a.locator('#undo-import').click();

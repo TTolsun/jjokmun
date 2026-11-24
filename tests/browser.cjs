@@ -12,6 +12,14 @@ function loadChromium() {
 
 const installed = path.resolve(__dirname, '../jjokmun');
 const extension = fs.existsSync(path.join(installed, 'manifest.json')) ? installed : path.resolve(__dirname, '../extension');
+async function selectFolder(page, name = 'test-vault') {
+  await page.evaluate(name => {
+    window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle(name, {create:true});
+  }, name);
+  await page.locator('#choose-first-folder').click();
+  await page.locator('#storage-start').waitFor({state:'hidden'});
+}
+
 async function launch(profile, extensionPath = extension) {
   const chromium = loadChromium();
   const executablePath = process.env.MEMO_CHROME_PATH || chromium.executablePath();
@@ -33,9 +41,10 @@ async function launch(profile, extensionPath = extension) {
       try { owner ||= request.frame().url(); } catch {}
       if (owner?.startsWith('chrome-extension:')) external.push(request.url());
     });
-    const tab = async date => {
+    const tab = async (date, folder = 'test-vault') => {
       const page = await context.newPage();
       await page.goto(home + (date ? '?date=' + date : ''));
+      if (folder) await selectFolder(page, folder);
       return page;
     };
     return {context, home, worker, external, tab};
@@ -72,4 +81,4 @@ async function checkPolicy(session) {
     await new Promise(resolve => server.close(resolve));
   }
 }
-module.exports = {launch, extension, checkPolicy};
+module.exports = {launch, extension, checkPolicy, selectFolder};

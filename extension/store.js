@@ -57,13 +57,13 @@ const validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/
 const validText = (value) => typeof value === 'string' && value.length <= NOTE_LIMIT && Boolean(value.trim()) && !/[\r\n]/.test(value);
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 
-export function validateBackup(value) {
+export function validateBackup(value, { local = false } = {}) {
   function require(condition) {
     if (!condition) throw new Error('jjokmun에서 내보낸 올바른 JSON 백업 파일을 선택해 주세요.');
   }
   require(object(value) && value.version === VERSION
-    && Array.isArray(value.memos) && value.memos.length <= 10_000
-    && Array.isArray(value.daily) && value.daily.length <= 20_000
+    && Array.isArray(value.memos) && (local || value.memos.length <= 10_000)
+    && Array.isArray(value.daily) && (local || value.daily.length <= 20_000)
     && Array.isArray(value.props) && value.props.length <= PROP_KINDS.length);
 
   const memosById = new Map();
@@ -71,9 +71,9 @@ export function validateBackup(value) {
   const memos = value.memos.map((memo) => {
     require(object(memo) && validId(memo.id) && !memosById.has(memo.id) && validText(memo.text)
       && validDate(memo.createdOn) && validTime(memo.updatedAt) && Array.isArray(memo.replies)
-      && memo.replies.length <= 5_000);
+      && (local || memo.replies.length <= 5_000));
     replyCount += memo.replies.length;
-    require(replyCount <= 30_000);
+    require(local || replyCount <= 30_000);
     const replyIds = new Set();
     const replies = memo.replies.map((reply) => {
       require(object(reply) && validId(reply.id) && !replyIds.has(reply.id) && validText(reply.text)
