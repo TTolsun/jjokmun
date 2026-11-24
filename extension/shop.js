@@ -64,7 +64,7 @@ export function regularOf(memoId) {
   return { person, name };
 }
 
-function requestDates(daily) {
+export function requestDates(daily) {
   const dates = new Map();
   for (const entry of daily) {
     if (!entry.memoId || entry.folded) continue;
