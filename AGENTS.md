@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-jjokmun is an offline Chrome Manifest V3 extension for writing memos and replies. All runtime files live in `extension/`, including the toolbar icons. The service worker in `background.js` opens `index.html`. Edit `app.js` for memo interactions, `scene.js` for the bookshop, and `styles.css` for layout.
+jjokmun is an offline Chrome Manifest V3 extension for writing memos and replies. All runtime files live in `extension/`, including the toolbar icons. The service worker in `background.js` opens `index.html`. Edit `app.js` for memo interactions, `shop.js` and `ui/bookshop.js` for the bookshop, and `styles.css` for layout.
 
 Within `extension/`, `store.js` defines the memo model and validates backups. `vault.js` manages IndexedDB storage and locking, `crypto.js` handles encryption, and `imports.js` merges backups and undoes imports. Preserve compatibility with the existing `memo-alley` database and older backups when changing persistence.
 

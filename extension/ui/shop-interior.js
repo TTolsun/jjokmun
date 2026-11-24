@@ -226,7 +226,7 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
       {p:'#d8766c', g:'#49734b', h:'#a4b759', a:'#e9c185', v:'#668e92'});
     box(117, 64, 5, 6, 11, 2, ['#a54b46', '#6c453a', '#f1dba7']);
   });
-  furnish(42, 103, ({ box }) => {
+  furnish(42, 103, ({ box }, brush) => {
     box(24, 95, 37, 12, 1, 6, WOOD);
     box(23, 94, 39, 14, 7, 2, TRIM);
     for (const [i, color] of BOOKS.slice(0, 3).entries()) {
@@ -235,7 +235,9 @@ export function paintInterior(canvas, shop, seat, drawClerk, sheet) {
       box(x, 96, 8, 8, 11, 1, [color, color, color]);
       box(x + 2, 98, 4, 2, 12, 0, ['#f9dfa4', color, color]);
     }
-    if (shop.plan === 'picks') box(49, 94, 9, 2, 9, 6, ['#f6dd88', '#aa7941', '#e5b95c']);
+    box(49, 94, 10, 2, 9, 8, ['#ffe7a6', '#aa7941', '#cb874a']);
+    const [px, py] = project(53, 97, 16);
+    stamp(brush, px - 2, py, ['x.x.x', 'xxxxx', '.xxx.', '.ggg.'], {x:'#fff0ae', g:'#774c30'});
   });
   furnish(...seat, art => chair(art, ...seat), 'seat');
   furnish(seat[0] - 13, seat[1] + 5, ({ box, tile }) => {

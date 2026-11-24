@@ -1,11 +1,13 @@
-import { COLLECTOR_REPUTATION, newShop, operate, schedule, shiftSeconds, totals, upgradeCost } from '../shop.js';
+import { COLLECTOR_REPUTATION, VISIT_MS, bookTraffic, newShop, operate, schedule, shiftSeconds, totals, upgradeCost } from '../shop.js';
 import { element } from './dom.js';
-import { guestPose, paintGuests, paintPortrait, paintRoom } from './shop-scene.js';
+import { displayGuests, guestPose, paintGuests, paintPortrait, paintRoom } from './shop-scene.js';
 import { loadFurnishingSheet } from './shop-interior.js';
 
 export function bindShop(change) {
-  const dialog = element('shop-dialog');
-  const street = element('street-guests');
+  const mini = element('shop-mini');
+  const miniature = mini.querySelector('canvas');
+  const floor = element('shop-floor');
+  let arrivals = [];
   const actors = element('shop-guests');
   const primary = element('shop-primary');
   const upgrade = element('shop-upgrade');
@@ -31,35 +33,39 @@ export function bindShop(change) {
     const open = shop.openedAt > 0;
     const elapsed = open ? Math.max(0, (Date.now() - shop.openedAt) / 1000) : -1;
     const done = elapsed >= duration;
-    text('shop-front-status', open ? (done ? '정산 대기' : '영업 중') : '개점 준비');
-    if (!dialog.open) paintGuests(street, visitors, elapsed, shop, reduced, true);
-    if (dialog.open) {
-      visibleGuests = paintGuests(actors, visitors, elapsed, shop, reduced, false, selectedName, furniture);
-      const result = totals(visitors, elapsed);
-      const guest = visitors.find(v => v.person.name === selectedName);
-      const pose = guestPose(guest, shop, elapsed, reduced);
-      const preference = guest.person.seat === 'window' ? '창가' : '화분 옆';
-      const taste = guest.person.plan === 'reading' ? '느긋한 독서' : '추천 판매';
-      const activity = pose?.label || (elapsed < guest.enters ? '방문 예정' : '귀가 완료');
-      text('shop-phase', !open ? '개점 준비' : done ? '오늘 영업 종료' : `영업 중 · ${Math.ceil(duration - elapsed)}초`);
-      text('shop-sales', open ? `계산 ${result.served}/${visitors.length}명 · 매출 ${result.coins}잎전` : `방문 예정 ${visitors.length}명`);
-      text('shop-guests-status', `${guest.person.name} · ${activity}`);
-      let note = `좋아하는 자리 · ${preference}　/　좋아하는 방침 · ${taste}`;
-      if (elapsed >= guest.paid) {
-        const reason = guest.favorites.length ? guest.favorites.join(' · ') : '취향에 맞는 항목 없음';
-        note = `구매 ${guest.coins}잎전　/　평판 +${guest.hearts} (${reason})`;
-      } else if (pose?.reading) {
-        note = guest.person.seat === shop.seat ? `“${preference}에 자리가 있네요. 한 장 더 읽고 갈래요.”` : `“다음에는 ${preference}에서 읽어 보고 싶어요.”`;
-      } else if (pose?.browsing && !guest.reads) {
-        note = '“오늘의 추천 책이군요. 이걸로 할게요.”';
-      }
-      text('shop-guest-note', note);
-      element('shop-progress').value = Math.min(100, Math.max(0, 100 * elapsed / duration));
-      primary.hidden = open && !done;
-      primary.disabled = pending;
-      text('shop-primary', done ? '오늘 매출 정산' : '가게 열기');
+    const now = Date.now();
+    const crowd = displayGuests(arrivals, now, reduced);
+    visibleGuests = paintGuests(actors, visitors, elapsed, shop, reduced, selectedName, furniture, crowd);
+    text('shop-crowd', crowd.length ? `베스트셀러 방문객 ${crowd.length}명` : '메모나 답장을 남기면 독자들이 찾아옵니다.');
+    if (!mini.hidden) {
+      const ctx = miniature.getContext('2d');
+      ctx.drawImage(floor, 0, 0);
+      ctx.drawImage(actors, 0, 0);
     }
-    if (done) stopTimer();
+    const result = totals(visitors, elapsed);
+    const guest = visitors.find(v => v.person.name === selectedName);
+    const pose = guestPose(guest, shop, elapsed, reduced);
+    const preference = guest.person.seat === 'window' ? '창가' : '화분 옆';
+    const taste = guest.person.plan === 'reading' ? '느긋한 독서' : '추천 판매';
+    const activity = pose?.label || (elapsed < guest.enters ? '방문 예정' : '귀가 완료');
+    text('shop-phase', !open ? '개점 준비' : done ? '오늘 영업 종료' : `영업 중 · ${Math.ceil(duration - elapsed)}초`);
+    text('shop-sales', open ? `계산 ${result.served}/${visitors.length}명 · 매출 ${result.coins}잎전` : `방문 예정 ${visitors.length}명`);
+    text('shop-guests-status', `${guest.person.name} · ${activity}`);
+    let note = `좋아하는 자리 · ${preference}　/　좋아하는 방침 · ${taste}`;
+    if (elapsed >= guest.paid) {
+      const reason = guest.favorites.length ? guest.favorites.join(' · ') : '취향에 맞는 항목 없음';
+      note = `구매 ${guest.coins}잎전　/　평판 +${guest.hearts} (${reason})`;
+    } else if (pose?.reading) {
+      note = guest.person.seat === shop.seat ? `“${preference}에 자리가 있네요. 한 장 더 읽고 갈래요.”` : `“다음에는 ${preference}에서 읽어 보고 싶어요.”`;
+    } else if (pose?.browsing && !guest.reads) {
+      note = '“오늘의 추천 책이군요. 이걸로 할게요.”';
+    }
+    text('shop-guest-note', note);
+    element('shop-progress').value = Math.min(100, Math.max(0, 100 * elapsed / duration));
+    primary.hidden = open && !done;
+    primary.disabled = pending;
+    text('shop-primary', done ? '오늘 매출 정산' : '가게 열기');
+    if ((!open || done) && !arrivals.some(at => now < at + VISIT_MS)) stopTimer();
   }
 
   function stopTimer() {
@@ -70,12 +76,24 @@ export function bindShop(change) {
   function sync() {
     stopTimer();
     if (!shop || document.hidden) return;
-    if (shop.openedAt) timer = setInterval(draw, reduced ? 650 : 125);
+    if (shop.openedAt || arrivals.some(at => Date.now() < at + VISIT_MS)) timer = setInterval(draw, reduced ? 650 : 125);
     draw();
   }
 
-  function update(saved) {
+  function update(saved, memos) {
+    if (memos) {
+      const traffic = bookTraffic(memos, Date.now());
+      arrivals = traffic.arrivals;
+      text('shop-book', traffic.featured?.text || '첫 메모를 기다리는 중');
+    }
     shop = saved || newShop();
+    loadingSheet ??= loadFurnishingSheet().then(result => {
+      sheet = result;
+      if (sheet && shop) {
+        furniture = paintRoom(element('shop-floor'), shop, sheet);
+        draw();
+      }
+    });
     visitors = schedule(shop);
     const roster = element('shop-roster');
     if (!visitors.some(v => v.person.name === selectedName)) selectedName = visitors[0].person.name;
@@ -137,12 +155,12 @@ export function bindShop(change) {
           || (action === 'open' && (before.seat !== current.seat || before.plan !== current.plan))) {
           throw new Error('다른 탭에서 운영 상태가 바뀌었어요. 다시 확인해 주세요.');
         }
-        applied = operate(current, action, value, now, draft.props.length);
+        applied = operate(current, action, value, now);
         if (!applied) return false;
         draft.shop = current;
       });
       if (turn !== generation || !applied) return;
-      if (action === 'open' && dialog.open) element('shop-roster').querySelector('[aria-pressed="true"]').focus();
+      if (action === 'open') element('shop-roster').querySelector('[aria-pressed="true"]').focus();
       if (action === 'settle') text('shop-message', `${before.days + 1}일차 결산 · 매출 +${earnings.coins}잎전, 평판 +${earnings.hearts}`);
       if (action === 'upgrade') text('shop-message', '서가를 늘렸어요. 다음 영업부터 손님이 한 명 더 찾아옵니다.');
     } catch (error) {
@@ -155,26 +173,19 @@ export function bindShop(change) {
     }
   }
 
-  element('open-shop').addEventListener('click', () => {
-    if (!shop) return;
-    dialog.showModal();
-    sync();
-    loadingSheet ??= loadFurnishingSheet().then(result => {
-      sheet = result;
-      if (sheet && shop) {
-        furniture = paintRoom(element('shop-floor'), shop, sheet);
-        draw();
-      }
-    });
-  });
-  element('shop-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', sync);
+  new IntersectionObserver(([entry]) => {
+    mini.hidden = !shop || entry.isIntersecting;
+    if (!mini.hidden) draw();
+  }, {rootMargin: '-68px 0px 0px', threshold: 0.05}).observe(floor);
   actors.addEventListener('click', event => {
     const bounds = actors.getBoundingClientRect();
     const x = (event.clientX - bounds.left) * actors.width / bounds.width;
     const y = (event.clientY - bounds.top) * actors.height / bounds.height;
     const guest = visibleGuests.find(item => Math.abs(x - item.x) <= 8 && y >= item.y - 24 && y <= item.y + 2);
-    if (guest) element('shop-roster').children[guest.v.i]?.click();
+    if (guest) {
+      element('shop-controls').open = true;
+      element('shop-roster').children[guest.v.i]?.click();
+    }
   });
   element('shop-roster').addEventListener('click', event => {
     const button = event.target.closest('button');
@@ -207,10 +218,12 @@ export function bindShop(change) {
     visibleGuests = [];
     element('shop-roster').replaceChildren();
     stopTimer();
-    if (dialog.open) dialog.close();
-    for (const canvas of [street, actors, element('shop-floor')]) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    arrivals = [];
+    mini.hidden = true;
+    element('shop-controls').open = false;
+    for (const canvas of [miniature, actors, floor]) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     for (const id of ['shop-day', 'shop-coins', 'shop-hearts', 'shop-phase', 'shop-sales', 'shop-guests-status',
-      'shop-guest-note', 'shop-message', 'shop-front-status', 'shop-primary', 'shop-upgrade', 'shop-hint', 'shop-regular']) text(id, '');
+      'shop-guest-note', 'shop-message', 'shop-book', 'shop-crowd', 'shop-primary', 'shop-upgrade', 'shop-hint', 'shop-regular']) text(id, '');
     element('shop-progress').value = 0;
     element('shop-seat').selectedIndex = element('shop-plan').selectedIndex = 0;
   } };

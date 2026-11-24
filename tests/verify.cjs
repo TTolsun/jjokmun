@@ -128,7 +128,7 @@ async function checkReplyActions(session, a) {
   const updated = '두 번째 답장을 수정한 내용';
   await a.locator('#reply-input').fill(original);
   await a.locator('#reply-save').click();
-  await a.locator('#prop-plant').waitFor();
+  await a.locator('#detail-replies').getByText(original,{exact:true}).waitFor();
   const before = await readState(a);
   const memo = before.memos.find(item => item.text === note);
   const target = memo.replies.find(item => item.text === original);
@@ -149,27 +149,26 @@ async function checkReplyActions(session, a) {
     await b.locator('#reply-dialog-cancel').click();
     await b.locator('#archive-search').fill(updated);
     await b.locator('#archive-list mark').waitFor();
-    await b.locator('#prop-plant').click();
+    await b.locator('#archive-list button').first().click();
     assert.equal(await b.locator('.linked-reply p').innerText(), updated);
     const edited = await readState(b);
     assert.deepEqual(edited.memos.find(item => item.id === memo.id).replies[1], {...target, text: updated});
     assert.deepEqual(edited.props, before.props);
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     assert.equal(await b.locator('#reply-delete-text').innerText(), updated);
-    assert.match(await b.locator('#reply-delete-message').innerText(), /소품/);
+    assert.match(await b.locator('#reply-delete-message').innerText(), /되돌릴 수 없습니다/);
     await b.keyboard.press('Escape');
     assert.deepEqual(await readState(b), edited);
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     await b.locator('#reply-dialog-confirm').click();
     await a.locator(row).waitFor({state: 'detached'});
-    await b.locator('#prop-plant').waitFor({state: 'hidden'});
     await b.getByText('검색 결과가 없습니다.').waitFor();
     await a.reload();
-    await a.locator('#prop-chair').waitFor();
+    await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
     const after = await readState(a);
     assert.deepEqual(after.memos.find(item => item.id === memo.id).replies, [memo.replies[0]]);
     assert.deepEqual(after.props, before.props.filter(prop => prop.kind !== 'plant'));
-    console.log('PASS  reply edit, search, concurrent edit protection, delete confirmation and linked prop cleanup');
+    console.log('PASS  reply edit, search, concurrent edit protection, delete confirmation and reload');
   } finally {
     await b.close();
   }
@@ -193,7 +192,7 @@ async function createSource(session) {
   await write(a,note);
   await a.locator('#reply-input').fill(reply);
   await a.locator('#reply-save').click();
-  await a.locator('#prop-chair').waitFor();
+  await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
   await checkReplyActions(session, a);
   await a.keyboard.press('Control+k');
   await a.locator('#archive-search').fill('일치하지 않는 검색어');
@@ -254,15 +253,16 @@ async function checkVault(session, a) {
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
-  await owner.locator('#open-shop').click();
+  await owner.locator('#shop-controls summary').click();
   await owner.getByRole('button', {name: '가게 열기'}).click();
   await owner.waitForFunction(() => document.querySelector('#shop-phase').textContent.startsWith('영업 중'));
   const opening = (await readState(owner)).shop.openedAt;
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
-  assert.equal(await owner.locator('#shop-dialog').isVisible(), false);
+  assert.equal(await owner.locator('#shop').isVisible(), false);
   assert.equal(await owner.locator('#shop-roster').textContent(), '');
+  assert.equal(await owner.locator('#shop-book').textContent(), '');
   await unlock(owner);
   assert.equal((await readState(owner)).shop.openedAt, opening);
   await owner.close();
@@ -280,9 +280,10 @@ async function checkVault(session, a) {
   await assertLocked(a);
   assert.deepEqual(await rawRecord(a),locked);
   await unlock(a);
-  await a.locator('#prop-chair').click();
+  await a.locator('#archive-search').fill(reply);
+  await a.locator('#archive-list button').first().click();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
-  console.log('PASS  encryption transition rollback, encrypted live record, two-tab lock and draft scrubbing, wrong password and chair recovery');
+  console.log('PASS  encryption transition rollback, encrypted live record, two-tab lock and draft scrubbing, wrong password and bookstore recovery');
 }
 
 async function checkRecovery(session, bytes, initial) {
@@ -334,7 +335,8 @@ async function checkRecovery(session, bytes, initial) {
   assert.deepEqual(restored.props,initial.props);
   for (const entry of initial.daily) assert.ok(restored.daily.some(d=>d.date===entry.date && d.memoId===entry.memoId));
   await doneSettings(a);
-  await a.locator('#prop-chair').click();
+  await a.locator('#archive-search').fill(reply);
+  await a.locator('#archive-list button').first().click();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
   const previousUndo = await a.evaluate(async ()=>(await (await import('./vault.js')).readPayload()).payload.undo);
   assert.ok(previousUndo);
