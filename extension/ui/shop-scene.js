@@ -1,4 +1,5 @@
 import { paintInterior, project, stamp } from './shop-interior.js';
+import { REGULARS, VISIT_MS } from '../shop.js';
 
 const seatPoint = shop => shop.seat === 'window' ? [29, 78] : [173, 78];
 const entrance = [94, 119];
@@ -144,7 +145,24 @@ export function paintRoom(canvas, shop, sheet) {
     pixelPerson(ctx, x, y, { hair: '#6a5040', coat: '#608675' }), sheet);
 }
 
-export function paintGuests(canvas, visitors, time, shop, still, street, selected, furniture = []) {
+const displaySpots = [[44, 112], [65, 102], [43, 88], [28, 112], [62, 88], [61, 114], [25, 88], [76, 103], [76, 115]];
+
+export function displayGuests(arrivals, now, still) {
+  const guests = [];
+  arrivals.forEach((at, i) => {
+    const age = now - at;
+    if (age < 0 || age >= VISIT_MS) return;
+    const spot = displaySpots[i];
+    const route = [entrance, [80, 117], [80, spot[1]], spot];
+    const progress = Math.min(1, age / 2800, (VISIT_MS - age) / 2200);
+    const [x, y] = project(...along(route, still ? 1 : progress));
+    guests.push({ x, y, depth: y, person: REGULARS[i % REGULARS.length],
+      step: !still && progress < 1 ? Math.floor(age / 220) % 2 : 0, browsing: still || progress === 1 });
+  });
+  return guests;
+}
+
+export function paintGuests(canvas, visitors, time, shop, still, selected, furniture, walkIns) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const actors = [];
@@ -153,27 +171,25 @@ export function paintGuests(canvas, visitors, time, shop, still, street, selecte
     if (!pose) continue;
     let [x, y] = project(...pose.xy);
     let left = false;
-    if (street) {
-      if (time < v.enters + 2) x = still ? 70 : Math.round(10 + 81 * (time - v.enters) / 2);
-      else if (time >= v.paid) x = still ? 106 : Math.round(91 + 48 * (time - v.paid) / 2);
-      else continue;
-      y = 99;
-    } else if (pose.walking) {
+    if (pose.walking) {
       const next = guestPose(v, shop, time + .12, false);
       left = next && project(...next.xy)[0] < x;
     }
     actors.push({ v, pose, x, y, left, depth: y + (pose.reading ? 1 : 0) });
   }
-  const layers = [...furniture, ...actors].sort((a, b) => a.depth - b.depth);
+  const layers = [...furniture, ...actors, ...walkIns].sort((a, b) => a.depth - b.depth);
   for (const item of layers) {
     if (item.layer) {
       ctx.drawImage(item.layer, 0, 0);
       continue;
     }
+    if (item.person) {
+      pixelPerson(ctx, item.x, item.y, item.person, item.step, false, true, item.browsing);
+      continue;
+    }
     const { v, pose, x, y, left } = item;
     pixelPerson(ctx, x, y, v.person, pose.walking ? Math.floor(time * 4 + v.i) % 2 : 0, pose.reading, left, pose.browsing, pose.browsing && v.reads);
   }
-  if (street) return;
   for (const { v, pose, x, y } of actors) {
     if (pose.paying || (pose.reading && v.person.seat === shop.seat)) {
       ctx.fillStyle = '#785d4b';

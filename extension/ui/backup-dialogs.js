@@ -62,7 +62,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, channel, refre
     const list = document.createElement('dl');
     for (const [label, field] of [
       ['추가할 메모', 'newMemos'], ['바뀔 원문', 'updatedMemos'], ['새 답장', 'newReplies'],
-      ['입간판 기록', 'daily'], ['추가할 소품', 'props'], ['충돌', 'conflicts']
+      ['입간판 기록', 'daily'], ['충돌', 'conflicts']
     ]) {
       const term = document.createElement('dt');
       term.textContent = label;

@@ -82,6 +82,10 @@ export function validateBackup(value) {
       return { id: reply.id, text: reply.text, createdOn: reply.createdOn, createdAt: reply.createdAt };
     });
     const clean = { id: memo.id, text: memo.text, createdOn: memo.createdOn, updatedAt: memo.updatedAt, replies };
+    if (memo.createdAt !== undefined) {
+      require(validTime(memo.createdAt));
+      clean.createdAt = memo.createdAt;
+    }
     memosById.set(clean.id, clean);
     return clean;
   });

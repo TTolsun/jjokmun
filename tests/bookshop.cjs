@@ -8,8 +8,28 @@ async function checkBookshop(session) {
   try {
     for (const page of [a, b]) {
       await page.clock.setFixedTime(start);
-      await page.locator('#open-shop').click();
+      await page.locator('#shop-controls summary').click();
     }
+    assert.equal(await a.locator('#shop-floor').isVisible(), true);
+    assert.equal(await a.getByRole('button', {name:'책방 운영'}).count(), 0);
+    const title = '파란 창문 너머의 서점';
+    await a.locator('#memo-input').fill(title);
+    await a.locator('#memo-save').click();
+    await a.locator('#detail-original').getByText(title,{exact:true}).waitFor();
+    await a.locator('#reply-input').fill('다시 읽고 싶은 책');
+    await a.locator('#reply-save').click();
+    await a.locator('#detail-replies').getByText('다시 읽고 싶은 책',{exact:true}).waitFor();
+    await a.locator('#reply-input').fill('다음 모임에서 소개할 책');
+    await a.locator('#reply-save').click();
+    await a.locator('#detail-replies').getByText('다음 모임에서 소개할 책',{exact:true}).waitFor();
+    for (const page of [a,b]) {
+      await page.bringToFront();
+      await page.clock.setFixedTime(new Date(start.getTime()+1800));
+      await page.waitForFunction(() => document.querySelector('#shop-crowd').textContent.includes('7명'));
+      assert.equal(await page.locator('#shop-book').textContent(), title);
+    }
+    await a.bringToFront();
+    await a.clock.setFixedTime(start);
     assert.equal(await a.locator('#shop-upgrade').isDisabled(), true);
     await a.locator('#shop-seat').selectOption('garden');
     await b.waitForFunction(() => document.querySelector('#shop-seat').value === 'garden');
@@ -42,7 +62,7 @@ async function checkBookshop(session) {
     assert.equal(await b.getByRole('button', {name: '유리', exact: true}).getAttribute('aria-pressed'), 'true');
     assert.equal(await b.locator('#shop-seat').isDisabled(), true);
     await b.reload();
-    await b.locator('#open-shop').click();
+    await b.locator('#shop-controls summary').click();
     assert.equal((await shopState(b)).openedAt, start.getTime());
     for (const page of [a, b]) {
       await page.bringToFront();

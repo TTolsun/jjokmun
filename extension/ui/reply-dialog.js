@@ -17,19 +17,16 @@ export function bindReplyDialog(change) {
     if (dialog.open) dialog.close();
   }
 
-  function open(action, memoId, reply, props) {
+  function open(action, memoId, reply) {
     const editing = action === 'edit';
-    const prop = props.find(item => item.memoId === memoId && item.replyId === reply.id);
-    target = { action, memoId, replyId: reply.id, original: reply.text, propKind: prop?.kind };
+    target = { action, memoId, replyId: reply.id, original: reply.text };
     element('reply-dialog-title').textContent = editing ? '답장 수정' : '답장을 삭제할까요?';
     element('reply-edit-field').hidden = !editing;
     element('reply-delete-preview').hidden = editing;
     input.disabled = !editing;
     input.value = editing ? reply.text : '';
     element('reply-delete-text').textContent = editing ? '' : reply.text;
-    element('reply-delete-message').textContent = prop
-      ? '이 답장에 연결된 책방 소품도 함께 사라집니다. 삭제한 답장은 되돌릴 수 없습니다.'
-      : '삭제한 답장은 되돌릴 수 없습니다.';
+    element('reply-delete-message').textContent = '삭제한 답장은 되돌릴 수 없습니다.';
     confirm.textContent = editing ? '수정 저장' : '삭제';
     confirm.classList.toggle('danger', !editing);
     status.textContent = '';
@@ -75,10 +72,8 @@ export function bindReplyDialog(change) {
         if (editing) {
           reply.text = text;
         } else {
-          const prop = draft.props.find(item => item.memoId === memo.id && item.replyId === reply.id);
-          if (prop?.kind !== pending.propKind) throw new Error('연결된 소품이 바뀌었습니다. 취소한 뒤 다시 확인해 주세요.');
           memo.replies = memo.replies.filter(item => item.id !== reply.id);
-          if (prop) draft.props = draft.props.filter(item => item !== prop);
+          draft.props = draft.props.filter(item => item.memoId !== memo.id || item.replyId !== reply.id);
         }
       });
       if (target === pending) {

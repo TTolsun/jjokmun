@@ -11,6 +11,31 @@ export function newShop() {
   return { days: 0, coins: 0, hearts: 0, level: 1, seat: 'window', plan: 'reading', openedAt: 0, decor: 0 };
 }
 
+export const VISIT_MS = 18000;
+
+// Rebuild visits from successful writes, so reloading and opening a second tab
+// replay the same crowd without awarding another visit for an edit.
+export function bookTraffic(memos, now) {
+  let featured;
+  const recent = [];
+  function record(at, size) {
+    if (at <= now && now - at < VISIT_MS + 1200) recent.push({ at, size });
+  }
+  for (const memo of memos) {
+    const newer = !featured || memo.createdOn > featured.createdOn ||
+      (memo.createdOn === featured.createdOn && (memo.createdAt ?? 0) >= (featured.createdAt ?? 0));
+    if (!featured || memo.replies.length > featured.replies.length ||
+      (memo.replies.length === featured.replies.length && newer)) featured = memo;
+    record(memo.createdAt, 3);
+    for (const reply of memo.replies) record(reply.createdAt, 2);
+  }
+  const arrivals = [];
+  for (const { at, size } of recent.sort((a, b) => a.at - b.at).slice(-5)) {
+    for (let i = 0; i < size; i++) arrivals.push(at + i * 550);
+  }
+  return { featured, arrivals: arrivals.slice(-9) };
+}
+
 export function validateShop(shop) {
   if (!shop || !['days', 'coins', 'hearts', 'openedAt', 'level', 'decor'].every(
     key => Number.isSafeInteger(shop[key]) && shop[key] >= 0 && shop[key] <= Number.MAX_SAFE_INTEGER / 2)
@@ -68,7 +93,7 @@ export function totals(visitors, elapsed) {
   return result;
 }
 
-export function operate(shop, action, value, now, decor) {
+export function operate(shop, action, value, now) {
   if (action === 'settle') {
     const visitors = schedule(shop);
     if (!shop.openedAt || now - shop.openedAt < shiftSeconds(visitors) * 1000) return false;
@@ -82,7 +107,7 @@ export function operate(shop, action, value, now, decor) {
   if (shop.openedAt) return false;
   if (action === 'open') {
     shop.openedAt = now;
-    shop.decor = decor;
+    shop.decor = 0;
   } else if (action === 'upgrade' && shop.level < 3 && shop.coins >= upgradeCost(shop.level)) {
     shop.coins -= upgradeCost(shop.level);
     shop.level++;
