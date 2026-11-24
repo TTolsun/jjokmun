@@ -1,7 +1,7 @@
-import { DEFAULT_NAME, bookTraffic, newShop, visitsAt } from '../shop.js';
+import { DEFAULT_NAME, REGULAR_TIER, bookTraffic, newShop, regularOf, visitsAt } from '../shop.js';
 import { localDate } from '../store.js';
 import { element } from './dom.js';
-import { paintGuests, paintRoom } from './shop-scene.js';
+import { paintGuests, paintPortrait, paintRoom } from './shop-scene.js';
 import { loadCharacterSheet, loadFurnishingSheet } from './shop-interior.js';
 
 const clock = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
@@ -14,6 +14,7 @@ export function bindShop() {
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let shop, traffic, firstDate, sheet, characters, loading, layout, timer;
   let furniture = [];
+  let closeRegularCount = 0;
 
   function text(id, value) {
     if (element(id).textContent !== value) element(id).textContent = value;
@@ -27,7 +28,8 @@ export function bindShop() {
     text('shop-day', (elapsed + 1) + '일차');
     text('shop-clock', clock.format(now));
     const arrivals = visitsAt(traffic, now.getTime());
-    text('shop-crowd', '단골 ' + traffic.readers.length + '명 · 방문 중 ' + arrivals.length + '명');
+    text('shop-crowd', '단골 ' + traffic.readers.length + '명 · 방문 중 ' + arrivals.length + '명'
+      + (closeRegularCount ? ' · 반가운 단골 이상 ' + closeRegularCount + '명' : ''));
     paintGuests(actors, arrivals, now.getTime(), motion.matches, furniture, characters);
     if (!mini.hidden) {
       const ctx = miniature.getContext('2d');
@@ -53,7 +55,8 @@ export function bindShop() {
   return {
     update(state) {
       shop = state.shop || newShop();
-      traffic = bookTraffic(state.memos);
+      traffic = bookTraffic(state.memos, Date.now(), state.daily);
+      closeRegularCount = traffic.readers.filter(reader => reader.tier >= REGULAR_TIER).length;
       firstDate = state.daily.reduce((first, item) => item.date < first ? item.date : first, localDate());
       text('shop-title', shop.name || DEFAULT_NAME);
       mini.setAttribute('aria-label', (shop.name || DEFAULT_NAME) + '으로 이동');
@@ -72,6 +75,9 @@ export function bindShop() {
       }
       draw();
       sync();
+    },
+    portrait(canvas, memoId) {
+      paintPortrait(canvas, regularOf(memoId).person, characters);
     },
     reset() {
       clearInterval(timer);

@@ -76,6 +76,7 @@ async function forceNextWriteToFail(p) {
 }
 async function assertLocked(p) {
   await p.locator('#lock-screen').waitFor();
+  assert.deepEqual(await p.locator('#regular-progress').evaluate(bar => [bar.value, bar.max]), [0, 1]);
   for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#daily-memo', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
@@ -397,6 +398,7 @@ async function checkRecovery(session, bytes, initial) {
 async function run() {
   await require('./undo.cjs').checkPlainJournal();
   await require('./undo.cjs').checkLegacyFieldOrder();
+  await require('./regulars.cjs').checkBondRules();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));
   assert.equal(manifest.chrome_url_overrides,undefined);
   assert.equal(manifest.host_permissions,undefined);
@@ -425,6 +427,7 @@ async function run() {
     session = await launch(path.join(directory, 'bookshop-profile'));
     await require('./bookshop.cjs').checkBookshop(session);
     await require('./folder.cjs').checkFolder(session);
+    await require('./regulars.cjs').checkRegulars(session);
     assert.deepEqual(session.external,[]);
   } finally {
     if (session) await session.context.close();

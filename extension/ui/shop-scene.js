@@ -1,5 +1,5 @@
 import { paintInterior, project, stamp, WALK_WIDTH, WALK_HEIGHT } from './shop-interior.js';
-import { VISIT_MS } from '../shop.js';
+import { REGULAR_TIER, VISIT_MS } from '../shop.js';
 
 const seatPoint = shop => shop.seat === 'window' ? [29, 78] : [173, 78];
 const entrance = [94, 119];
@@ -87,6 +87,15 @@ function pixelPerson(ctx, x, y, person, {step = 0, left = false, back = false, r
   ctx.restore();
 }
 
+const heart = ['.o.o.', 'ohoho', 'ohhho', '.oho.', '..o..'];
+const heartColors = {o:'#7b2f3b', h:'#e36d7e'};
+
+export function paintPortrait(canvas, person, characters) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  pixelPerson(ctx, canvas.width / 2, canvas.height - 2, person, {}, characters);
+}
+
 export function paintRoom(canvas, shop, furnishings, characters) {
   return paintInterior(canvas, shop, seatPoint(shop), (ctx, x, y) =>
     pixelPerson(ctx, x, y, clerk, { left: true }, characters), furnishings);
@@ -97,7 +106,7 @@ const displaySpots = [[44, 112], [65, 102], [43, 88], [28, 112], [62, 88], [61, 
 export function paintGuests(canvas, arrivals, now, still, furniture, characters) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const guests = arrivals.map(({ at, seed, person, bestseller }, i) => {
+  const guests = arrivals.map(({ at, seed, person, bestseller, tier = 0 }, i) => {
     const age = now - at;
     const spot = bestseller ? displaySpots[i % displaySpots.length] : [42 + seed % 4 * 24, 56 + seed % 2 * 10];
     const route = [entrance, [80, 117], [80, spot[1]], spot];
@@ -107,10 +116,12 @@ export function paintGuests(canvas, arrivals, now, still, furniture, characters)
     const browsing = still || progress === 1;
     const step = browsing ? 0 : [0, 1, 0, -1][Math.floor(distance / 4) % 4];
     return { x, y, depth: y, person, step, left: browsing ? seed % 2 === 0 : dx * facing < 0,
-      back: !browsing && dy * facing < 0, reading: browsing };
+      back: !browsing && dy * facing < 0, reading: browsing, fond: browsing && tier >= REGULAR_TIER };
   });
   for (const item of [...furniture, ...guests].sort((a, b) => a.depth - b.depth)) {
     if (item.layer) ctx.drawImage(item.layer, 0, 0);
     else pixelPerson(ctx, item.x, item.y, item.person, item, characters);
   }
+  // Close regulars show a small heart while they browse, drawn above furniture.
+  for (const guest of guests) if (guest.fond) stamp(ctx, guest.x - 2, guest.y - 35, heart, heartColors);
 }
