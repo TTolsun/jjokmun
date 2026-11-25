@@ -1,3 +1,4 @@
+const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -83,6 +84,7 @@ async function checkSeason(session) {
       });
     }, {memos:[...november.memos, ...december], daily:november.daily});
     await page.reload();
+    await openSection(page, 'journal-extras');
 
     await waitText(page, 'season-name', '12월 · 겨울');
     assert.equal(await page.locator('#shop').getAttribute('data-season'), 'winter');
@@ -103,6 +105,7 @@ async function checkSeason(session) {
     assert.deepEqual(await page.locator('#goal-list .goal-count').allTextContents(), ['8/8 달성', '0/4', '0/2']);
 
     autumn = await session.tab('2031-11-25', folder);
+    await openSection(autumn, 'journal-extras');
     await waitText(autumn, 'season-name', '11월 · 가을');
     await waitText(autumn, 'shop-grade', '책방 등급: 이름난 책방 · 목표를 모두 이룬 달이 2번 더 있으면 골목 명소가 돼요.');
     assert.ok(await autumn.locator('#year-review').isHidden(), 'the review waits for December');

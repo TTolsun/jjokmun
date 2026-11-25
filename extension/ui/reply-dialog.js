@@ -38,7 +38,9 @@ export function bindReplyDialog(change) {
     const { replyId, action } = target;
     reset();
     const row = element('detail-replies').querySelector(`[data-reply-id="${CSS.escape(replyId)}"]`);
-    (row?.querySelector(`[data-action="${action}"]`) || element('reply-input')).focus();
+    const compose = element('reply-compose');
+    const fallback = compose.open ? element('reply-input') : compose.querySelector('summary');
+    (row?.querySelector(`[data-action="${action}"]`) || fallback).focus();
   }
 
   cancel.addEventListener('click', closeAndFocus);
@@ -73,6 +75,7 @@ export function bindReplyDialog(change) {
           reply.text = text;
         } else {
           memo.replies = memo.replies.filter(item => item.id !== reply.id);
+          if (draft.shop?.guestMemoId === memo.id && draft.shop.guestReplyId === reply.id) delete draft.shop.guestReplyId;
           draft.props = draft.props.filter(item => item.memoId !== memo.id || item.replyId !== reply.id);
         }
       });

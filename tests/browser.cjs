@@ -12,6 +12,11 @@ function loadChromium() {
 
 const installed = path.resolve(__dirname, '../jjokmun');
 const extension = fs.existsSync(path.join(installed, 'manifest.json')) ? installed : path.resolve(__dirname, '../extension');
+async function openSection(page, id) {
+  const section = page.locator('#' + id);
+  if (!await section.evaluate(node => node.open)) await section.locator(':scope > summary').click();
+}
+
 async function selectFolder(page, name = 'test-vault', button = '#choose-first-folder') {
   await page.evaluate(name => {
     window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle(name, {create:true});
@@ -41,9 +46,9 @@ async function launch(profile, extensionPath = extension) {
       try { owner ||= request.frame().url(); } catch {}
       if (owner?.startsWith('chrome-extension:')) external.push(request.url());
     });
-    const tab = async (date, folder = 'test-vault') => {
+    const tab = async (date, folder = 'test-vault', view = 'journal') => {
       const page = await context.newPage();
-      await page.goto(home + (date ? '?date=' + date : ''));
+      await page.goto(home + (date ? '?date=' + date : '') + (view === 'journal' ? '#journal' : ''));
       if (folder) {
         await page.locator('#storage-start:visible, .workspace:visible, #lock-screen:visible').waitFor();
         if (await page.locator('#choose-first-folder').isVisible()) await selectFolder(page, folder);
@@ -86,4 +91,4 @@ async function checkPolicy(session) {
     await new Promise(resolve => server.close(resolve));
   }
 }
-module.exports = {launch, extension, checkPolicy, selectFolder};
+module.exports = {launch, extension, checkPolicy, selectFolder, openSection};

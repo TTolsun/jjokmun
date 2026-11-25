@@ -51,7 +51,7 @@ function hair(ctx, cut, colors) {
   if (cut === 'sidepart') stamp(ctx, -3, -23, ['..llllh.', '.lllhhho','llhhho..','hhho....'], colors);
 }
 
-function pixelPerson(ctx, x, y, person, {step = 0, left = false, back = false, reading = false} = {}, sheet) {
+export function pixelPerson(ctx, x, y, person, {step = 0, left = false, back = false, reading = false} = {}, sheet) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(left ? -1 : 1, 1);

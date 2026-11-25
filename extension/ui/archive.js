@@ -26,6 +26,11 @@ function showMatchingText(container, value, query) {
 const PAGE_SIZE = 100;
 let visibleLimit = PAGE_SIZE;
 
+function searchControl() {
+  const section = element('memo-search');
+  return section.open ? element('archive-search') : section.querySelector('summary');
+}
+
 export function resetArchive() {
   visibleLimit = PAGE_SIZE;
   const more = element('archive-more');
@@ -82,22 +87,37 @@ export function renderArchive(memos, selectedId, openDetail) {
     list.append(row);
     if (memo.id === focusedId) focusTarget = row;
   }
-  if (focusedId) (focusTarget || element('archive-search')).focus();
+  if (focusedId) (focusTarget || searchControl()).focus();
   element('archive-status').textContent = list.childElementCount ? '' : query ? '검색 결과가 없습니다.' : '아직 남긴 메모가 없습니다.';
 }
 
-function focusSearch() {
-  element('archive-search').focus();
-  element('archive-search').select();
+function openJournal() {
+  if (location.hash !== '#journal') {
+    history.replaceState(null, '', '#journal');
+    window.dispatchEvent(new Event('hashchange'));
+  }
 }
-element('open-archive').addEventListener('click', focusSearch);
+element('open-archive').addEventListener('click', () => {
+  openJournal();
+  element('memo-input').focus();
+});
 window.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     event.preventDefault();
-    focusSearch();
+    openJournal();
+    element('memo-search').open = true;
+    element('archive-search').focus();
+    element('archive-search').select();
   }
 });
 element('archive-search').addEventListener('input', () => { visibleLimit = PAGE_SIZE; });
+element('memo-search').addEventListener('toggle', () => {
+  const search = element('archive-search');
+  if (!element('memo-search').open && search.value) {
+    search.value = '';
+    search.dispatchEvent(new Event('input'));
+  }
+});
 element('archive-search').addEventListener('keydown', (event) => {
   if (event.isComposing || event.keyCode === 229) return;
   const first = element('archive-list').firstElementChild;
@@ -112,6 +132,6 @@ element('archive-list').addEventListener('keydown', (event) => {
     event.target.nextElementSibling?.focus();
   } else if (event.key === 'ArrowUp') {
     event.preventDefault();
-    (event.target.previousElementSibling || element('archive-search')).focus();
+    (event.target.previousElementSibling || searchControl()).focus();
   }
 });

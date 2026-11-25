@@ -84,6 +84,7 @@ export function bindFolderFiles() {
 
   function reset() {
     scan?.abort();
+    scan = undefined;
     connection = undefined;
     files = [];
     skipped = 0;
@@ -98,6 +99,7 @@ export function bindFolderFiles() {
     element('file-status').textContent = '';
   }
 
+  panel.addEventListener('toggle', () => { if (panel.open && !scan) rescan(); });
   preview.addEventListener('close', clearPreview);
   element('file-close').addEventListener('click', () => preview.close());
   element('scan-files').addEventListener('click', rescan);
@@ -111,8 +113,6 @@ export function bindFolderFiles() {
     if (next) {
       element('storage-location').textContent = next.directory.name + ' / ' + VAULT_FILE;
       panel.hidden = false;
-      panel.open = true;
-      rescan();
     }
   } };
 }

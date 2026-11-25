@@ -1,3 +1,4 @@
+const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkBookshop(session) {
@@ -19,12 +20,15 @@ async function checkBookshop(session) {
     }
     await waitText(page, 'shop-book', '어떤 메모를 권할까요?');
     const interested = page.locator('.shelf-reader.interested h4');
+    await openSection(page, 'journal-extras');
     await page.locator('#choose-display').click();
     await page.locator('#archive-list button').filter({hasText:'겨울의 기록'}).click();
+    await openSection(page, 'memo-tools');
     await page.locator('#display-memo').click();
     await waitText(page, 'shop-book', '겨울의 기록');
     assert.deepEqual(await interested.allTextContents(), []);
     await page.locator('#shop-book').click();
+    await openSection(page, 'reply-compose');
     await page.locator('#reply-input').fill('좋은 책');
     await page.locator('#reply-save').click();
     await page.locator('#detail-replies').getByText('좋은 책').waitFor();
@@ -38,12 +42,15 @@ async function checkBookshop(session) {
     await page.clock.setFixedTime(start + 7 * 86400000);
     await page.locator('#regular-window.interested').waitFor();
     assert.match(await page.locator('#regular-window .regular-reaction').innerText(), /7일 전/);
+    await openSection(page, 'reply-compose');
     await page.locator('#reply-input').fill('일주일 뒤 다시 읽었다');
     await page.locator('#reply-save').click();
     await page.locator('#regular-door.interested').waitFor();
     assert.deepEqual(await interested.allTextContents(), ['창가 단골', '문가 단골']);
+    await openSection(page, 'journal-extras');
     await page.locator('#choose-display').click();
     await page.locator('#archive-list button').filter({hasText:'봄의 기록'}).click();
+    await openSection(page, 'memo-tools');
     await page.locator('#display-memo').click();
     await waitText(second, 'shop-book', '봄의 기록');
     assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
@@ -52,6 +59,7 @@ async function checkBookshop(session) {
     await page.locator('#shop-name-form button').click();
     await waitText(second, 'shop-title', '달빛 서점');
     await page.reload();
+    await openSection(page, 'journal-extras');
     await waitText(page, 'shop-title', '달빛 서점');
     await waitText(page, 'shop-book', '봄의 기록');
     await page.setViewportSize({ width: 360, height: 740 });
@@ -134,6 +142,7 @@ async function checkBookshop(session) {
     assert.deepEqual(frames.slice(-2), [[216,0], [216,0]]);
     for (let count = 2; count > 0; count--) {
       await page.locator('#archive-list button').first().click();
+      await openSection(page, 'memo-tools');
       await page.locator('#delete-memo').click();
       await page.locator('#delete-confirm').click();
       await waitText(page, 'memo-count', String(count - 1));

@@ -70,11 +70,12 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
       value.textContent = summary[field] + '개';
       list.append(term, value);
     }
-    if (next.backup.shop) {
+    for (const [key, label] of [['shop', '책방 운영 기록'], ['business', '가구 배치와 단골 기록']]) {
+      if (!next.backup[key]) continue;
       const term = document.createElement('dt');
-      term.textContent = '책방 운영 기록';
+      term.textContent = label;
       const value = document.createElement('dd');
-      value.textContent = summary.shop ? '복원' : '현재 기록 유지';
+      value.textContent = summary[key] ? '복원' : '현재 기록 유지';
       list.append(term, value);
     }
     const reasons = document.createElement('ul');
