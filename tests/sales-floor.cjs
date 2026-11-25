@@ -65,8 +65,8 @@ async function checkSalesFloor(session) {
     const second = (await read()).business;
     assert.equal(second.days, 1);
     assert.deepEqual(second.opening.cart, moved.moves[0].point);
+    assert.ok(second.loyalty.some(n => n > 0));
     await page.clock.setFixedTime(second.started + 35000);
-    await page.waitForFunction(() => parseInt(document.querySelector('#floor-regulars').textContent, 10) > 0);
     const chair = page.getByRole('button', {name:'의자',exact:true});
     await chair.focus();
     await chair.press('ArrowRight');
@@ -88,7 +88,44 @@ async function checkSalesFloor(session) {
       advanceBusiness(copy.business, 864000000);
       if (copy.business.days < 100 || !copy.business.loyalty.includes(2)) throw Error('clock catch-up');
     }, state);
-    assert.equal(await page.locator('#floor input:visible').count(), 0);
+    // Writing on the floor puts a book on the cart; the next cart reader opens
+    // it, buys it, and the sold book leads straight to a reply.
+    assert.deepEqual(await page.locator('#floor input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['floor-memo-input', 'guest-input']);
+    await page.locator('#sold-empty').getByText('아직 내 책이 없어요').waitFor();
+    const third = await page.evaluate(async () => {
+      const { currentShift } = await import('./business.js');
+      const b = (await (await import('./vault.js')).readPayload()).payload.state.business;
+      return currentShift(b, Date.now()).opens;
+    });
+    await page.clock.setFixedTime(third + 500);
+    await page.getByText('영업 3일차', {exact:true}).waitFor();
+    await page.locator('#floor-memo-input').fill('골목 끝 나무 아래에서 쓴 첫 책');
+    await page.locator('#floor-memo-save').click();
+    await page.locator('#floor-memo-status').getByText('새 책을 신간 매대에 꽂았어요. 곧 손님이 펼쳐 볼 거예요.').waitFor();
+    assert.equal(await page.locator('#floor-memo-input').inputValue(), '');
+    const sale = await page.evaluate(async () => {
+      const { memoBooks, dayFor, STEP_MS } = await import('./business.js');
+      const state = (await (await import('./vault.js')).readPayload()).payload.state;
+      const b = state.business;
+      const picks = memoBooks(b, state.memos);
+      const frames = dayFor(b).frames;
+      const buyer = [...picks].find(([, memo]) => memo.id === state.memos[0].id)?.[0];
+      if (buyer === undefined) throw Error('new memo was not picked from the cart');
+      const index = frames.findIndex(frame => frame.buyers.includes(buyer));
+      if (index < 0) throw Error('cart reader did not buy the new memo');
+      // Picks made before a memo existed stay the same once it is written.
+      const before = memoBooks(b, []);
+      if (before.size) throw Error('books without memos');
+      return b.started + index * STEP_MS + 10;
+    });
+    await page.clock.setFixedTime(sale);
+    const sold = page.locator('#sold-list button').filter({ hasText: '골목 끝 나무 아래에서 쓴 첫 책' });
+    await sold.waitFor();
+    assert.match(await page.locator('#floor-sold').textContent(), /^[1-9]\d*권$/);
+    await sold.click();
+    await page.locator('#detail-original').getByText('골목 끝 나무 아래에서 쓴 첫 책').waitFor();
+    assert.equal(await page.locator('#reply-input').evaluate(input => input === document.activeElement), true);
+    await page.locator('#reply-compose > summary').click();
     assert.equal(await page.locator('.owners-pick').isVisible(), false);
     await page.locator('#open-archive').click();
     assert.deepEqual(await page.locator('.workspace input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input']);

@@ -7,7 +7,7 @@ import { bondRoster, requestDates } from './shop.js';
 export const MONTHLY_GOALS = [
   { key: 'writing', label: '메모를 쓴 날', target: 8 },
   { key: 'rereading', label: '다른 날 다시 읽고 답장한 날', target: 4 },
-  { key: 'requests', label: '입간판 부탁을 들어준 날', target: 2 }
+  { key: 'requests', label: '다시 찾는 책에 답장한 날', target: 2 }
 ];
 
 // Levels match the shelf counts the shop interior can draw.
@@ -18,10 +18,10 @@ export const SHOP_GRADES = [
 ];
 
 const SEASONS = [
-  { key: 'spring', months: [3, 4, 5], name: '봄', shelf: '봄맞이 시집 서가' },
-  { key: 'summer', months: [6, 7, 8], name: '여름', shelf: '한여름 여행기 서가' },
-  { key: 'autumn', months: [9, 10, 11], name: '가을', shelf: '독서의 계절 서가' },
-  { key: 'winter', months: [12, 1, 2], name: '겨울', shelf: '긴 겨울밤 소설 서가' }
+  { key: 'spring', months: [3, 4, 5], name: '봄' },
+  { key: 'summer', months: [6, 7, 8], name: '여름' },
+  { key: 'autumn', months: [9, 10, 11], name: '가을' },
+  { key: 'winter', months: [12, 1, 2], name: '겨울' }
 ];
 
 const REVIEW_JANUARY_DAYS = 15;

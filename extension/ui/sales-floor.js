@@ -1,32 +1,40 @@
 import { advanceBusiness, currentLayout, currentShift, defaultLayout, firstBusiness, floorPoint,
-  FURNITURE, moveFurniture, placementError } from '../business.js';
-import { DEFAULT_NAME, newShop, regularOf } from '../shop.js';
+  FURNITURE, memoBooks, moveFurniture, placementError } from '../business.js';
+import { DEFAULT_NAME, REGULAR_TIER, bondOf, newShop, regularOf } from '../shop.js';
 import { element } from './dom.js';
 import { project } from './shop-interior.js';
-import { paintRoom, pixelPerson } from './shop-scene.js';
+import { paintHeart, paintRoom, pixelPerson } from './shop-scene.js';
 
 const people = Array.from({ length: 10 }, (_, i) => regularOf('shopper-' + i).person);
 function text(id, value) {
   if (element(id).textContent !== value) element(id).textContent = value;
+}
+function excerpt(memo) {
+  const characters = Array.from(memo.text);
+  return '「' + (characters.length > 24 ? characters.slice(0, 24).join('') + '…' : memo.text) + '」';
 }
 function floorDelta(dx, dy) {
   const det = .82 * .58 + .86 * .32;
   return [(.58 * dx + .86 * dy) / det, (.82 * dy - .32 * dx) / det];
 }
 
-export function bindSalesFloor(change) {
+export function bindSalesFloor(change, { openMemo }) {
   const stage = element('sales-floor');
   const floor = element('business-room');
   const actors = element('business-people');
   const ctx = actors.getContext('2d');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const handles = {};
-  let state, layout, pieces = [], artKey, drag, timer, pending, retry, busy = false, failed = false, generation = 0;
+  let state, today, layout, books = new Map(), fond = new Set(), requestedId, soldKey, pieces = [], artKey, drag, timer, pending, retry, busy = false, failed = false, generation = 0;
 
   function reset() {
     clearInterval(timer);
     generation++;
-    state = layout = artKey = drag = undefined;
+    state = layout = artKey = drag = soldKey = undefined;
+    books = new Map();
+    fond = new Set();
+    requestedId = undefined;
+    element('sold-list').replaceChildren();
     pending = retry = undefined;
     stage.classList.remove('dragging');
     pieces = [];
@@ -35,7 +43,7 @@ export function bindSalesFloor(change) {
     floor.getContext('2d').clearRect(0, 0, floor.width, floor.height);
     ctx.clearRect(0, 0, actors.width, actors.height);
     for (const id of ['floor-title','business-pick','business-status','floor-event','business-day',
-      'business-phase','floor-guests','floor-regulars']) text(id, '');
+      'business-phase','floor-guests','floor-sold','sold-empty']) text(id, '');
   }
 
   async function save(mutate) {
@@ -161,7 +169,7 @@ export function bindSalesFloor(change) {
     handles[key] = button;
   }
 
-  function paint(frame, progress, losses, loyalty) {
+  function paint(frame, progress, losses) {
     ctx.clearRect(0,0,actors.width,actors.height);
     let shiftX = 0, shiftY = 0;
     if (drag) {
@@ -196,13 +204,15 @@ export function bindSalesFloor(change) {
         const g = item.guest;
         pixelPerson(ctx,item.x,item.y,people[g.id],item.pose);
         const waiting = g.phase === 'queue' && g.cell === g.from;
-        if (waiting || g.phase === 'leave' || loyalty[g.id] >= 2) {
-          ctx.fillStyle = g.phase === 'leave' ? '#a44132' : waiting ? '#604622' : '#885260';
+        // A heart marks a regular holding a book they have grown fond of.
+        const fondly = fond.has(g.id) && (g.phase === 'read' || g.carrying);
+        if (waiting || g.phase === 'leave') {
+          ctx.fillStyle = g.phase === 'leave' ? '#a44132' : '#604622';
           ctx.fillRect(item.x-4,item.y-33,9,8);
           ctx.fillStyle = '#fff4ce';
           ctx.font = 'bold 8px sans-serif';
-          ctx.fillText(waiting || g.phase === 'leave' ? '!' : '♥', item.x-3,item.y-26);
-        }
+          ctx.fillText('!', item.x-3,item.y-26);
+        } else if (fondly) paintHeart(ctx, item.x, item.y);
       }
     }
     for (const cell of losses) {
@@ -221,22 +231,73 @@ export function bindSalesFloor(change) {
     const now = Date.now();
     const shift = currentShift(b,now);
     if (now >= shift.opens && !busy && !failed) syncClock();
-    const loyalty = [...b.loyalty];
-    for (const id of shift.frame.buyers) loyalty[id]++;
-    paint(shift.frame, shift.elapsed % 1, shift.closed ? shift.day.losses : [], loyalty);
+    paint(shift.frame, shift.elapsed % 1, shift.closed ? shift.day.losses : []);
     text('business-day', '영업 ' + (b.days+1) + '일차');
     text('business-phase', shift.closed ? '다음 개점까지 ' + Math.max(0,Math.ceil((shift.opens-now)/1000)) + '초' : '영업 중');
     text('floor-guests', shift.frame.people.length + '명');
-    text('floor-regulars', loyalty.filter(n => n >= 2).length + '명');
-    const names = ['문학 서가','여행 서가','신간 매대'];
-    const best = names.filter((_, i) => shift.day.stops[i] === Math.max(...shift.day.stops));
-    const closing = '오늘 손님들이 가장 많이 멈춘 곳은 ' + best.join('·') + '입니다.'
-      + (shift.day.losses.length ? ' 붉은 표시는 기다리던 손님이 책을 놓고 떠난 자리예요.' : '');
-    text('floor-event', shift.closed ? closing : shift.frame.event);
+    const sold = shift.frame.buyers.filter(id => books.has(id)).map(id => books.get(id));
+    text('floor-sold', sold.length + '권');
+    renderSold(sold);
+    const losses = shift.day.losses.length ? ' 붉은 표시는 기다리던 손님이 책을 놓고 떠난 자리예요.' : '';
+    const closing = (sold.length
+      ? '오늘 내 책 ' + sold.length + '권이 팔렸어요. 팔린 책을 누르면 다시 읽고 답장할 수 있어요.'
+      : state.memos.length ? '오늘은 내 책이 팔리지 않았어요. 다음 영업에서 손님이 다시 찾아와요.'
+        : '아직 매대에 내 책이 없어요. 위에 한 줄을 쓰면 첫 책이 꽂혀요.') + losses;
+    text('floor-event', shift.closed ? closing : floorEvent(shift));
   }
-  function update(next) {
+  // The simulation only knows shelves and stock. Name the memo behind each
+  // purchase and each open book so writing visibly changes what happens.
+  function floorEvent(shift) {
+    const frames = shift.day.frames;
+    const index = frames.indexOf(shift.frame);
+    const before = frames[index - 1]?.buyers || [];
+    const buyer = shift.frame.buyers.find(id => !before.includes(id));
+    if (buyer !== undefined && books.has(buyer)) return excerpt(books.get(buyer)) + ' 책이 팔렸어요.';
+    const reader = shift.frame.people.filter(person => person.phase === 'read').sort((a, b) => b.time - a.time)[0];
+    if (reader && books.has(reader.id)) {
+      const memo = books.get(reader.id);
+      return (memo.id === requestedId ? '단골이 다시 찾던 ' : '손님이 ') + excerpt(memo) + ' 책을 펼쳐 읽어요.';
+    }
+    if (reader?.title === 2) return '신간 매대에 아직 내 책이 없어요. 위에 한 줄을 쓰면 새 책이 꽂혀요.';
+    return shift.frame.event;
+  }
+  function renderSold(sold) {
+    const counts = new Map();
+    for (const memo of sold) counts.set(memo.id, (counts.get(memo.id) || 0) + 1);
+    const unique = [...new Map(sold.map(memo => [memo.id, memo])).values()].reverse().slice(0, 5);
+    text('sold-empty', unique.length ? ''
+      : state.memos.length ? '손님이 책을 고르는 중이에요.' : '아직 내 책이 없어요. 위에 한 줄을 써 보세요.');
+    const key = unique.map(memo => memo.id + memo.updatedAt + ':' + counts.get(memo.id)).join();
+    if (key === soldKey) return;
+    soldKey = key;
+    const list = element('sold-list');
+    const focused = list.contains(document.activeElement) ? document.activeElement.dataset.memoId : undefined;
+    list.replaceChildren(...unique.map(memo => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.memoId = memo.id;
+      const title = document.createElement('span');
+      title.textContent = excerpt(memo);
+      const action = document.createElement('small');
+      const count = counts.get(memo.id);
+      action.textContent = (count > 1 ? count + '권 팔림 · ' : '') + '다시 읽고 답장';
+      button.append(title, action);
+      button.addEventListener('click', () => openMemo(memo.id));
+      item.append(button);
+      return item;
+    }));
+    if (focused) list.querySelector(`[data-memo-id="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+  }
+  function update(next, date = today) {
     state = next;
+    today = date;
+    const entry = state.daily.find(item => item.date === date);
+    requestedId = entry && !entry.folded ? entry.memoId : undefined;
     layout = state.business ? currentLayout(state.business) : defaultLayout();
+    books = state.business ? memoBooks(state.business, state.memos, requestedId) : new Map();
+    fond = new Set([...books].filter(([, memo]) => bondOf(memo, state.daily).tier >= REGULAR_TIER).map(([id]) => id));
+    soldKey = undefined;
     const memo = state.memos.find(item => item.id === state.shop?.displayMemoId);
     element('business-pick').parentElement.hidden = !memo;
     text('business-pick', memo?.text || '');

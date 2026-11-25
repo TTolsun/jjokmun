@@ -111,7 +111,7 @@ export function bondRoster(state) {
 export function bondHint(bond, { requestedToday = false, repliedToday = false } = {}) {
   if (!bond.nextTitle) return '가장 깊은 사이가 되었어요.';
   if (repliedToday) return bond.nextTitle + '까지 정 ' + bond.remaining + ' 남았어요. 다른 날 다시 들러 주세요.';
-  if (requestedToday) return '오늘 입간판에 걸린 책이에요. 지금 답장하면 정 +' + BOND_POINTS.request + '.';
+  if (requestedToday) return '단골이 오늘 다시 찾는 책이에요. 지금 답장하면 정 +' + BOND_POINTS.request + '.';
   return bond.nextTitle + '까지 정 ' + bond.remaining + ' 남았어요. 메모를 쓴 날이 아닌 다른 날 답장하면 정 +' + BOND_POINTS.revisit + '.';
 }
 
@@ -120,52 +120,6 @@ export function newShop() {
 }
 
 export const DEFAULT_NAME = '골목 책방';
-export const VISIT_MS = 18000;
-
-export const REGULARS = [
-  { id: 'window', person: appearance(identity('window-reader')), name: '창가 단골',
-    wish: '쓴 지 일주일은 된 글을 읽고 싶어요.' },
-  { id: 'door', person: appearance(identity('door-reader')), name: '문가 단골',
-    wish: '오늘 답장이 달린 글을 읽고 싶어요.' }
-];
-
-export function shelfReactions(memo, date) {
-  if (!memo) return REGULARS.map(() => ({ interested: false, reason: '' }));
-  const age = (Date.parse(date) - Date.parse(memo.createdOn)) / 86400000;
-  const continued = memo.replies.some(reply => reply.createdOn === date);
-  return [
-    { interested: age >= 7, reason: age >= 7 ? `${age}일 전의 글이네요. 그때 이야기를 읽어 볼게요.` : '조금 더 오래된 글을 기다릴게요.' },
-    { interested: continued, reason: continued ? '오늘 새 답장이 왔네요. 뒷이야기가 궁금해요.' : '이 글에는 오늘 달린 답장이 없네요.' }
-  ];
-}
-
-export function bookTraffic(memos, now = Date.now(), daily = []) {
-  const requested = requestDates(daily);
-  const readers = memos.map(memo => {
-    const seed = identity(memo.id);
-    const at = memo.replies.reduce((latest, reply) => Math.max(latest, reply.createdAt), memo.createdAt || 0);
-    return { at, seed, tier: scoreBond(memo, requested.get(memo.id)).tier };
-  });
-  const recent = readers.filter(reader => reader.at >= now - VISIT_MS).sort((a, b) => b.at - a.at).slice(0, 9);
-  return { readers, recent };
-}
-
-// One reader per memo. Reconstruct arrivals from wall time so returning tabs agree.
-export function visitsAt(traffic, now) {
-  const { readers } = traffic;
-  if (!readers.length) return [];
-  const arrivals = new Map();
-  const interval = Math.max(3200, Math.ceil(25000 / readers.length));
-  const ticket = Math.floor(now / interval);
-  for (let t = ticket; t * interval > now - VISIT_MS; t--) {
-    const reader = readers[t % readers.length];
-    if (!arrivals.has(reader)) arrivals.set(reader, t * interval);
-  }
-  for (const reader of traffic.recent) {
-    if (reader.at <= now && now - reader.at < VISIT_MS) arrivals.set(reader, reader.at);
-  }
-  return Array.from(arrivals, ([reader, at]) => ({ ...reader, person: appearance(reader.seed), at }));
-}
 
 export function validateShop(shop) {
   if (!shop || !['days', 'coins', 'hearts', 'openedAt', 'level', 'decor'].every(

@@ -80,7 +80,7 @@ async function forceNextWriteToFail(p) {
 async function assertLocked(p) {
   await p.locator('#lock-screen').waitFor();
   assert.deepEqual(await p.locator('#regular-progress').evaluate(bar => [bar.value, bar.max]), [0, 1]);
-  for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#daily-memo', '#archive-search']) {
+  for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#floor-memo-input', '#daily-memo', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
   const contents = await p.evaluate(() => document.body.textContent + [...document.querySelectorAll('input')].map(i => i.value).join(' '));
@@ -276,8 +276,9 @@ async function checkVault(session, a) {
   await openSection(b, 'memo-search');
   await b.locator('#archive-search').fill('미저장 비밀 문장');
   await b.locator('#memo-input').fill('미저장 비밀 문장');
-  await openSection(b, 'journal-extras');
+  await b.locator('#floor-link').click();
   await b.locator('#guest-input').fill('미저장 비밀 문장');
+  await b.locator('#floor-memo-input').fill('미저장 비밀 문장');
   await settings(b);
   await upload(b, Buffer.from(JSON.stringify(await readState(b))));
   await b.locator('#import-preview-dialog').waitFor();
@@ -290,23 +291,21 @@ async function checkVault(session, a) {
   await unlock(owner);
   await openSection(owner, 'memo-tools');
   await owner.locator('#display-memo').click();
-  await owner.waitForFunction(() => !document.querySelector('#shop-book').disabled);
+  await owner.locator('#detail-status').getByText('책방 매대에 추천글을 올렸어요.').waitFor();
   await settings(owner);
   await owner.locator('#shop-name').fill('저녁의 서점');
   await owner.locator('#shop-name-form button').click();
-  await owner.waitForFunction(() => document.querySelector('#shop-title').textContent === '저녁의 서점');
   await owner.locator('#settings-close').click();
   await owner.locator('#floor-link').click();
   await owner.locator('#floor-title').getByText('저녁의 서점').waitFor();
+  await owner.waitForFunction(() => document.querySelector('#business-pick').textContent !== '');
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
-  assert.equal(await owner.locator('#shop').isVisible(), false);
-  assert.equal(await owner.locator('#shop-title').textContent(), '');
-  assert.equal(await owner.locator('#shop-book').textContent(), '');
+  assert.equal(await owner.locator('#floor').isVisible(), false);
   assert.equal(await owner.locator('#business-pick').textContent(), '');
   assert.equal(await owner.locator('#floor-title').textContent(), '');
-  assert.deepEqual(await owner.locator('.regular-reaction').allTextContents(), ['', '']);
+  assert.equal(await owner.locator('#sold-list').textContent(), '');
   await unlock(owner);
   assert.equal((await readState(owner)).shop.name, '저녁의 서점');
   await owner.close();
