@@ -1,3 +1,4 @@
+const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -65,9 +66,11 @@ async function checkRegulars(session) {
     assert.match(name, /손님$/);
     await waitText(monday, 'roster-tally', '새 단골 1명');
 
+    await openSection(monday, 'reply-compose');
     await monday.locator('#reply-input').fill('같은 날 첫 답장');
     await monday.locator('#reply-save').click();
     await waitText(monday, 'detail-status', '답장을 저장했어요. ' + name + '과의 정 +1.');
+    await openSection(monday, 'reply-compose');
     await monday.locator('#reply-input').fill('같은 날 두 번째 답장');
     await monday.locator('#reply-save').click();
     await waitText(monday, 'detail-status', '답장을 저장했어요. 오늘은 ' + name + '과 이미 정을 쌓았어요.');
@@ -75,8 +78,10 @@ async function checkRegulars(session) {
 
     tuesday = await session.tab('2031-05-13', folder);
     await waitText(tuesday, 'daily-request', name + '이 이 책을 다시 찾아요');
+    await openSection(tuesday, 'journal-extras');
     await tuesday.locator('#daily-memo').click();
     await waitText(tuesday, 'regular-hint', '오늘 입간판에 걸린 책이에요. 지금 답장하면 정 +3.');
+    await openSection(tuesday, 'reply-compose');
     await tuesday.locator('#reply-input').fill('입간판을 보고 남긴 답장');
     await tuesday.locator('#reply-save').click();
     await waitText(tuesday, 'detail-status', '답장을 저장했어요. ' + name + '과 한층 가까워졌어요: 낯익은 단골.');
@@ -84,7 +89,9 @@ async function checkRegulars(session) {
     assert.equal(await tuesday.locator('#regular-progress').evaluate(bar => [bar.value, bar.max].join('/')), '2/3');
 
     wednesday = await session.tab('2031-05-14', folder);
+    await openSection(wednesday, 'journal-extras');
     await wednesday.locator('#daily-memo').click();
+    await openSection(wednesday, 'reply-compose');
     await wednesday.locator('#reply-input').fill('다음 날에도 남긴 답장');
     await wednesday.locator('#reply-save').click();
     await waitText(wednesday, 'detail-status', '답장을 저장했어요. ' + name + '과 한층 가까워졌어요: 반가운 단골.');
@@ -119,18 +126,22 @@ async function checkRegulars(session) {
 
     nextWeek = await session.tab('2031-05-19', folder);
     await nextWeek.locator('#detail-close').click();
+    await openSection(nextWeek, 'journal-extras');
     await nextWeek.locator('#roster-list button').first().click();
+    await openSection(nextWeek, 'memo-tools');
     await nextWeek.locator('#display-memo').click();
     await waitText(nextWeek, 'shop-book', '단골과 다시 읽을 메모');
     const interested = nextWeek.locator('.shelf-reader.interested h4');
     assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
     await waitText(nextWeek, 'regular-title', '반가운 단골 · 정 7');
     await nextWeek.locator('#shop-book').click();
+    await openSection(nextWeek, 'reply-compose');
     await nextWeek.locator('#reply-input').fill('매대에서 다시 읽고 남긴 답장');
     await nextWeek.locator('#reply-save').click();
     await waitText(nextWeek, 'regular-title', '오랜 단골 · 정 10');
     await waitText(monday, 'roster-tally', '오랜 단골 1명');
     assert.deepEqual(await interested.allTextContents(), ['창가 단골', '문가 단골']);
+    await openSection(nextWeek, 'memo-tools');
     await nextWeek.locator('#detail-replies article').filter({hasText:'매대에서 다시 읽고 남긴 답장'})
       .getByRole('button', {name:'답장 삭제'}).click();
     await nextWeek.locator('#reply-dialog-confirm').click();
@@ -140,9 +151,11 @@ async function checkRegulars(session) {
 
     await monday.locator('#detail-close').click();
     await monday.locator('#detail-dialog').waitFor({state:'hidden'});
+    await openSection(monday, 'journal-extras');
     await monday.locator('#roster-list button').first().click();
     await monday.locator('#detail-title').waitFor();
     assert.equal(await monday.locator('#detail-original').textContent(), '단골과 다시 읽을 메모');
+    await openSection(monday, 'memo-tools');
     await monday.locator('#delete-memo').click();
     await monday.locator('#delete-confirm').click();
     await waitText(monday, 'roster-count', '0명');

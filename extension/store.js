@@ -1,4 +1,5 @@
 import { validateShop } from './shop.js';
+import { validateBusiness } from './business.js';
 
 const VERSION = 1;
 export const NOTE_LIMIT = 2000;
@@ -110,8 +111,17 @@ export function validateBackup(value, { local = false } = {}) {
     return { kind: prop.kind, memoId: prop.memoId, replyId: prop.replyId };
   });
   const clean = { version: VERSION, memos, daily, props };
+  if (value.business !== undefined) clean.business = validateBusiness(value.business);
   if (value.shop !== undefined) {
     clean.shop = validateShop(value.shop);
+    if (value.shop.guestMemoId !== undefined) {
+      require(memosById.has(value.shop.guestMemoId));
+      clean.shop.guestMemoId = value.shop.guestMemoId;
+    }
+    if (value.shop.guestReplyId !== undefined) {
+      require(memosById.get(clean.shop.guestMemoId)?.replies.some(reply => reply.id === value.shop.guestReplyId));
+      clean.shop.guestReplyId = value.shop.guestReplyId;
+    }
     if (value.shop.displayMemoId !== undefined) {
       require(memosById.has(value.shop.displayMemoId));
       clean.shop.displayMemoId = value.shop.displayMemoId;

@@ -1,4 +1,5 @@
 import { selectDaily } from './store.js';
+import { validateBusiness } from './business.js';
 
 const core = (memo) => ({ text: memo.text, updatedAt: memo.updatedAt });
 const link = (memoId, replyId) => memoId + '/' + replyId;
@@ -106,8 +107,22 @@ export function mergeImport(state, backup, date) {
   summary.props = undo.props.length;
 
   const changed = Object.values(undo).some((entries) => entries.length > 0);
+  const freshFloor = state.business && !state.business.days && !state.business.moves.length;
+  if (backup.business && (!state.business || (freshFloor && (backup.business.days > 0 || backup.business.moves.length > 0)))) {
+    undo.business = { before: state.business || null, after: structuredClone(backup.business) };
+    state.business = structuredClone(backup.business);
+    summary.business = 1;
+  }
   if (backup.shop && !state.shop) {
     state.shop = structuredClone(backup.shop);
+    if (rejectedMemos.has(state.shop.guestMemoId)) {
+      delete state.shop.guestMemoId;
+      delete state.shop.guestReplyId;
+      conflict(summary, '작성일이 충돌한 메모는 연두에게 건넨 글에서 제외했습니다.');
+    } else if (rejectedReplies.has(link(state.shop.guestMemoId, state.shop.guestReplyId))) {
+      delete state.shop.guestReplyId;
+      conflict(summary, '내용이 충돌한 답장은 연두의 뒷이야기에서 제외했습니다.');
+    }
     if (rejectedMemos.has(state.shop.displayMemoId)) {
       delete state.shop.displayMemoId;
       conflict(summary, '작성일이 충돌한 메모는 매대에 올리지 않았습니다.');
@@ -117,11 +132,17 @@ export function mergeImport(state, backup, date) {
     undo.shop = structuredClone(state.shop);
     summary.shop = 1;
   }
-  return { summary, undo: changed || undo.shop ? structuredClone(undo) : null };
+  return { summary, undo: changed || undo.shop || undo.business ? structuredClone(undo) : null };
 }
 
 export function undoImport(state, undo, date) {
   const summary = { memos: 0, originals: 0, replies: 0, conflicts: 0, reasons: [] };
+  if (undo.business) {
+    if (state.business && JSON.stringify(validateBusiness(state.business)) === JSON.stringify(validateBusiness(undo.business.after))) {
+      if (undo.business.before) state.business = undo.business.before;
+      else delete state.business;
+    } else conflict(summary, '가져오기 뒤 진행한 영업은 유지했습니다.');
+  }
   if (undo.shop) {
     if (Object.keys(state.shop || {}).length === Object.keys(undo.shop).length && Object.keys(undo.shop).every(key => state.shop?.[key] === undo.shop[key])) delete state.shop;
     else conflict(summary, '가져오기 뒤 운영한 책방 기록은 유지했습니다.');
@@ -135,6 +156,7 @@ export function undoImport(state, undo, date) {
     return true;
   });
   const linked = new Set(state.props.map((prop) => link(prop.memoId, prop.replyId)));
+  if (state.shop?.guestReplyId) linked.add(link(state.shop.guestMemoId, state.shop.guestReplyId));
   const memos = new Map(state.memos.map((memo) => [memo.id, memo]));
   for (const delta of undo.memos) {
     const memo = memos.get(delta.id);
@@ -162,6 +184,8 @@ export function undoImport(state, undo, date) {
     if (delta.before && sameOriginal) {
       Object.assign(memo, delta.before);
       summary.originals += 1;
+    } else if (!delta.before && sameOriginal && !memo.replies.length && memo.id === state.shop?.guestMemoId) {
+      conflict(summary, '가져오기 뒤 연두에게 건넨 메모는 유지했습니다.');
     } else if (!delta.before && sameOriginal && !memo.replies.length && memo.id === state.shop?.displayMemoId) {
       conflict(summary, '가져오기 뒤 매대에 올린 메모는 유지했습니다.');
     } else if (!delta.before && sameOriginal && !memo.replies.length) {

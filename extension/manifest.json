@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "jjokmun",
+  "name": "쪽문 · 나만의 메모장",
   "version": "1.5.0",
-  "description": "오늘의 한 줄을 남기고, 며칠 뒤 작은 책방에서 다시 만나요.",
+  "description": "작은 도트 책방에서 손님을 맞으세요. 서가와 가구를 직접 옮기고 손님들이 단골이 되는 모습을 지켜보세요. 내 메모를 주인의 추천글로 진열할 수도 있어요.",
   "icons": { "16": "icon-16.png", "32": "icon-32.png", "128": "icon-128.png" },
   "action": {
-    "default_title": "jjokmun 열기",
+    "default_title": "쪽문 · 나만의 메모장 열기",
     "default_icon": {
       "16": "icon-16.png",
       "32": "icon-32.png"

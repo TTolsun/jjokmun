@@ -1,3 +1,4 @@
+const { openSection } = require('./browser.cjs');
 const {selectFolder} = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
@@ -33,7 +34,9 @@ async function checkFolder(session) {
       window.showDirectoryPicker = async () => library;
     });
     await page.locator('#open-settings').click();
+    await openSection(page, 'storage-tools');
     await page.locator('#choose-folder').click();
+    await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
     assert.equal(await page.locator('#file-list button').count(), 6);
     for (const [name, text] of [['안내.txt','첫 안내'], ['서가/안내.txt','둘째 안내'], ['서가/하단/code.cpp','int main() { return 0; }']]) {
@@ -57,9 +60,11 @@ async function checkFolder(session) {
       await stream.close();
       window.showDirectoryPicker = async () => damaged;
     });
+    await openSection(page, 'storage-tools');
     await page.locator('#choose-folder').click();
     await page.getByText('쪽문 저장 파일의 형식을 확인해 주세요.').waitFor();
     await page.reload();
+    await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
     await page.locator('#detail-original').getByText('옮길 메모').waitFor();
     const another = await session.tab(undefined, null);
@@ -94,6 +99,7 @@ async function checkFolder(session) {
     assert.equal(await page.locator('#file-list').textContent(), '');
     await page.evaluate(() => window.restoreFolderPermission());
     await page.locator('#storage-reconnect').click();
+    await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
     const stored = await page.evaluate(async () => {
       const vault = await import('./vault.js');

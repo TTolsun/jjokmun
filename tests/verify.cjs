@@ -1,3 +1,4 @@
+const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -43,6 +44,7 @@ async function password(p, value) {
 }
 async function exportFile(p) {
   await settings(p);
+  await openSection(p, 'backup-tools');
   await p.locator('#export-backup').click();
   const download = p.waitForEvent('download');
   await password(p, backupPass);
@@ -53,6 +55,7 @@ async function exportFile(p) {
 }
 async function upload(p, bytes) {
   await settings(p);
+  await openSection(p, 'backup-tools');
   await p.locator('#import-backup').setInputFiles({name:'test-backup.json', mimeType:'application/json', buffer:bytes});
 }
 async function commitPreview(p) {
@@ -102,6 +105,7 @@ async function seedLegacy(worker) {
 }
 
 async function copyText(p, selector, expected, keyboard = false) {
+  await openSection(p, 'memo-tools');
   const button = p.locator(selector).first();
   assert.ok(await button.getAttribute('aria-label'));
   await p.bringToFront();
@@ -120,6 +124,7 @@ async function copyText(p, selector, expected, keyboard = false) {
 async function checkReplyActions(session, a) {
   const original = '두 번째 답장의 원문';
   const updated = '두 번째 답장을 수정한 내용';
+  await openSection(a, 'reply-compose');
   await a.locator('#reply-input').fill(original);
   await a.locator('#reply-save').click();
   await a.locator('#detail-replies').getByText(original,{exact:true}).waitFor();
@@ -129,8 +134,10 @@ async function checkReplyActions(session, a) {
   const row = `article[data-reply-id="${target.id}"]`;
   const b = await session.tab(monday);
   try {
+    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await b.locator('#reply-edit-input').fill('다른 탭의 초안');
+    await openSection(a, 'memo-tools');
     await a.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await a.locator('#reply-edit-input').fill('   ');
     await a.locator('#reply-dialog-confirm').click();
@@ -141,6 +148,7 @@ async function checkReplyActions(session, a) {
     await b.locator('#reply-dialog-confirm').click();
     await b.getByText('다른 탭에서 답장이 바뀌었습니다.', {exact: false}).waitFor();
     await b.locator('#reply-dialog-cancel').click();
+    await openSection(b, 'memo-search');
     await b.locator('#archive-search').fill(updated);
     await b.locator('#archive-list mark').waitFor();
     await b.locator('#archive-list button').first().click();
@@ -148,11 +156,13 @@ async function checkReplyActions(session, a) {
     const edited = await readState(b);
     assert.deepEqual(edited.memos.find(item => item.id === memo.id).replies[1], {...target, text: updated});
     assert.deepEqual(edited.props, before.props);
+    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     assert.equal(await b.locator('#reply-delete-text').innerText(), updated);
     assert.match(await b.locator('#reply-delete-message').innerText(), /되돌릴 수 없습니다/);
     await b.keyboard.press('Escape');
     assert.deepEqual(await readState(b), edited);
+    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     await b.locator('#reply-dialog-confirm').click();
     await a.locator(row).waitFor({state: 'detached'});
@@ -206,14 +216,17 @@ async function createSource(session) {
   assert.equal((await readState(a)).memos.length,1);
   await cdp.send('Input.insertText',{text:'한글'});
   await write(a,note);
+  await openSection(a, 'reply-compose');
   await a.locator('#reply-input').fill(reply);
   await a.locator('#reply-save').click();
   await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
   await checkReplyActions(session, a);
   await a.keyboard.press('Control+k');
+  await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill('일치하지 않는 검색어');
   assert.equal(await a.locator('#archive-list button').count(), 0);
   assert.equal(await a.locator('#archive-status').innerText(), '검색 결과가 없습니다.');
+  await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill('창문 옆에');
   await a.locator('#archive-list mark').waitFor();
   await a.locator('#archive-search').press('ArrowDown');
@@ -242,10 +255,12 @@ async function checkVault(session, a) {
   const b = await session.tab(monday);
   const before = await rawRecord(a);
   await settings(a);
+  await openSection(a, 'about-tools');
   const developer = a.getByRole('region', {name: '개발자 정보'});
   assert.ok(await developer.getByText('KH', {exact: true}).isVisible());
   const email = developer.getByRole('link', {name: 'baboess@gmail.com'});
   assert.equal(await email.getAttribute('href'), 'mailto:baboess@gmail.com');
+  await openSection(a, 'storage-tools');
   await a.locator('#enable-vault').click();
   await forceNextWriteToFail(a);
   await password(a,vaultPass);
@@ -258,29 +273,39 @@ async function checkVault(session, a) {
   assert.equal(encrypted.mode,'encrypted');
   for (const value of [note,reply,legacyText,vaultPass]) assert.ok(!JSON.stringify(encrypted).includes(value));
   await unlock(b);
+  await openSection(b, 'memo-search');
   await b.locator('#archive-search').fill('미저장 비밀 문장');
   await b.locator('#memo-input').fill('미저장 비밀 문장');
+  await openSection(b, 'journal-extras');
+  await b.locator('#guest-input').fill('미저장 비밀 문장');
   await settings(b);
   await upload(b, Buffer.from(JSON.stringify(await readState(b))));
   await b.locator('#import-preview-dialog').waitFor();
   const editor = await session.tab(monday);
   await unlock(editor);
+  await openSection(editor, 'memo-tools');
   await editor.getByRole('button', {name: '답장 수정'}).click();
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
+  await openSection(owner, 'memo-tools');
   await owner.locator('#display-memo').click();
   await owner.waitForFunction(() => !document.querySelector('#shop-book').disabled);
   await settings(owner);
   await owner.locator('#shop-name').fill('저녁의 서점');
   await owner.locator('#shop-name-form button').click();
   await owner.waitForFunction(() => document.querySelector('#shop-title').textContent === '저녁의 서점');
+  await owner.locator('#settings-close').click();
+  await owner.locator('#floor-link').click();
+  await owner.locator('#floor-title').getByText('저녁의 서점').waitFor();
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
   assert.equal(await owner.locator('#shop').isVisible(), false);
   assert.equal(await owner.locator('#shop-title').textContent(), '');
   assert.equal(await owner.locator('#shop-book').textContent(), '');
+  assert.equal(await owner.locator('#business-pick').textContent(), '');
+  assert.equal(await owner.locator('#floor-title').textContent(), '');
   assert.deepEqual(await owner.locator('.regular-reaction').allTextContents(), ['', '']);
   await unlock(owner);
   assert.equal((await readState(owner)).shop.name, '저녁의 서점');
@@ -299,6 +324,7 @@ async function checkVault(session, a) {
   await assertLocked(a);
   assert.deepEqual(await rawRecord(a),locked);
   await unlock(a);
+  await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill(reply);
   await a.locator('#archive-list button').first().click();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
@@ -310,6 +336,7 @@ async function checkRecovery(session, bytes, initial) {
   const b = await session.tab(wednesday);
   await a.locator('#today-date').waitFor();
   await settings(a);
+  await openSection(a, 'storage-tools');
   await a.locator('#enable-vault').click();
   await password(a,vaultPass);
   await assertLocked(b);
@@ -354,6 +381,7 @@ async function checkRecovery(session, bytes, initial) {
   assert.deepEqual(restored.props,initial.props);
   for (const entry of initial.daily) assert.ok(restored.daily.some(d=>d.date===entry.date && d.memoId===entry.memoId));
   await doneSettings(a);
+  await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill(reply);
   await a.locator('#archive-list button').first().click();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
@@ -366,6 +394,7 @@ async function checkRecovery(session, bytes, initial) {
   await write(b,localNote);
   // A later change to a previously imported note must survive selective undo.
   await b.locator('#archive-list button').filter({hasText:legacyText}).click();
+  await openSection(b, 'memo-tools');
   await b.locator('#edit-memo').click();
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');
   await b.locator('#edit-save').click();
@@ -373,6 +402,7 @@ async function checkRecovery(session, bytes, initial) {
   await a.reload();
   await unlock(a);
   await settings(a);
+  await openSection(a, 'backup-tools');
   await a.locator('#undo-import').click();
   await a.locator('#undo-confirm').click();
   await a.locator('#undo-dialog').waitFor({state:'hidden'});
@@ -392,6 +422,7 @@ async function checkRecovery(session, bytes, initial) {
   assert.equal((await readState(a)).memos.length,3);
   await commitPreview(a);
   assert.ok((await readState(a)).memos.some(m=>m.text===note));
+  await openSection(a, 'storage-tools');
   await a.locator('#disable-vault').click();
   await password(a,vaultPass);
   await a.waitForFunction(()=>!document.querySelector('#enable-vault').hidden);
@@ -429,8 +460,14 @@ async function run() {
     console.log('PASS  no external HTTP(S) requests in normal application workflows');
     await checkPolicy(session);
     await session.context.close();
+    session = await launch(path.join(directory, 'sales-floor-profile'));
+    await require('./sales-floor.cjs').checkSalesFloor(session);
+    await require('./journal-layout.cjs').checkJournalLayout(session);
+    assert.deepEqual(session.external, []);
+    await session.context.close();
     session = await launch(path.join(directory, 'bookshop-profile'));
     await require('./bookshop.cjs').checkBookshop(session);
+    await require('./guest-visit.cjs').checkGuestVisit(session);
     assert.deepEqual(session.external,[]);
     await session.context.close();
     session = await launch(path.join(directory, 'folder-profile'));

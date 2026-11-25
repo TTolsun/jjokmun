@@ -10,6 +10,8 @@ import { FolderAccessError } from './folder.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindShop } from './ui/bookshop.js';
+import { bindGuestVisit } from './ui/guest-visit.js';
+import { bindSalesFloor } from './ui/sales-floor.js';
 import { activity, monthlyProgress, reviewYear, seasonOf, shopGrade, yearReview } from './season.js';
 
 const channel = new BroadcastChannel('memo-alley');
@@ -22,6 +24,7 @@ let linkedReply;
 let returnFocus;
 let confirmedReplyCount;
 let initialView = true;
+let pickingMemo = false;
 let pendingRefresh = Promise.resolve();
 let workspaceReady = false;
 let mode;
@@ -33,6 +36,9 @@ const workspace = document.querySelector('.workspace');
 const header = document.querySelector('.site-header');
 const replyDialog = bindReplyDialog(change);
 const bookshop = bindShop();
+const salesFloor = bindSalesFloor(change);
+const guestVisit = bindGuestVisit();
+bookshop.portrait(element('guest-portrait'), 'sketchbook-reader');
 const folderFiles = bindFolderFiles();
 
 function currentMemo() {
@@ -48,12 +54,16 @@ function clearSensitive(showLock) {
   viewGeneration += 1;
   workspaceReady = false;
   workspace.hidden = true;
+  pickingMemo = false;
+  for (const details of document.querySelectorAll('.journal-disclosure[open]')) details.open = false;
   header.hidden = true;
   element('lock-screen').hidden = !showLock;
   element('startup-status').hidden = showLock;
   if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
   replyDialog.reset();
   bookshop.reset();
+  salesFloor.reset();
+  guestVisit.reset();
   folderFiles.reset();
   resetArchive();
   element('folder-start-status').textContent = '';
@@ -110,7 +120,25 @@ function renderPayload(result, date, storageMode = mode) {
     ? '현재 저장소의 메모와 가져오기 되돌리기 기록을 암호화하고 있습니다.'
     : '현재 저장소의 메모는 현재 평문으로 저장됩니다.');
   render(date, months, grade);
+  if (!document.body.classList.contains('journal-view')) salesFloor.update(state);
 }
+
+function switchView() {
+  const journal = location.hash === '#journal' || location.hash === '#shop';
+  const leavingJournal = !journal && document.body.classList.contains('journal-view');
+  document.body.classList.toggle('journal-view', journal);
+  if (location.hash === '#shop') element('journal-extras').open = true;
+  element('floor-link').setAttribute('aria-current', journal ? 'false' : 'page');
+  element('open-archive').setAttribute('aria-current', journal ? 'page' : 'false');
+  if (journal) salesFloor.reset();
+  else if (workspaceReady) salesFloor.update(state);
+  if (leavingJournal) {
+    element('floor-title').focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  }
+}
+window.addEventListener('hashchange', switchView);
+switchView();
 
 function refresh() {
   let expected;
@@ -176,6 +204,7 @@ async function change(mutator) {
 
 function render(date, months, grade) {
   displayedDate = date;
+  guestVisit.render(state, date);
   element('today-date').textContent = formatDate(date, longDate);
   const entry = state.daily.find((record) => record.date === date);
   const memo = !entry?.folded && state.memos.find((note) => note.id === entry?.memoId);
@@ -378,12 +407,18 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit) {
   });
 }
 
+function newMemo(text, date) {
+  const now = Date.now();
+  return { id: crypto.randomUUID(), text, createdOn: date, createdAt: now, updatedAt: now, replies: [] };
+}
+
 bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text) => {
-  const id = crypto.randomUUID();
+  let id;
   const previousId = detailId;
   await change((draft, date) => {
-    const now = Date.now();
-    draft.memos.push({ id, text, createdOn: date, createdAt: now, updatedAt: now, replies: [] });
+    const memo = newMemo(text, date);
+    draft.memos.push(memo);
+    id = memo.id;
   });
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
@@ -402,6 +437,48 @@ function findMemo(draft, id) {
   if (!memo) throw new Error('목록에서 이 메모를 찾을 수 없습니다.');
   return memo;
 }
+
+async function giveGuestMemo({ id, text }) {
+  let givenId;
+  await change((draft, date) => {
+    if (draft.shop?.guestMemoId) return false;
+    const memo = id ? findMemo(draft, id) : newMemo(text, date);
+    if (!id) draft.memos.push(memo);
+    (draft.shop ??= newShop()).guestMemoId = memo.id;
+    givenId = memo.id;
+  });
+  if (givenId) openDetail(givenId);
+  element('journal-extras').open = true;
+  element('writing-title').focus();
+  return givenId ? '연두에게 글을 건넸어요.' : '연두가 다른 탭에서 이미 글을 받았어요.';
+}
+
+bindTextForm('guest-form', 'guest-input', 'guest-submit', 'guest-status', async text => {
+  const id = state.shop?.guestMemoId;
+  if (!id) return giveGuestMemo({ text });
+  let saved = false;
+  await change((draft, date) => {
+    if (draft.shop?.guestMemoId !== id || draft.shop.guestReplyId) return false;
+    const memo = findMemo(draft, id);
+    const reply = { id: crypto.randomUUID(), text, createdOn: date, createdAt: Date.now() };
+    memo.replies.push(reply);
+    draft.shop.guestReplyId = reply.id;
+    saved = true;
+  });
+  element('writing-title').focus();
+  return saved ? '건넨 글에 뒷이야기를 답장으로 남겼어요.' : '다른 탭에서 연두의 이야기가 바뀌었어요.';
+});
+
+element('give-memo').addEventListener('click', async () => {
+  const button = element('give-memo');
+  const expected = viewGeneration;
+  button.disabled = true;
+  try {
+    setStatus('guest-status', await giveGuestMemo({ id: detailId }));
+  } catch (error) {
+    if (expected === viewGeneration) setStatus('detail-status', error.message || '글을 건네지 못했어요.');
+  } finally { button.disabled = false; }
+});
 
 bindTextForm('reply-form', 'reply-input', 'reply-save', 'detail-status', async (text) => {
   const replyId = crypto.randomUUID();
@@ -508,6 +585,8 @@ element('archive-search').addEventListener('input', refreshArchive);
 function openDetail(id, replyId, source) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
+    element('reply-compose').open = false;
+    element('memo-tools').open = false;
     replyDialog.reset();
     element('reply-input').value = '';
     element('edit-form').hidden = true;
@@ -517,6 +596,10 @@ function openDetail(id, replyId, source) {
   detailId = id;
   linkedReply = replyId;
   returnFocus = source;
+  if (pickingMemo && source?.dataset.memoId) {
+    element('memo-tools').open = true;
+    pickingMemo = false;
+  }
   renderSelection();
   refreshArchive();
   if (source) element('detail-title').focus();
@@ -524,6 +607,7 @@ function openDetail(id, replyId, source) {
 
 function renderSelection() {
   const hasMemo = Boolean(currentMemo());
+  document.querySelector('.notebook').hidden = !state.memos.length;
   element('detail-dialog').hidden = !hasMemo;
   element('note-empty').hidden = hasMemo;
   if (hasMemo) {
@@ -540,13 +624,17 @@ function renderSelection() {
   }
 }
 
-element('choose-display').addEventListener('click', () => {
+function chooseFromArchive(message) {
+  pickingMemo = true;
+  element('memo-search').open = true;
   const search = element('archive-search');
   search.value = '';
   search.dispatchEvent(new Event('input'));
   search.focus();
-  setStatus('archive-status', '메모를 열고 ‘매대에 올리기’를 눌러 주세요.');
-});
+  setStatus('archive-status', message);
+}
+element('choose-display').addEventListener('click', () => chooseFromArchive('메모를 열고 ‘매대에 올리기’를 눌러 주세요.'));
+element('guest-choose').addEventListener('click', () => chooseFromArchive('메모를 열고 ‘이 글을 연두에게 건네기’를 눌러 주세요.'));
 
 element('shop-book').addEventListener('click', event => {
   if (state.shop?.displayMemoId) openDetail(state.shop.displayMemoId, undefined, event.currentTarget);
@@ -561,7 +649,10 @@ element('display-memo').addEventListener('click', async () => {
       findMemo(draft, id);
       (draft.shop ??= newShop()).displayMemoId = id;
     });
-    if (detailId === id && state.shop?.displayMemoId === id) element('shop-book').focus();
+    if (detailId === id && state.shop?.displayMemoId === id) {
+      setStatus('detail-status', '책방 매대에 추천글을 올렸어요.');
+      (element('journal-extras').open ? element('shop-book') : element('memo-tools').querySelector('summary')).focus();
+    }
   } catch (error) {
     if (workspaceReady && detailId === id) {
       button.disabled = id === state.shop?.displayMemoId;
@@ -648,6 +739,10 @@ element('delete-confirm').addEventListener('click', async () => {
       }
       draft.memos = draft.memos.filter((memo) => memo.id !== id);
       if (draft.shop?.displayMemoId === id) delete draft.shop.displayMemoId;
+      if (draft.shop?.guestMemoId === id) {
+        delete draft.shop.guestMemoId;
+        delete draft.shop.guestReplyId;
+      }
       draft.props = draft.props.filter((prop) => prop.memoId !== id);
       for (const entry of draft.daily) {
         if (entry.memoId !== id) continue;
