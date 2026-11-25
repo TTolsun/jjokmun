@@ -2,18 +2,15 @@ const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkGuestVisit(session) {
-  const first = await session.tab('2031-05-12');
-  const second = await session.tab('2031-05-12');
+  const first = await session.tab('2031-05-12', 'test-vault', 'floor');
+  const second = await session.tab('2031-05-12', 'test-vault', 'floor');
   const note = '떨리는 손으로 연필을 쥐었다.';
   const story = '다음 날에는 창가에 앉아 나무를 그렸다.';
   const stateOf = page => page.evaluate(async () => (await (await import('./vault.js')).readPayload()).payload.state);
   try {
-    await openSection(first, 'journal-extras');
-    await openSection(second, 'journal-extras');
     await first.locator('#guest-input').waitFor();
     assert.match(await first.locator('#guest-speech').innerText(), /그날 이야기를/);
     assert.equal(await first.locator('#guest-choose').isVisible(), false);
-    await openSection(first, 'journal-extras');
     await first.locator('#guest-input').fill(note);
     await first.locator('#guest-submit').click();
     await first.locator('#guest-page').getByText(note, { exact: true }).waitFor();
@@ -24,11 +21,9 @@ async function checkGuestVisit(session) {
     assert.equal(await first.locator('#guest-form').isVisible(), false);
 
     await second.reload();
-    await openSection(second, 'journal-extras');
     await second.getByRole('button', { name: '뒷이야기 건네기' }).waitFor();
     assert.equal(await second.locator('#guest-page').innerText(), note);
     assert.match(await second.locator('#guest-reaction').innerText(), /다시 그려/);
-    await openSection(second, 'journal-extras');
     await second.locator('#guest-input').fill(story);
     await second.locator('#guest-input').press('Enter');
     await first.locator('#guest-reaction').getByText('“' + story + '”', { exact: true }).waitFor();
@@ -46,22 +41,24 @@ async function checkGuestVisit(session) {
       if (restored.shop || restored.memos.length) throw Error('guest undo');
     }, state);
     await second.reload();
-    await openSection(second, 'journal-extras');
     await second.locator('#guest-reaction').getByText('“' + story + '”', { exact: true }).waitFor();
+    await second.locator('#open-archive').click();
     await openSection(second, 'memo-tools');
     await second.getByRole('button', { name: '답장 삭제' }).click();
     await second.locator('#reply-dialog-confirm').click();
+    await second.locator('#floor-link').click();
     await second.getByRole('button', { name: '뒷이야기 건네기' }).waitFor();
+    await second.locator('#open-archive').click();
     await openSection(second, 'memo-tools');
     await second.locator('#delete-memo').click();
     await second.locator('#delete-confirm').click();
     await first.getByRole('button', { name: '글 건네기', exact: true }).waitFor();
 
     const picked = '어제는 동네 산책을 시작했다.';
-    for (const text of [picked, '오늘 적은 다른 메모']) {
-      await first.locator('#memo-input').fill(text);
-      await first.locator('#memo-save').click();
-      await first.locator('#detail-original').getByText(text, { exact: true }).waitFor();
+    for (const [index, text] of [picked, '오늘 적은 다른 메모'].entries()) {
+      await first.locator('#floor-memo-input').fill(text);
+      await first.locator('#floor-memo-save').click();
+      await first.waitForFunction(async count => (await (await import('./vault.js')).readPayload()).payload.state.memos.length === count, index + 1);
     }
     await first.locator('#guest-choose').click();
     await first.locator('#archive-list button').filter({ hasText: picked }).click();

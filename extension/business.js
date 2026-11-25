@@ -165,6 +165,48 @@ export function dayFor(b) {
   }
   return cache.get(signature);
 }
+// Memos are the books on sale. The new-release cart prefers memos written in
+// the last week and the two shelves prefer older ones; either falls back to
+// any memo when its own pool is empty. Each reader only sees memos that
+// existed when that reader opened a book and takes an unread one first, so
+// earlier picks never change when a memo is written mid-day and the newest
+// memo goes to the very next reader. The memo on today's signboard is the
+// book a returning regular asks for: the first shelf reader opens it.
+export const NEW_RELEASE_MS = 7 * 86400000;
+const writtenAt = memo => memo.createdAt ?? Date.parse(memo.createdOn + 'T00:00:00');
+export function memoBooks(b, memos, requestedId) {
+  const day = dayFor(b);
+  const readers = [];
+  day.frames.forEach((frame, index) => {
+    for (const person of frame.people) {
+      if (person.phase === 'read' && !readers.some(r => r.id === person.id)) {
+        readers.push({ id: person.id, cart: person.title === 2, at: b.started + index * STEP_MS });
+      }
+    }
+  });
+  const newest = [...memos].sort((x, y) => writtenAt(y) - writtenAt(x) || (x.id < y.id ? -1 : 1));
+  const picks = new Map();
+  const picked = new Set();
+  let request = newest.find(memo => memo.id === requestedId);
+  for (const [rank, reader] of readers.entries()) {
+    const existing = newest.filter(memo => writtenAt(memo) <= reader.at);
+    if (!reader.cart && request && existing.includes(request)) {
+      picks.set(reader.id, request);
+      picked.add(request.id);
+      request = undefined;
+      continue;
+    }
+    const fresh = existing.filter(memo => reader.at - writtenAt(memo) < NEW_RELEASE_MS);
+    const old = existing.filter(memo => reader.at - writtenAt(memo) >= NEW_RELEASE_MS);
+    // Rotate the older shelves by business day so different memos resurface.
+    if (old.length) old.push(...old.splice(0, (b.days * 3) % old.length));
+    const preferred = reader.cart ? fresh : old;
+    const pool = preferred.length ? preferred : existing;
+    const memo = pool.find(item => !picked.has(item.id)) ?? pool[rank % (pool.length || 1)];
+    if (memo) { picks.set(reader.id, memo); picked.add(memo.id); }
+  }
+  return picks;
+}
 export function firstBusiness(now) {
   return { days: 0, started: now, opening: defaultLayout(), moves: [], loyalty: cohort.map(() => 0) };
 }

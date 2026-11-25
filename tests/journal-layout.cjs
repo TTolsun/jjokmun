@@ -32,9 +32,11 @@ async function checkJournalLayout(session) {
     await page.locator('#memo-search > summary:focus').waitFor();
 
     await openSection(page, 'folder-files');
-    await openSection(page, 'journal-extras');
+    await click('#floor-link');
+    await page.locator('#daily-request').getByText(/다시 찾아요$/).waitFor();
     await click('#defer-memo');
-    await page.locator('#daily-empty').getByText('오늘은 입간판을 접어두었어요.').waitFor();
+    await page.locator('#daily-empty').getByText('오늘은 다시 찾는 책을 접어두었어요.').waitFor();
+    await click('#open-archive');
     await click('#open-settings');
     for (const id of ['storage-tools', 'backup-tools', 'about-tools']) await openSection(page, id);
     for (const width of [320, 360, 640, 768, 1280]) {

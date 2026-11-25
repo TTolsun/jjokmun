@@ -1,25 +1,6 @@
-import { paintInterior, project, stamp, WALK_WIDTH, WALK_HEIGHT } from './shop-interior.js';
-import { REGULARS, REGULAR_TIER, VISIT_MS } from '../shop.js';
+import { paintInterior, stamp, WALK_WIDTH, WALK_HEIGHT } from './shop-interior.js';
 
 const seatPoint = shop => shop.seat === 'window' ? [29, 78] : [173, 78];
-const entrance = [94, 119];
-
-function walkRoute(points, progress) {
-  const path = points.map(point => project(...point));
-  const lengths = path.slice(1).map(([x, y], i) => Math.hypot(x - path[i][0], y - path[i][1]));
-  const distance = Math.max(0, Math.min(1, progress)) * lengths.reduce((a, b) => a + b, 0);
-  let remaining = distance;
-  for (let i = 0; i < lengths.length; i++) {
-    if (remaining <= lengths[i] || i === lengths.length - 1) {
-      const [x, y] = path[i];
-      const dx = path[i + 1][0] - x, dy = path[i + 1][1] - y;
-      const t = lengths[i] ? remaining / lengths[i] : 0;
-      return {x:Math.round(x + t * dx), y:Math.round(y + t * dy), dx, dy, distance};
-    }
-    remaining -= lengths[i];
-  }
-}
-
 // All poses share the sole at (0, 0) and a neck joint at (0, -12).
 // The far eye sits one pixel higher on the turned face.
 const face = [
@@ -101,45 +82,7 @@ export function paintRoom(canvas, shop, furnishings, characters) {
     pixelPerson(ctx, x, y, clerk, { left: true }, characters), furnishings);
 }
 
-const regularRoutes = [
-  [[28, 67], [18, 84], [18, 112], [38, 112]],
-  [[102, 114], [78, 111], [66, 103]]
-];
-
-export function regularProgress(visit, now) {
-  const distance = Math.max(0, (now - visit.changedAt) / 1400);
-  return visit.interested ? Math.min(1, visit.from + distance) : Math.max(0, visit.from - distance);
-}
-
-export function paintGuests(canvas, arrivals, now, still, furniture, characters, regulars = []) {
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const guests = arrivals.map(({ at, seed, person, tier = 0 }) => {
-    const age = now - at;
-    const spot = [42 + seed % 4 * 24, 56 + seed % 2 * 10];
-    const route = [entrance, [80, 117], [80, spot[1]], spot];
-    const progress = Math.min(1, age / 3200, (VISIT_MS - age) / 3200);
-    const {x, y, dx, dy, distance} = walkRoute(route, still ? 1 : progress);
-    const facing = age > VISIT_MS / 2 ? -1 : 1;
-    const browsing = still || progress === 1;
-    const step = browsing ? 0 : [0, 1, 0, -1][Math.floor(distance / 4) % 4];
-    return { x, y, depth: y, person, step, left: browsing ? seed % 2 === 0 : dx * facing < 0,
-      back: !browsing && dy * facing < 0, reading: browsing, fond: browsing && tier >= REGULAR_TIER };
-  });
-  regulars.forEach((visit, index) => {
-    const progress = still ? Number(visit.interested) : regularProgress(visit, now);
-    const { x, y, dx, dy, distance } = walkRoute(regularRoutes[index], progress);
-    const moving = progress > 0 && progress < 1;
-    const direction = visit.interested ? 1 : -1;
-    guests.push({ x, y, depth: y, person: REGULARS[index].person,
-      step: moving ? [0, 1, 0, -1][Math.floor(distance / 4) % 4] : 0,
-      left: moving ? dx * direction < 0 : index === 1, back: moving && dy * direction < 0,
-      reading: progress === 1 });
-  });
-  for (const item of [...furniture, ...guests].sort((a, b) => a.depth - b.depth)) {
-    if (item.layer) ctx.drawImage(item.layer, 0, 0);
-    else pixelPerson(ctx, item.x, item.y, item.person, item, characters);
-  }
-  // Close regulars show a small heart while they browse, drawn above furniture.
-  for (const guest of guests) if (guest.fond) stamp(ctx, guest.x - 2, guest.y - 35, heart, heartColors);
+// Close regulars show a small pixel heart above their head.
+export function paintHeart(ctx, x, y) {
+  stamp(ctx, x - 2, y - 35, heart, heartColors);
 }

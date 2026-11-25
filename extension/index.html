@@ -13,10 +13,9 @@
       <img src="icon-32.png" width="30" height="30" alt="">
       <span>jjokmun</span>
     </div>
-    <a id="shop-mini" href="#shop" aria-label="골목 책방으로 이동" hidden><canvas width="256" height="152" aria-hidden="true"></canvas></a>
     <nav aria-label="작업 화면 이동">
+      <a href="#floor" id="floor-link">책방</a>
       <button type="button" id="open-archive">메모장</button>
-      <a href="#floor" id="floor-link">책방 운영</a>
       <button type="button" id="open-settings">설정</button>
     </nav>
   </header>
@@ -24,6 +23,14 @@
   <main class="workspace" hidden>
     <section id="floor" aria-labelledby="floor-title">
       <div class="floor-heading"><div><p class="floor-date" id="business-day"></p><h1 id="floor-title" tabindex="-1">골목 책방</h1></div><strong id="business-phase"></strong></div>
+      <form id="floor-memo-form" class="floor-memo" autocomplete="off">
+        <label class="field-label" for="floor-memo-input">한 줄을 쓰면 새 책이 되어 신간 매대에 꽂혀요</label>
+        <div class="inline-form">
+          <input id="floor-memo-input" type="text" maxlength="2000" placeholder="오늘 떠오른 생각을 한 줄로 적어 보세요" required>
+          <button id="floor-memo-save" type="submit">책 꽂기</button>
+        </div>
+      </form>
+      <p class="status" id="floor-memo-status" role="status"></p>
       <div class="floor-layout">
         <div>
           <div id="sales-floor">
@@ -32,16 +39,62 @@
             <div id="furniture-handles" role="group" aria-label="움직일 가구" aria-describedby="floor-help"></div>
           </div>
           <p id="floor-event"></p>
+          <div class="owners-pick" hidden><span>주인의 추천글</span><p id="business-pick"></p></div>
+          <section class="guest-visit" aria-labelledby="writing-title">
+            <p class="floor-kicker">오늘 들른 손님</p>
+            <div class="guest-byline"><canvas id="guest-portrait" width="24" height="32" aria-hidden="true"></canvas><span>스케치북을 든 연두</span></div>
+            <h2 id="writing-title" tabindex="-1">첫 장을 펴는 용기</h2>
+            <p id="guest-speech"></p>
+            <blockquote id="guest-page" hidden></blockquote>
+            <p id="guest-reaction" hidden></p>
+            <form id="guest-form" autocomplete="off">
+              <label class="field-label" for="guest-input" id="guest-label">연두에게 건넬 한 줄</label>
+              <div class="inline-form"><input type="text" id="guest-input" maxlength="2000" required><button type="submit" id="guest-submit">글 건네기</button></div>
+            </form>
+            <button type="button" id="guest-choose" hidden>써 둔 메모에서 고르기</button>
+            <p class="status" role="status" id="guest-status"></p>
+          </section>
+          <section class="roster" aria-labelledby="roster-title">
+            <div class="section-heading"><h3 id="roster-title">단골 명부</h3><span id="roster-count" class="count"></span></div>
+            <p id="roster-tally"></p>
+            <ol id="roster-list"></ol>
+          </section>
         </div>
         <section class="ledger" aria-labelledby="ledger-title">
           <h2 id="ledger-title">오늘의 책방</h2>
-          <dl class="ledger-values"><div><dt>가게 안 손님</dt><dd id="floor-guests"></dd></div><div><dt title="서로 다른 영업일에 두 번 이상 책을 사 간 손님">단골</dt><dd id="floor-regulars"></dd></div></dl>
-          <p id="floor-help">가구를 잡아 원하는 곳에 놓으세요. 키보드로는 가구에 초점을 맞추고 방향키로 옮길 수 있어요.</p>
+          <dl class="ledger-values"><div><dt>가게 안 손님</dt><dd id="floor-guests"></dd></div><div><dt>오늘 팔린 내 책</dt><dd id="floor-sold"></dd></div></dl>
+          <div class="sold-books">
+            <h3>팔린 책</h3>
+            <p id="sold-empty"></p>
+            <ol id="sold-list"></ol>
+          </div>
+          <section class="daily" aria-labelledby="daily-title">
+            <div class="section-heading"><h3 id="daily-title">다시 찾는 책</h3></div>
+            <p id="daily-empty">며칠 지난 책은 손님이 다시 찾아와요.</p>
+            <div id="daily-board" hidden>
+              <button type="button" id="daily-memo">
+                <span id="daily-request"></span>
+                <span id="daily-excerpt"></span>
+                <span class="daily-read" aria-hidden="true">다시 읽고 답장</span>
+              </button>
+              <button type="button" id="defer-memo">오늘은 접어두기</button>
+            </div>
+          </section>
+          <section class="season" aria-labelledby="season-title">
+            <div class="section-heading"><h3 id="season-title">이달의 목표</h3><span id="season-name" class="count"></span></div>
+            <ul id="goal-list"></ul>
+            <p id="shop-grade"></p>
+            <p id="goal-status" class="status" role="status"></p>
+          </section>
+          <section id="year-review" class="year-review" aria-labelledby="review-title" hidden>
+            <div class="section-heading"><h3 id="review-title"></h3></div>
+            <dl id="review-stats"></dl>
+          </section>
+          <p id="floor-help">가구는 끌어서 옮길 수 있어요. 키보드로는 가구에 초점을 맞추고 방향키를 누르세요.</p>
           <button id="retry-floor" type="button" hidden>영업 기록 다시 저장</button>
           <p id="business-status" role="status"></p>
         </section>
       </div>
-      <div class="owners-pick" hidden><span>주인의 추천글</span><p id="business-pick"></p><a href="#shelf">손님 반응 보기</a></div>
     </section>
     <section class="writing" aria-labelledby="journal-title">
       <div class="writing-copy">
@@ -54,20 +107,10 @@
         </form>
         <p class="status" id="home-status" role="status"></p>
       </div>
-      <section id="shelf" class="display-shelf" aria-labelledby="shelf-title">
-        <div class="section-heading">
-          <h2 id="shelf-title" tabindex="-1" aria-describedby="shop-book shop-regulars">책방 매대</h2>
-          <button id="choose-display" type="button">메모 고르기</button>
-        </div>
-        <p id="shelf-empty">한 줄을 저장하고, 손님에게 권하고 싶은 글을 여기에 놓아 보세요.</p>
-        <button id="shop-book" type="button" hidden></button>
-        <div id="shop-regulars" aria-label="이 글을 본 손님들의 반응" role="group" aria-live="polite" hidden></div>
-      </section>
     </section>
     <aside class="archive panel" aria-labelledby="archive-title">
       <div class="section-heading">
         <h2 id="archive-title">전체 메모</h2>
-        <button id="cancel-shelf-pick" type="button" hidden>고르기 취소</button>
         <span id="memo-count" class="count" aria-label="메모 수">0</span>
       </div>
       <details id="memo-search" class="journal-disclosure">
@@ -155,72 +198,6 @@
       </section>
     </section>
 
-    <details id="journal-extras" class="journal-disclosure">
-      <summary>연두의 편지와 책방 소식</summary>
-      <div class="journal-news">
-        <section class="guest-visit" aria-labelledby="writing-title">
-          <div class="guest-byline"><canvas id="guest-portrait" width="24" height="32" aria-hidden="true"></canvas><span>스케치북을 든 연두</span></div>
-          <h2 id="writing-title" tabindex="-1">첫 장을 펴는 용기</h2>
-          <p id="guest-speech"></p>
-          <blockquote id="guest-page" hidden></blockquote>
-          <p id="guest-reaction" hidden></p>
-          <form id="guest-form" autocomplete="off">
-            <label class="field-label" for="guest-input" id="guest-label">연두에게 건넬 한 줄</label>
-            <div class="inline-form"><input type="text" id="guest-input" maxlength="2000" required><button type="submit" id="guest-submit">글 건네기</button></div>
-          </form>
-          <button type="button" id="guest-choose" hidden>써 둔 메모에서 고르기</button>
-          <p class="status" role="status" id="guest-status"></p>
-        </section>
-        <section id="shop" aria-labelledby="shop-title">
-          <div class="section-heading">
-            <h2 id="shop-title">골목 책방</h2>
-            <span class="shop-time">영업일 <span id="shop-day"></span> · <time id="shop-clock" aria-label="현재 시간"></time></span>
-          </div>
-          <div class="shop-room" role="img" aria-label="서가, 열람석, 계산대가 있는 도트 책방 내부">
-            <canvas id="shop-floor" width="256" height="152" aria-hidden="true"></canvas>
-            <canvas id="shop-guests" class="actor-layer" width="256" height="152" aria-hidden="true"></canvas>
-          </div>
-          <p id="shop-crowd"></p>
-          <template id="shelf-reader-template">
-            <article class="shelf-reader">
-              <div class="shelf-reader-heading"><canvas width="24" height="32" aria-hidden="true"></canvas><h3></h3></div>
-              <p class="regular-reaction"></p>
-            </article>
-          </template>
-        </section>
-        <aside class="alley panel" aria-label="책방 입간판">
-          <section class="daily" aria-labelledby="daily-title">
-            <div class="section-heading"><h3 id="daily-title">오늘의 입간판</h3><span class="board-icon" aria-hidden="true"></span></div>
-            <p id="daily-empty">지난날의 메모가 여기에 걸려요.</p>
-            <div id="daily-board" hidden>
-              <button type="button" id="daily-memo">
-                <span id="daily-request"></span>
-                <span id="daily-excerpt"></span>
-                <span class="daily-read" aria-hidden="true">메모 열기 ↗</span>
-              </button>
-              <button type="button" id="defer-memo">오늘은 접어두기</button>
-            </div>
-          </section>
-          <section class="season" aria-labelledby="season-title">
-            <div class="section-heading"><h3 id="season-title">이달의 목표</h3><span id="season-name" class="count"></span></div>
-            <p id="season-shelf"></p>
-            <ul id="goal-list"></ul>
-            <p id="shop-grade"></p>
-            <p id="goal-status" class="status" role="status"></p>
-          </section>
-          <section id="year-review" class="year-review" aria-labelledby="review-title" hidden>
-            <div class="section-heading"><h3 id="review-title"></h3></div>
-            <dl id="review-stats"></dl>
-          </section>
-          <section class="roster" aria-labelledby="roster-title">
-            <div class="section-heading"><h3 id="roster-title">단골 명부</h3><span id="roster-count" class="count"></span></div>
-            <p id="roster-tally"></p>
-            <ol id="roster-list"></ol>
-          </section>
-
-        </aside>
-      </div>
-    </details>
   </main>
 
   <main class="lock-screen panel" id="lock-screen" hidden>

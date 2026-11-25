@@ -1,4 +1,3 @@
-const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -70,7 +69,7 @@ async function checkSeason(session) {
   const folder = 'season-vault';
   const waitText = (tab, id, value) => tab.waitForFunction(([id, value]) =>
     document.getElementById(id).textContent === value, [id, value]);
-  const page = await session.tab('2031-12-10', folder);
+  const page = await session.tab('2031-12-10', folder, 'floor');
   let autumn;
   try {
     const november = completedMonth(11);
@@ -84,10 +83,9 @@ async function checkSeason(session) {
       });
     }, {memos:[...november.memos, ...december], daily:november.daily});
     await page.reload();
-    await openSection(page, 'journal-extras');
 
     await waitText(page, 'season-name', '12월 · 겨울');
-    assert.equal(await page.locator('#shop').getAttribute('data-season'), 'winter');
+    assert.equal(await page.locator('#floor').getAttribute('data-season'), 'winter');
     await waitText(page, 'shop-grade', '책방 등급: 이름난 책방 · 목표를 모두 이룬 달이 2번 더 있으면 골목 명소가 돼요.');
     assert.deepEqual(await page.locator('#goal-list .goal-count').allTextContents(), ['7/8', '0/4', '0/2']);
     assert.equal(await page.locator('#review-title').textContent(), '2031년 책방 결산');
@@ -99,13 +97,12 @@ async function checkSeason(session) {
     assert.match(stats['올해의 단골'], /손님 · 반가운 단골$/);
     assert.equal(await page.locator('#goal-status').textContent(), '', 'goals met before opening are not announced');
 
-    await page.locator('#memo-input').fill('12월의 여덟 번째 날');
-    await page.locator('#memo-save').click();
+    await page.locator('#floor-memo-input').fill('12월의 여덟 번째 날');
+    await page.locator('#floor-memo-save').click();
     await waitText(page, 'goal-status', '이달의 목표 달성: 메모를 쓴 날.');
     assert.deepEqual(await page.locator('#goal-list .goal-count').allTextContents(), ['8/8 달성', '0/4', '0/2']);
 
-    autumn = await session.tab('2031-11-25', folder);
-    await openSection(autumn, 'journal-extras');
+    autumn = await session.tab('2031-11-25', folder, 'floor');
     await waitText(autumn, 'season-name', '11월 · 가을');
     await waitText(autumn, 'shop-grade', '책방 등급: 이름난 책방 · 목표를 모두 이룬 달이 2번 더 있으면 골목 명소가 돼요.');
     assert.ok(await autumn.locator('#year-review').isHidden(), 'the review waits for December');
