@@ -19,8 +19,7 @@ export function bindShop() {
   const cards = REGULARS.map(regular => {
     const card = element('shelf-reader-template').content.firstElementChild.cloneNode(true);
     card.id = 'regular-' + regular.id;
-    card.querySelector('h4').textContent = regular.name;
-    card.querySelector('.regular-wish').textContent = regular.wish;
+    card.querySelector('h3').textContent = regular.name;
     paintPortrait(card.querySelector('canvas'), regular.person);
     element('shop-regulars').append(card);
     return card;
@@ -73,15 +72,20 @@ export function bindShop() {
       text('shop-title', shop.name || DEFAULT_NAME);
       mini.setAttribute('aria-label', (shop.name || DEFAULT_NAME) + '으로 이동');
       const memo = state.memos.find(item => item.id === shop.displayMemoId);
-      text('shop-book', memo?.text || (state.memos.length ? '어떤 메모를 권할까요?' : '첫 메모를 쓰면 진열할 수 있어요.'));
-      element('shop-book').disabled = !memo;
+      text('shop-book', memo?.text || '');
+      element('shop-book').hidden = !memo;
+      element('shop-regulars').hidden = !memo;
+      element('shelf-empty').hidden = Boolean(memo);
+      text('shelf-empty', state.memos.length ? '아직 비어 있어요. 손님에게 권할 메모 한 편을 골라 보세요.' : '한 줄을 저장하고, 손님에게 권하고 싶은 글을 여기에 놓아 보세요.');
       element('choose-display').disabled = !state.memos.length;
+      element('choose-display').hidden = !state.memos.length;
+      text('choose-display', memo ? '다른 메모 고르기' : '메모 고르기');
       const now = Date.now();
       regulars = shelfReactions(memo, date).map(({ interested, reason }, i) => {
         const card = cards[i];
         card.classList.toggle('interested', interested);
         const reaction = card.querySelector('.regular-reaction');
-        const message = reason && (interested ? '매대에서 읽는 중 · ' : '') + reason;
+        const message = interested ? '읽는 중 · ' + reason : reason;
         if (reaction.textContent !== message) reaction.textContent = message;
         const previous = regulars[i];
         if (previous?.interested === interested) return previous;

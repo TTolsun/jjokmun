@@ -9,6 +9,8 @@ async function checkBookshop(session) {
     document.getElementById(id).textContent === value, [id, value]);
   try {
     await page.bringToFront();
+    assert.equal(new URL(page.url()).hash, '');
+    assert.ok(await page.locator('#memo-input').evaluate(input => input === document.activeElement));
     await page.clock.setFixedTime(start);
     await waitText(page, 'shop-crowd', '매대 단골 2명 · 메모 단골 방문 중 0명');
     assert.ok(await page.locator('#choose-display').isDisabled());
@@ -18,14 +20,26 @@ async function checkBookshop(session) {
       await page.locator('#memo-save').click();
       await waitText(page, 'shop-crowd', '매대 단골 2명 · 메모 단골 방문 중 ' + (index + 1) + '명');
     }
-    await waitText(page, 'shop-book', '어떤 메모를 권할까요?');
-    const interested = page.locator('.shelf-reader.interested h4');
-    await openSection(page, 'journal-extras');
+    assert.ok(await page.locator('#shop-book').isHidden());
+    assert.ok(await page.locator('#shelf-empty').isVisible());
+    const interested = page.locator('.shelf-reader.interested h3');
+    await page.locator('#choose-display').click();
+    const picker = page.getByRole('complementary', {name:'매대에 놓을 메모 고르기'});
+    await page.keyboard.press('Control+k');
+    assert.ok(await picker.isVisible(), 'search shortcut must keep the shelf picker open');
+    await picker.getByRole('searchbox').fill('없는 제목');
+    await picker.getByText('검색 결과가 없습니다.').waitFor();
+    assert.equal(await page.getByRole('button', {name:'매대에 놓기', exact:true}).count(), 0);
+    await picker.getByRole('button', {name:'고르기 취소'}).click();
+    await page.locator('#choose-display:focus').waitFor();
+    assert.equal(await page.locator('#detail-original').innerText(), '겨울의 기록');
     await page.locator('#choose-display').click();
     await page.locator('#archive-list button').filter({hasText:'겨울의 기록'}).click();
-    await openSection(page, 'memo-tools');
-    await page.locator('#display-memo').click();
+    assert.ok(await page.locator('#edit-memo').isHidden());
+    await page.getByRole('button', {name:'매대에 놓기', exact:true}).click();
     await waitText(page, 'shop-book', '겨울의 기록');
+    await page.locator('#shelf-title:focus').waitFor();
+    assert.ok(await page.locator('#regular-window .regular-reaction').isVisible());
     assert.deepEqual(await interested.allTextContents(), []);
     await page.locator('#shop-book').click();
     await openSection(page, 'reply-compose');
@@ -47,13 +61,27 @@ async function checkBookshop(session) {
     await page.locator('#reply-save').click();
     await page.locator('#regular-door.interested').waitFor();
     assert.deepEqual(await interested.allTextContents(), ['창가 단골', '문가 단골']);
-    await openSection(page, 'journal-extras');
     await page.locator('#choose-display').click();
+    await page.locator('#archive-search').fill('봄의 기록');
     await page.locator('#archive-list button').filter({hasText:'봄의 기록'}).click();
-    await openSection(page, 'memo-tools');
-    await page.locator('#display-memo').click();
+    assert.match(await page.locator('#shelf-previous').innerText(), /겨울의 기록/);
+    // Commit a remote shelf change before its notification reaches this tab.
+    await second.evaluate(async () => {
+      const {readPayload} = await import('./vault.js');
+      await readPayload(draft => { delete draft.shop.displayMemoId; });
+    });
+    await page.getByRole('button', {name:'이 글로 교체하기'}).click();
+    await page.locator('#detail-status').getByText(/다른 탭에서 매대의 글이 바뀌었어요/).waitFor();
+    assert.ok(await page.locator('#shop-book').isHidden());
+    await second.locator('#archive-list button').filter({hasText:'겨울의 기록'}).click();
+    await second.getByRole('button', {name:'매대에 놓기', exact:true}).click();
+    await waitText(page, 'shop-book', '겨울의 기록');
+    await page.getByRole('button', {name:'이 글로 교체하기'}).click();
     await waitText(second, 'shop-book', '봄의 기록');
     assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
+    assert.match(await page.locator('#regular-window').innerText(), /읽는 중 · 7일 전/);
+    await page.getByRole('button', {name:'매대에서 손님 반응 보기'}).click();
+    await page.locator('#shelf-title:focus').waitFor();
     await page.locator('#open-settings').click();
     await page.locator('#shop-name').fill('달빛 서점');
     await page.locator('#shop-name-form button').click();
@@ -148,7 +176,8 @@ async function checkBookshop(session) {
       await waitText(page, 'memo-count', String(count - 1));
     }
     await waitText(page, 'shop-crowd', '매대 단골 2명 · 메모 단골 방문 중 0명');
-    await waitText(page, 'shop-book', '첫 메모를 쓰면 진열할 수 있어요.');
+    await page.locator('#shelf-empty').waitFor();
+    assert.ok(await page.locator('#shop-book').isHidden());
     assert.deepEqual(await interested.allTextContents(), []);
     console.log('PASS  one-slot display, four taste outcomes, midnight rollover, multi-tab selection and recurring guests');
   } finally {

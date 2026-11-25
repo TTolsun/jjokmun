@@ -15,8 +15,8 @@
     </div>
     <a id="shop-mini" href="#shop" aria-label="골목 책방으로 이동" hidden><canvas width="256" height="152" aria-hidden="true"></canvas></a>
     <nav aria-label="작업 화면 이동">
-      <a href="#floor" id="floor-link">책방 운영</a>
       <button type="button" id="open-archive">메모장</button>
+      <a href="#floor" id="floor-link">책방 운영</a>
       <button type="button" id="open-settings">설정</button>
     </nav>
   </header>
@@ -41,7 +41,7 @@
           <p id="business-status" role="status"></p>
         </section>
       </div>
-      <div class="owners-pick" hidden><span>주인의 추천글</span><p id="business-pick"></p></div>
+      <div class="owners-pick" hidden><span>주인의 추천글</span><p id="business-pick"></p><a href="#shelf">손님 반응 보기</a></div>
     </section>
     <section class="writing" aria-labelledby="journal-title">
       <div class="writing-copy">
@@ -54,10 +54,20 @@
         </form>
         <p class="status" id="home-status" role="status"></p>
       </div>
+      <section id="shelf" class="display-shelf" aria-labelledby="shelf-title">
+        <div class="section-heading">
+          <h2 id="shelf-title" tabindex="-1" aria-describedby="shop-book shop-regulars">책방 매대</h2>
+          <button id="choose-display" type="button">메모 고르기</button>
+        </div>
+        <p id="shelf-empty">한 줄을 저장하고, 손님에게 권하고 싶은 글을 여기에 놓아 보세요.</p>
+        <button id="shop-book" type="button" hidden></button>
+        <div id="shop-regulars" aria-label="이 글을 본 손님들의 반응" role="group" aria-live="polite" hidden></div>
+      </section>
     </section>
     <aside class="archive panel" aria-labelledby="archive-title">
       <div class="section-heading">
         <h2 id="archive-title">전체 메모</h2>
+        <button id="cancel-shelf-pick" type="button" hidden>고르기 취소</button>
         <span id="memo-count" class="count" aria-label="메모 수">0</span>
       </div>
       <details id="memo-search" class="journal-disclosure">
@@ -93,6 +103,10 @@
         </div>
         <div class="note-byline"><time id="detail-date"></time></div>
         <p class="original" id="detail-original"></p>
+        <div class="shelf-action">
+          <button type="button" id="display-memo">매대에 놓기</button>
+          <p id="shelf-previous" hidden></p>
+        </div>
         <div id="detail-replies" class="replies"></div>
         <template id="reply-actions-template">
           <div class="detail-actions">
@@ -125,7 +139,6 @@
             <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
             <button type="button" id="edit-memo">원문 수정</button>
             <button type="button" id="delete-memo">메모 삭제</button>
-            <button type="button" id="display-memo">매대에 올리기</button>
             <button type="button" id="give-memo" hidden>이 글을 연두에게 건네기</button>
           </div>
           <form id="edit-form" hidden>
@@ -168,15 +181,9 @@
             <canvas id="shop-guests" class="actor-layer" width="256" height="152" aria-hidden="true"></canvas>
           </div>
           <p id="shop-crowd"></p>
-          <div class="display-shelf">
-            <div><h3>한 칸 매대</h3><button id="shop-book" type="button"></button></div>
-            <button id="choose-display" type="button">메모 고르기</button>
-          </div>
-          <div id="shop-regulars" aria-label="단골의 취향과 반응" role="group" aria-live="polite"></div>
           <template id="shelf-reader-template">
             <article class="shelf-reader">
-              <div class="shelf-reader-heading"><canvas width="24" height="32" aria-hidden="true"></canvas><h4></h4></div>
-              <p class="regular-wish"></p>
+              <div class="shelf-reader-heading"><canvas width="24" height="32" aria-hidden="true"></canvas><h3></h3></div>
               <p class="regular-reaction"></p>
             </article>
           </template>
@@ -233,8 +240,8 @@
 
   <main id="storage-start" class="lock-screen panel" hidden aria-labelledby="start-title">
     <img src="icon-32.png" width="36" height="36" alt="">
-    <h1 id="start-title">어느 폴더에 책방을 열까요?</h1>
-    <p>책방 배치와 메모를 보관할 폴더를 선택하세요. 새 책방에서는 바로 첫 영업이 시작됩니다.</p>
+    <h1 id="start-title">메모를 어디에 보관할까요?</h1>
+    <p>내 기기의 폴더에 메모와 책방을 함께 저장해요. 전에 쓰던 폴더를 고르면 이어서 쓸 수 있어요.</p>
     <button id="reopen-last-folder" type="button" hidden>저장 폴더 다시 연결</button>
     <button id="choose-first-folder" type="button">메모 저장 폴더 선택</button>
     <button id="choose-new-folder" type="button" hidden>새 책방 시작</button>

@@ -24,7 +24,7 @@ let linkedReply;
 let returnFocus;
 let confirmedReplyCount;
 let initialView = true;
-let pickingMemo = false;
+let choosingFor;
 let pendingRefresh = Promise.resolve();
 let workspaceReady = false;
 let mode;
@@ -54,7 +54,7 @@ function clearSensitive(showLock) {
   viewGeneration += 1;
   workspaceReady = false;
   workspace.hidden = true;
-  pickingMemo = false;
+  choosingFor = undefined;
   for (const details of document.querySelectorAll('.journal-disclosure[open]')) details.open = false;
   header.hidden = true;
   element('lock-screen').hidden = !showLock;
@@ -73,7 +73,7 @@ function clearSensitive(showLock) {
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
-    'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
+    'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status', 'shelf-previous',
     'delete-message', 'vault-state', 'unlock-status', 'daily-request', 'roster-count', 'roster-tally', 'roster-list',
     'regular-name', 'regular-title', 'regular-hint', 'season-name', 'season-shelf', 'goal-list', 'shop-grade',
     'goal-status', 'review-title', 'review-stats']) {
@@ -107,6 +107,7 @@ function renderPayload(result, date, storageMode = mode) {
   const months = activity(state, date);
   const grade = shopGrade(state, date, months);
   bookshop.update(state, date, grade.level);
+  const justOpened = !workspaceReady;
   workspaceReady = true;
   workspace.hidden = false;
   header.hidden = false;
@@ -121,10 +122,12 @@ function renderPayload(result, date, storageMode = mode) {
     : '현재 저장소의 메모는 현재 평문으로 저장됩니다.');
   render(date, months, grade);
   if (!document.body.classList.contains('journal-view')) salesFloor.update(state);
+  else if (justOpened && location.hash === '#shelf') focusShelf();
+  else if (justOpened && location.hash !== '#shop') element('memo-input').focus({ preventScroll: true });
 }
 
 function switchView() {
-  const journal = location.hash === '#journal' || location.hash === '#shop';
+  const journal = location.hash !== '#floor';
   const leavingJournal = !journal && document.body.classList.contains('journal-view');
   document.body.classList.toggle('journal-view', journal);
   if (location.hash === '#shop') element('journal-extras').open = true;
@@ -132,6 +135,11 @@ function switchView() {
   element('open-archive').setAttribute('aria-current', journal ? 'page' : 'false');
   if (journal) salesFloor.reset();
   else if (workspaceReady) salesFloor.update(state);
+  if (workspaceReady && choosingFor) {
+    choosingFor = undefined;
+    renderSelection();
+  }
+  if (workspaceReady && location.hash === '#shelf') focusShelf();
   if (leavingJournal) {
     element('floor-title').focus({ preventScroll: true });
     window.scrollTo(0, 0);
@@ -422,7 +430,7 @@ bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text)
   });
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
-  return '메모를 남겼어요. ' + regularOf(id).name + '이 새 단골이 되어 책방에 들러요.';
+  return '메모를 저장했어요.';
 });
 
 function replyMessage(memoId, before, after) {
@@ -585,6 +593,7 @@ element('archive-search').addEventListener('input', refreshArchive);
 function openDetail(id, replyId, source) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
+    setStatus('home-status', '');
     element('reply-compose').open = false;
     element('memo-tools').open = false;
     replyDialog.reset();
@@ -596,10 +605,10 @@ function openDetail(id, replyId, source) {
   detailId = id;
   linkedReply = replyId;
   returnFocus = source;
-  if (pickingMemo && source?.dataset.memoId) {
+  if (choosingFor === 'guest' && source?.dataset.memoId) {
     element('memo-tools').open = true;
-    pickingMemo = false;
   }
+  choosingFor = undefined;
   renderSelection();
   refreshArchive();
   if (source) element('detail-title').focus();
@@ -607,13 +616,20 @@ function openDetail(id, replyId, source) {
 
 function renderSelection() {
   const hasMemo = Boolean(currentMemo());
-  document.querySelector('.notebook').hidden = !state.memos.length;
+  const pickingShelf = choosingFor === 'shelf' && state.memos.length > 0;
+  element('archive-title').textContent = pickingShelf ? '매대에 놓을 메모 고르기' : '전체 메모';
+  element('cancel-shelf-pick').hidden = !pickingShelf;
+  document.querySelector('.notebook').hidden = !state.memos.length || pickingShelf;
   element('detail-dialog').hidden = !hasMemo;
   element('note-empty').hidden = hasMemo;
   if (hasMemo) {
-    const displayed = detailId === state.shop?.displayMemoId;
-    element('display-memo').disabled = displayed;
-    element('display-memo').textContent = displayed ? '매대에 진열 중' : '매대에 올리기';
+    const displayId = state.shop?.displayMemoId;
+    const displayed = detailId === displayId;
+    const previous = displayId && !displayed && state.memos.find(memo => memo.id === displayId);
+    element('shelf-previous').hidden = !previous;
+    element('shelf-previous').textContent = previous ? '지금 매대에 놓인 글 · ' + previous.text : '';
+    element('display-memo').disabled = false;
+    element('display-memo').textContent = displayed ? '매대에서 손님 반응 보기' : previous ? '이 글로 교체하기' : '매대에 놓기';
     renderDetail();
   } else if (state.memos.length) {
     element('empty-title').textContent = '메모를 골라 주세요';
@@ -624,38 +640,60 @@ function renderSelection() {
   }
 }
 
-function chooseFromArchive(message) {
-  pickingMemo = true;
+function chooseFromArchive(purpose) {
+  choosingFor = purpose;
+  renderSelection();
   element('memo-search').open = true;
   const search = element('archive-search');
   search.value = '';
   search.dispatchEvent(new Event('input'));
   search.focus();
-  setStatus('archive-status', message);
+  if (purpose === 'guest') setStatus('archive-status', '메모를 열고 ‘이 글을 연두에게 건네기’를 눌러 주세요.');
 }
-element('choose-display').addEventListener('click', () => chooseFromArchive('메모를 열고 ‘매대에 올리기’를 눌러 주세요.'));
-element('guest-choose').addEventListener('click', () => chooseFromArchive('메모를 열고 ‘이 글을 연두에게 건네기’를 눌러 주세요.'));
+element('choose-display').addEventListener('click', () => chooseFromArchive('shelf'));
+element('guest-choose').addEventListener('click', () => chooseFromArchive('guest'));
+element('cancel-shelf-pick').addEventListener('click', () => {
+  choosingFor = undefined;
+  element('memo-search').open = false;
+  renderSelection();
+  element('choose-display').focus();
+});
 
 element('shop-book').addEventListener('click', event => {
   if (state.shop?.displayMemoId) openDetail(state.shop.displayMemoId, undefined, event.currentTarget);
 });
 
+function focusShelf() {
+  element('shelf-title').focus({ preventScroll: true });
+  document.querySelector('.display-shelf').scrollIntoView({ block: 'nearest' });
+}
+
 element('display-memo').addEventListener('click', async () => {
   const id = detailId;
+  const previousId = state.shop?.displayMemoId;
+  if (id === previousId) {
+    focusShelf();
+    return;
+  }
   const button = element('display-memo');
   button.disabled = true;
   try {
     await change(draft => {
       findMemo(draft, id);
+      if (draft.shop?.displayMemoId !== previousId) return false;
       (draft.shop ??= newShop()).displayMemoId = id;
     });
-    if (detailId === id && state.shop?.displayMemoId === id) {
-      setStatus('detail-status', '책방 매대에 추천글을 올렸어요.');
-      (element('journal-extras').open ? element('shop-book') : element('memo-tools').querySelector('summary')).focus();
+    if (detailId === id) {
+      if (state.shop?.displayMemoId === id) {
+        setStatus('detail-status', '책방 매대에 추천글을 올렸어요.');
+        focusShelf();
+      } else {
+        setStatus('detail-status', '다른 탭에서 매대의 글이 바뀌었어요. 교체할 글을 다시 확인해 주세요.');
+      }
     }
   } catch (error) {
     if (workspaceReady && detailId === id) {
-      button.disabled = id === state.shop?.displayMemoId;
+      button.disabled = false;
       setStatus('detail-status', error.message || '매대에 올리지 못했어요. 다시 시도해 주세요.');
     }
   }

@@ -46,9 +46,9 @@ async function launch(profile, extensionPath = extension) {
       try { owner ||= request.frame().url(); } catch {}
       if (owner?.startsWith('chrome-extension:')) external.push(request.url());
     });
-    const tab = async (date, folder = 'test-vault', view = 'journal') => {
+    const tab = async (date, folder = 'test-vault', view) => {
       const page = await context.newPage();
-      await page.goto(home + (date ? '?date=' + date : '') + (view === 'journal' ? '#journal' : ''));
+      await page.goto(home + (date ? '?date=' + date : '') + (view ? '#' + view : ''));
       if (folder) {
         await page.locator('#storage-start:visible, .workspace:visible, #lock-screen:visible').waitFor();
         if (await page.locator('#choose-first-folder').isVisible()) await selectFolder(page, folder);

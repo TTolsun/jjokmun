@@ -290,7 +290,7 @@ async function checkVault(session, a) {
   await unlock(owner);
   await openSection(owner, 'memo-tools');
   await owner.locator('#display-memo').click();
-  await owner.waitForFunction(() => !document.querySelector('#shop-book').disabled);
+  await owner.locator('#shop-book').waitFor();
   await settings(owner);
   await owner.locator('#shop-name').fill('저녁의 서점');
   await owner.locator('#shop-name-form button').click();

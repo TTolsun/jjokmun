@@ -123,10 +123,8 @@ export const DEFAULT_NAME = '골목 책방';
 export const VISIT_MS = 18000;
 
 export const REGULARS = [
-  { id: 'window', person: appearance(identity('window-reader')), name: '창가 단골',
-    wish: '쓴 지 일주일은 된 글을 읽고 싶어요.' },
-  { id: 'door', person: appearance(identity('door-reader')), name: '문가 단골',
-    wish: '오늘 답장이 달린 글을 읽고 싶어요.' }
+  { id: 'window', person: appearance(identity('window-reader')), name: '창가 단골' },
+  { id: 'door', person: appearance(identity('door-reader')), name: '문가 단골' }
 ];
 
 export function shelfReactions(memo, date) {
@@ -134,8 +132,8 @@ export function shelfReactions(memo, date) {
   const age = (Date.parse(date) - Date.parse(memo.createdOn)) / 86400000;
   const continued = memo.replies.some(reply => reply.createdOn === date);
   return [
-    { interested: age >= 7, reason: age >= 7 ? `${age}일 전의 글이네요. 그때 이야기를 읽어 볼게요.` : '조금 더 오래된 글을 기다릴게요.' },
-    { interested: continued, reason: continued ? '오늘 새 답장이 왔네요. 뒷이야기가 궁금해요.' : '이 글에는 오늘 달린 답장이 없네요.' }
+    { interested: age >= 7, reason: age >= 7 ? `${age}일 전의 글이네요. 그때 이야기를 읽어 볼게요.` : '쓴 지 일주일이 되면 읽으러 올게요.' },
+    { interested: continued, reason: continued ? '오늘 새 답장이 왔네요. 뒷이야기가 궁금해요.' : '오늘 답장을 남겨 주시면 뒷이야기를 읽으러 올게요.' }
   ];
 }
 
