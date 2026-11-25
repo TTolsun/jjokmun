@@ -15,8 +15,9 @@ function showMatchingText(container, value, query) {
     container.textContent = value;
     return;
   }
-  const start = Math.max(0, hit - 5);
-  const end = Math.min(normalized.length, hit + query.length + 32);
+  const short = normalized.length <= 64;
+  const start = short ? 0 : Math.max(0, hit - 5);
+  const end = short ? normalized.length : Math.min(normalized.length, hit + query.length + 32);
   const match = document.createElement('mark');
   match.textContent = normalized.slice(hit, hit + query.length);
   container.append((start ? '…' : '') + normalized.slice(start, hit), match,
@@ -43,6 +44,7 @@ export function renderArchive(memos, selectedId, openDetail) {
   const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.memoId : undefined;
   const query = searchText(element('archive-search').value.trim());
   element('memo-count').textContent = memos.length;
+  element('memo-count').hidden = Boolean(query);
   list.replaceChildren();
   const more = element('archive-more');
   more.hidden = true;
@@ -104,7 +106,7 @@ element('open-archive').addEventListener('click', () => {
 window.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     event.preventDefault();
-    openJournal();
+    if (!document.body.classList.contains('journal-view')) openJournal();
     element('memo-search').open = true;
     element('archive-search').focus();
     element('archive-search').select();

@@ -72,7 +72,7 @@ function clearSensitive(showLock) {
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   for (const id of ['memo-input', 'floor-memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
-    'detail-status', 'copy-status', 'home-status', 'floor-memo-status', 'archive-status', 'settings-status',
+    'detail-status', 'copy-status', 'home-status', 'floor-memo-status', 'archive-status', 'settings-status', 'shelf-previous',
     'delete-message', 'vault-state', 'unlock-status', 'daily-request', 'roster-count', 'roster-tally', 'roster-list',
     'regular-name', 'regular-title', 'regular-hint', 'season-name', 'goal-list', 'shop-grade',
     'goal-status', 'review-title', 'review-stats']) {
@@ -611,6 +611,7 @@ element('archive-search').addEventListener('input', refreshArchive);
 function openDetail(id, replyId, source) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
+    setStatus('home-status', '');
     element('reply-compose').open = false;
     element('memo-tools').open = false;
     replyDialog.reset();
@@ -637,9 +638,14 @@ function renderSelection() {
   element('detail-dialog').hidden = !hasMemo;
   element('note-empty').hidden = hasMemo;
   if (hasMemo) {
-    const displayed = detailId === state.shop?.displayMemoId;
-    element('display-memo').disabled = displayed;
-    element('display-memo').textContent = displayed ? '매대에 진열 중' : '매대에 올리기';
+    // The shelf holds one memo, so show what a new pick would replace.
+    const displayId = state.shop?.displayMemoId;
+    const displayed = detailId === displayId;
+    const previous = displayId && !displayed && state.memos.find(memo => memo.id === displayId);
+    element('shelf-previous').hidden = !previous;
+    element('shelf-previous').textContent = previous ? '지금 매대에 놓인 글 · ' + previous.text : '';
+    element('display-memo').disabled = false;
+    element('display-memo').textContent = displayed ? '책방에서 보기' : previous ? '이 글로 교체하기' : '매대에 놓기';
     renderDetail();
   } else if (state.memos.length) {
     element('empty-title').textContent = '메모를 골라 주세요';
@@ -665,22 +671,30 @@ element('guest-choose').addEventListener('click', () => chooseFromArchive('메�
 
 element('display-memo').addEventListener('click', async () => {
   const id = detailId;
+  const previousId = state.shop?.displayMemoId;
+  if (id === previousId) {
+    showView('#floor');
+    return;
+  }
   const button = element('display-memo');
   button.disabled = true;
   try {
+    // Replace only the pick this tab showed; another tab may have changed it.
     await change(draft => {
       findMemo(draft, id);
+      if (draft.shop?.displayMemoId !== previousId) return false;
       (draft.shop ??= newShop()).displayMemoId = id;
     });
-    if (detailId === id && state.shop?.displayMemoId === id) {
-      setStatus('detail-status', '책방 매대에 추천글을 올렸어요.');
-      element('memo-tools').querySelector('summary').focus();
+    if (detailId === id) {
+      setStatus('detail-status', state.shop?.displayMemoId === id
+        ? '책방 매대에 추천글을 올렸어요.'
+        : '다른 탭에서 매대의 글이 바뀌었어요. 교체할 글을 다시 확인해 주세요.');
+      button.focus();
     }
   } catch (error) {
-    if (workspaceReady && detailId === id) {
-      button.disabled = id === state.shop?.displayMemoId;
-      setStatus('detail-status', error.message || '매대에 올리지 못했어요. 다시 시도해 주세요.');
-    }
+    if (workspaceReady && detailId === id) setStatus('detail-status', error.message || '매대에 올리지 못했어요. 다시 시도해 주세요.');
+  } finally {
+    button.disabled = false;
   }
 });
 

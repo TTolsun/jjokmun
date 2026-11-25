@@ -9,10 +9,9 @@ async function checkBookshop(session) {
     document.getElementById(id).textContent === value, [id, value]);
   const pick = async name => {
     await page.locator('#archive-list button').filter({hasText:name}).click();
-    await openSection(page, 'memo-tools');
     await page.locator('#display-memo').click();
     await waitText(page, 'detail-status', '책방 매대에 추천글을 올렸어요.');
-    assert.equal(await page.locator('#display-memo').textContent(), '매대에 진열 중');
+    assert.equal(await page.locator('#display-memo').textContent(), '책방에서 보기');
     await waitText(second, 'business-pick', name);
   };
   try {
@@ -23,7 +22,20 @@ async function checkBookshop(session) {
       await page.locator('#detail-original').getByText(name).waitFor();
     }
     await pick('겨울의 기록');
+    await page.locator('#archive-list button').filter({hasText:'봄의 기록'}).click();
+    assert.match(await page.locator('#shelf-previous').innerText(), /겨울의 기록/);
+    // Commit a remote shelf change before its notification reaches this tab.
+    await second.evaluate(async () => {
+      const {readPayload} = await import('./vault.js');
+      await readPayload(draft => { delete draft.shop.displayMemoId; });
+    });
+    await page.getByRole('button', {name:'이 글로 교체하기'}).click();
+    await waitText(page, 'detail-status', '다른 탭에서 매대의 글이 바뀌었어요. 교체할 글을 다시 확인해 주세요.');
+    await second.locator('.owners-pick').waitFor({state:'hidden'});
     await pick('봄의 기록');
+    await page.getByRole('button', {name:'책방에서 보기'}).click();
+    await page.locator('#business-pick').getByText('봄의 기록').waitFor();
+    await page.locator('#open-archive').click();
     await page.locator('#open-settings').click();
     await page.locator('#shop-name').fill('달빛 서점');
     await page.locator('#shop-name-form button').click();

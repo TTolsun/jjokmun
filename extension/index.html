@@ -146,6 +146,10 @@
         </div>
         <div class="note-byline"><time id="detail-date"></time></div>
         <p class="original" id="detail-original"></p>
+        <div class="shelf-action">
+          <button type="button" id="display-memo">매대에 놓기</button>
+          <p id="shelf-previous" hidden></p>
+        </div>
         <div id="detail-replies" class="replies"></div>
         <template id="reply-actions-template">
           <div class="detail-actions">
@@ -178,7 +182,6 @@
             <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
             <button type="button" id="edit-memo">원문 수정</button>
             <button type="button" id="delete-memo">메모 삭제</button>
-            <button type="button" id="display-memo">매대에 올리기</button>
             <button type="button" id="give-memo" hidden>이 글을 연두에게 건네기</button>
           </div>
           <form id="edit-form" hidden>
@@ -214,8 +217,8 @@
 
   <main id="storage-start" class="lock-screen panel" hidden aria-labelledby="start-title">
     <img src="icon-32.png" width="36" height="36" alt="">
-    <h1 id="start-title">어느 폴더에 책방을 열까요?</h1>
-    <p>책방 배치와 메모를 보관할 폴더를 선택하세요. 새 책방에서는 바로 첫 영업이 시작됩니다.</p>
+    <h1 id="start-title">메모를 어디에 보관할까요?</h1>
+    <p>내 기기의 폴더에 메모와 책방을 함께 저장해요. 전에 쓰던 폴더를 고르면 이어서 쓸 수 있어요.</p>
     <button id="reopen-last-folder" type="button" hidden>저장 폴더 다시 연결</button>
     <button id="choose-first-folder" type="button">메모 저장 폴더 선택</button>
     <button id="choose-new-folder" type="button" hidden>새 책방 시작</button>
