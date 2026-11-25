@@ -12,12 +12,12 @@ function loadChromium() {
 
 const installed = path.resolve(__dirname, '../jjokmun');
 const extension = fs.existsSync(path.join(installed, 'manifest.json')) ? installed : path.resolve(__dirname, '../extension');
-async function selectFolder(page, name = 'test-vault') {
+async function selectFolder(page, name = 'test-vault', button = '#choose-first-folder') {
   await page.evaluate(name => {
     window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle(name, {create:true});
   }, name);
-  await page.locator('#choose-first-folder').click();
-  await page.locator('#storage-start').waitFor({state:'hidden'});
+  await page.locator(button).click();
+  await page.locator('.workspace:visible, #lock-screen:visible').waitFor();
 }
 
 async function launch(profile, extensionPath = extension) {
@@ -44,7 +44,12 @@ async function launch(profile, extensionPath = extension) {
     const tab = async (date, folder = 'test-vault') => {
       const page = await context.newPage();
       await page.goto(home + (date ? '?date=' + date : ''));
-      if (folder) await selectFolder(page, folder);
+      if (folder) {
+        await page.locator('#storage-start:visible, .workspace:visible, #lock-screen:visible').waitFor();
+        if (await page.locator('#choose-first-folder').isVisible()) await selectFolder(page, folder);
+        const selected = await page.evaluate(async () => (await import('./vault.js')).folderConnection().directory.name);
+        assert.equal(selected, folder);
+      }
       return page;
     };
     return {context, home, worker, external, tab};

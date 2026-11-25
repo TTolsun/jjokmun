@@ -5,6 +5,7 @@ import { newestMemos, renderArchive, resetArchive } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
 import { folderConnection, useFolder, reconnectFolder } from './vault.js';
+import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
@@ -691,24 +692,69 @@ element('shop-name-form').addEventListener('submit', async event => {
   } catch (error) { setStatus('settings-status', error.message); }
 });
 
+let lastDirectory;
+
+function reopenLastFolder() {
+  return useFolder(lastDirectory, { reopen: true, remember: false });
+}
+
+function showLastFolderError(error) {
+  const name = lastDirectory.name;
+  element('reopen-last-folder').hidden = false;
+  element('reopen-last-folder').textContent = name + ' 다시 연결';
+  element('choose-first-folder').textContent = '기존 저장 폴더 찾아 열기';
+  element('choose-new-folder').hidden = false;
+  element('folder-start-status').textContent = '「' + name + '」 폴더를 열 수 없습니다. ' + error.message;
+}
+
+async function restoreLastFolder() {
+  try {
+    lastDirectory = await readLastFolder();
+    if (lastDirectory) await reopenLastFolder();
+  } catch (error) {
+    if (lastDirectory) showLastFolderError(error);
+    else element('folder-start-status').textContent = '마지막 폴더를 확인할 수 없습니다. 저장 폴더를 선택해 주세요.';
+  }
+}
+
+element('reopen-last-folder').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  button.disabled = element('choose-first-folder').disabled = element('choose-new-folder').disabled = true;
+  try {
+    if (await lastDirectory.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+      throw new FolderAccessError('다시 연결하려면 읽기와 쓰기를 허용해 주세요.');
+    }
+    await reopenLastFolder();
+    clearSensitive(false);
+    await refresh();
+  } catch (error) { showLastFolderError(error); }
+  finally { button.disabled = element('choose-first-folder').disabled = element('choose-new-folder').disabled = false; }
+});
+
 async function chooseFolder(button, reopen) {
   const expected = viewGeneration;
   button.disabled = true;
   try {
     const directory = await window.showDirectoryPicker({ mode: 'readwrite' });
     if (expected !== viewGeneration) return;
-    await useFolder(directory, { reopen });
+    const remembered = await useFolder(directory, { reopen, copyCurrent: workspaceReady });
     clearSensitive(false);
     await refresh();
+    if (!remembered) {
+      setStatus(workspaceReady ? 'home-status' : 'unlock-status', '폴더를 열었지만 다음 실행을 위한 연결 정보를 저장하지 못했습니다.');
+    }
   } catch (error) {
     if (error.name !== 'AbortError') {
       if (!folderConnection()) element('folder-start-status').textContent = error.message;
+      else if (!element('lock-screen').hidden) setStatus('unlock-status', error.message);
       else setStatus(reopen ? 'startup-status' : 'settings-status', error.message);
     }
   } finally { button.disabled = false; }
 }
 
-element('choose-first-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
+element('choose-first-folder').addEventListener('click', event => chooseFolder(event.currentTarget, Boolean(lastDirectory)));
+element('choose-new-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
+element('choose-locked-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('choose-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('storage-relocate').addEventListener('click', event => chooseFolder(event.currentTarget, true));
 element('storage-reconnect').addEventListener('click', async () => {
@@ -807,4 +853,5 @@ setInterval(async () => {
     if (workspaceReady && error instanceof FolderAccessError) refresh();
   }
 }, 5000);
+pendingRefresh = restoreLastFolder();
 refresh();

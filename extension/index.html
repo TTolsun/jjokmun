@@ -175,6 +175,7 @@
       <button type="submit" id="unlock-submit">잠금 해제</button>
     </form>
     <p class="status" role="status" id="unlock-status"></p>
+    <button id="choose-locked-folder" type="button">다른 저장 폴더 선택</button>
   </main>
   <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
 
@@ -183,7 +184,9 @@
     <img src="icon-32.png" width="36" height="36" alt="">
     <h1 id="start-title">어느 폴더에 책방을 열까요?</h1>
     <p>메모와 답장을 보관할 폴더를 선택하세요. 기존 폴더를 고르면 쓰던 책방이 열립니다.</p>
+    <button id="reopen-last-folder" type="button" hidden>저장 폴더 다시 연결</button>
     <button id="choose-first-folder" type="button">메모 저장 폴더 선택</button>
+    <button id="choose-new-folder" type="button" hidden>새 책방 시작</button>
     <p id="folder-start-status" class="status" role="status"></p>
   </main>
   <div id="storage-recovery" hidden>
