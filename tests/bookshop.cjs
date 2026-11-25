@@ -52,7 +52,6 @@ async function checkBookshop(session) {
     await page.locator('#shop-name-form button').click();
     await waitText(second, 'shop-title', '달빛 서점');
     await page.reload();
-    await require('./browser.cjs').selectFolder(page);
     await waitText(page, 'shop-title', '달빛 서점');
     await waitText(page, 'shop-book', '봄의 기록');
     await page.setViewportSize({ width: 360, height: 740 });

@@ -157,7 +157,7 @@ async function checkReplyActions(session, a) {
     await b.locator('#reply-dialog-confirm').click();
     await a.locator(row).waitFor({state: 'detached'});
     await b.getByText('검색 결과가 없습니다.').waitFor();
-    await a.reload(); await selectFolder(a);
+    await a.reload();
     await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
     const after = await readState(a);
     assert.deepEqual(after.memos.find(item => item.id === memo.id).replies, [memo.replies[0]]);
@@ -183,14 +183,15 @@ async function createSource(session) {
     await existing.evaluate(async pass => (await import('./vault.js')).enableVault(pass), vaultPass);
     const encrypted = await rawRecord(existing);
     await existing.reload();
-    await selectFolder(existing, folder);
     await assertLocked(existing);
     assert.deepEqual(await rawRecord(existing), encrypted);
     await unlock(existing);
     assert.deepEqual((await readState(existing)).memos, plain.payload.state.memos);
   } finally { await existing.close(); }
   // The untouched profile can still be migrated into a separate, empty directory.
-  const a = await session.tab(monday);
+  const a = await session.tab(monday, null);
+  await selectFolder(a, 'test-vault', '#choose-locked-folder');
+  await a.locator('.workspace').waitFor();
   await a.locator('#archive-list').getByText(legacyText,{exact:true}).waitFor();
   console.log('PASS  selected plain and encrypted folder vaults take precedence over a different legacy profile');
   const native = await session.context.newPage();
@@ -369,7 +370,7 @@ async function checkRecovery(session, bytes, initial) {
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');
   await b.locator('#edit-save').click();
   await b.waitForFunction(()=>document.querySelector('#detail-original').textContent==='가져오기 뒤 수정한 원문');
-  await a.reload(); await selectFolder(a);
+  await a.reload();
   await unlock(a);
   await settings(a);
   await a.locator('#undo-import').click();
@@ -418,7 +419,7 @@ async function run() {
     assert.deepEqual(session.external,[]);
     await session.context.close();
     session=await launch(sourceProfile);
-    const reopened=await session.tab(monday);
+    const reopened=await session.tab(monday, null);
     await assertLocked(reopened); await unlock(reopened);
     assert.ok((await readState(reopened)).memos.some(m=>m.text===note));
     await session.context.close();
@@ -430,8 +431,17 @@ async function run() {
     await session.context.close();
     session = await launch(path.join(directory, 'bookshop-profile'));
     await require('./bookshop.cjs').checkBookshop(session);
+    assert.deepEqual(session.external,[]);
+    await session.context.close();
+    session = await launch(path.join(directory, 'folder-profile'));
     await require('./folder.cjs').checkFolder(session);
+    assert.deepEqual(session.external,[]);
+    await session.context.close();
+    session = await launch(path.join(directory, 'regulars-profile'));
     await require('./regulars.cjs').checkRegulars(session);
+    assert.deepEqual(session.external,[]);
+    await session.context.close();
+    session = await launch(path.join(directory, 'season-profile'));
     await require('./season.cjs').checkSeason(session);
     assert.deepEqual(session.external,[]);
   } finally {

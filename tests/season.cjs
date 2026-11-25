@@ -83,7 +83,6 @@ async function checkSeason(session) {
       });
     }, {memos:[...november.memos, ...december], daily:november.daily});
     await page.reload();
-    await require('./browser.cjs').selectFolder(page, folder);
 
     await waitText(page, 'season-name', '12월 · 겨울');
     assert.equal(await page.locator('#shop').getAttribute('data-season'), 'winter');

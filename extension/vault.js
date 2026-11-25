@@ -1,4 +1,5 @@
-import { readVaultFile, writeVaultFile, FolderAccessError, VAULT_FILE } from './folder.js';
+import { readVaultFile, writeVaultFile, FolderAccessError } from './folder.js';
+import { rememberFolder } from './last-folder.js';
 import { legacySnapshot, removeMigratedProfile } from './legacy-profile.js';
 import { emptyState, validateBackup } from './store.js';
 import { deriveKey, newSalt, requireNewPassword, seal, unseal } from './crypto.js';
@@ -47,16 +48,18 @@ function access(write) {
   });
 }
 
-export function useFolder(directory, { reopen = false } = {}) {
+export function useFolder(directory, { reopen = false, remember = true, copyCurrent = true } = {}) {
   const expected = generation;
   return navigator.locks.request(storageLock, async () => {
-    const previous = connection;
-    if (previous && await previous.directory.isSameEntry(directory)) return;
-    const existing = await readVaultFile(directory, true);
+    if (await directory.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+      throw new FolderAccessError('폴더의 읽기와 쓰기를 허용해 주세요.');
+    }
+    const previous = copyCurrent ? connection : undefined;
+    const sameFolder = connection && await connection.directory.isSameEntry(directory);
+    const existing = await readVaultFile(directory, !reopen && !sameFolder);
     if (existing) {
       if (existing.mode === 'plain') validateBackup(existing.payload.state, { local: true });
     } else {
-      if (reopen) throw new Error('기존 ' + VAULT_FILE + ' 파일이 있는 폴더를 선택해 주세요.');
       const legacy = previous ? null : await legacySnapshot();
       const current = previous ? await fileRecord(previous) : normalize(legacy?.state);
       assertGeneration(expected);
@@ -70,8 +73,17 @@ export function useFolder(directory, { reopen = false } = {}) {
       }
     }
     assertGeneration(expected);
-    connection = { id: crypto.randomUUID(), directory };
-    dropVaultKey();
+    let saved = true;
+    if (remember) {
+      try { await rememberFolder(directory); }
+      catch { saved = false; }
+    }
+    assertGeneration(expected);
+    if (!sameFolder) {
+      connection = { id: crypto.randomUUID(), directory };
+      dropVaultKey();
+    }
+    return saved;
   });
 }
 

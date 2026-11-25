@@ -47,16 +47,22 @@ async function checkFolder(session) {
     await page.locator('#file-download').click();
     assert.deepEqual(await require('node:fs/promises').readFile(await (await downloaded).path()), Buffer.from([0,255,17]));
     await page.locator('#file-close').click();
+    await page.locator('#open-settings').click();
+    await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      const damaged = await root.getDirectoryHandle('손상된 책방', {create:true});
+      const file = await damaged.getFileHandle('jjokmun-vault.json', {create:true});
+      const stream = await file.createWritable();
+      await stream.write('{}');
+      await stream.close();
+      window.showDirectoryPicker = async () => damaged;
+    });
+    await page.locator('#choose-folder').click();
+    await page.getByText('쪽문 저장 파일의 형식을 확인해 주세요.').waitFor();
     await page.reload();
-    await page.locator('#choose-first-folder').waitFor();
-    assert.equal(await page.locator('#shop').isVisible(), false);
-    assert.equal(await page.evaluate(async () => {
-      try { await (await import('./vault.js')).transact(); return true; } catch { return false; }
-    }), false);
-    await selectFolder(page, '내 책장');
     await page.locator('#file-list button').nth(5).waitFor();
     await page.locator('#detail-original').getByText('옮길 메모').waitFor();
-    const another = await session.tab(undefined, '내 책장');
+    const another = await session.tab(undefined, null);
     try {
       await another.locator('#memo-input').waitFor();
       const write = (tab, text) => tab.evaluate(async text => {
@@ -107,6 +113,49 @@ async function checkFolder(session) {
     assert.equal(stored.encrypted.mode, 'encrypted');
     assert.equal(stored.encrypted.payload, undefined);
     assert.equal(stored.decrypted, 3);
+    const retry = await session.context.newPage();
+    try {
+      await retry.addInitScript(() => {
+        let permission = 'prompt';
+        window.permissionRequests = 0;
+        FileSystemDirectoryHandle.prototype.queryPermission = async () => permission;
+        FileSystemDirectoryHandle.prototype.requestPermission = async () => {
+          window.permissionRequests++;
+          return permission = window.permissionRequests === 1 ? 'denied' : 'granted';
+        };
+      });
+      await retry.goto(session.home);
+      const reconnect = retry.getByRole('button', {name:'내 책장 다시 연결'});
+      await reconnect.waitFor();
+      assert.equal(await retry.evaluate(() => window.permissionRequests), 0);
+      await reconnect.click();
+      await retry.waitForFunction(() => window.permissionRequests === 1 && !document.querySelector('#reopen-last-folder').disabled);
+      assert.equal(await retry.locator('.workspace').isVisible(), false);
+      await reconnect.click();
+      await retry.locator('#lock-screen').waitFor();
+      assert.equal(await retry.evaluate(() => window.permissionRequests), 2);
+    } finally { await retry.close(); }
+    await page.evaluate(async () => {
+      const {directory} = (await import('./vault.js')).folderConnection();
+      await directory.removeEntry('jjokmun-vault.json');
+    });
+    await page.reload();
+    await page.getByText(/jjokmun-vault.json 파일을 찾을 수 없습니다/).waitFor();
+    await page.evaluate(() => {
+      window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('내 책장');
+    });
+    await page.locator('#choose-first-folder').click();
+    await page.waitForFunction(() => !document.querySelector('#choose-first-folder').disabled);
+    assert.equal(await page.locator('#storage-start').isVisible(), true);
+    const remainingFiles = await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      const directory = await root.getDirectoryHandle('내 책장');
+      return Array.fromAsync(directory.keys());
+    });
+    assert.ok(!remainingFiles.includes('jjokmun-vault.json'));
+    await selectFolder(page, 'test-vault');
+    await page.locator('#detail-original').getByText('옮길 메모').waitFor();
+    console.log('PASS  automatic folder restore, permission retry, encrypted startup and missing vault recovery');
     console.log('PASS  folder migration, nested text/source/binary files, reload, concurrent writes and encrypted disk record');
   } finally { await page.close(); }
 }
