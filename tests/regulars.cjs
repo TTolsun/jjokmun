@@ -60,7 +60,7 @@ async function checkRegulars(session) {
   try {
     await monday.locator('#memo-input').fill('단골과 다시 읽을 메모');
     await monday.locator('#memo-save').click();
-    await waitMatch(monday, 'home-status', '손님이 새 단골이 되어 책방에 들러요\\.$');
+    await waitText(monday, 'home-status', '메모를 저장했어요.');
     await waitText(monday, 'regular-title', '새 단골 · 정 0');
     const name = await monday.locator('#regular-name').textContent();
     assert.match(name, /손님$/);
@@ -131,7 +131,7 @@ async function checkRegulars(session) {
     await openSection(nextWeek, 'memo-tools');
     await nextWeek.locator('#display-memo').click();
     await waitText(nextWeek, 'shop-book', '단골과 다시 읽을 메모');
-    const interested = nextWeek.locator('.shelf-reader.interested h4');
+    const interested = nextWeek.locator('.shelf-reader.interested h3');
     assert.deepEqual(await interested.allTextContents(), ['창가 단골']);
     await waitText(nextWeek, 'regular-title', '반가운 단골 · 정 7');
     await nextWeek.locator('#shop-book').click();
@@ -160,7 +160,8 @@ async function checkRegulars(session) {
     await monday.locator('#delete-confirm').click();
     await waitText(monday, 'roster-count', '0명');
     await waitText(wednesday, 'roster-count', '0명');
-    await waitText(nextWeek, 'shop-book', '첫 메모를 쓰면 진열할 수 있어요.');
+    await nextWeek.locator('#shelf-empty').waitFor();
+    assert.ok(await nextWeek.locator('#shop-book').isHidden());
     assert.deepEqual(await interested.allTextContents(), []);
     assert.equal(await monday.locator('#roster-list button').count(), 0);
     console.log('PASS  regular card, signboard request, roster and tier-up messages');

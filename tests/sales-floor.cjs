@@ -107,6 +107,11 @@ async function checkSalesFloor(session) {
     await page.locator('#business-pick').getByText('주인이 권하는 여행기').waitFor();
     await page.setViewportSize({ width:360, height:740 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.getByRole('link', {name:'손님 반응 보기'}).click();
+    await page.locator('#shelf-title:focus').waitFor();
+    assert.equal(await page.locator('#shop-book').innerText(), '주인이 권하는 여행기');
+    await page.reload();
+    await page.locator('#shelf-title:focus').waitFor();
     console.log('PASS  automatic shifts, live furniture drag, guest routes, loyalty, parallel clocks, restore and owner pick');
   } finally { await page.close(); await other.close(); }
 }
