@@ -71,7 +71,9 @@ async function checkBookshop(session) {
       mergeImport(collision, backup, day);
       if (validateBackup(collision).shop.displayMemoId) throw Error('display points to conflicting memo');
     });
+    await page.setViewportSize({ width: 360, height: 740 });
     for (let count = 2; count > 0; count--) {
+      await page.locator('#archive-toggle').click();
       await page.locator('#archive-list button').first().click();
       await openSection(page, 'memo-tools');
       await page.locator('#delete-memo').click();

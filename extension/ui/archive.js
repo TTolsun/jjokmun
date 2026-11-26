@@ -32,8 +32,24 @@ function searchControl() {
   return section.open ? element('archive-search') : section.querySelector('summary');
 }
 
+const archiveToggle = element('archive-toggle');
+
+export function setArchiveOpen(open) {
+  archiveToggle.setAttribute('aria-expanded', String(open));
+}
+
+export function focusArchiveReturn(id) {
+  if (archiveToggle.getClientRects().length && archiveToggle.getAttribute('aria-expanded') === 'false') {
+    archiveToggle.focus();
+  } else {
+    const row = [...element('archive-list').children].find(item => item.dataset.memoId === id);
+    (row || searchControl()).focus();
+  }
+}
+
 export function resetArchive() {
   visibleLimit = PAGE_SIZE;
+  setArchiveOpen(false);
   const more = element('archive-more');
   more.onclick = null;
   more.hidden = true;
@@ -103,10 +119,15 @@ element('open-archive').addEventListener('click', () => {
   openJournal();
   element('memo-input').focus();
 });
+archiveToggle.addEventListener('click', () => {
+  setArchiveOpen(archiveToggle.getAttribute('aria-expanded') === 'false');
+});
 window.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     event.preventDefault();
     if (!document.body.classList.contains('journal-view')) openJournal();
+    if (element('memo-archive').closest('[hidden]')) return;
+    setArchiveOpen(true);
     element('memo-search').open = true;
     element('archive-search').focus();
     element('archive-search').select();
