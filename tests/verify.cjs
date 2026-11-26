@@ -30,6 +30,13 @@ async function write(p, text) {
 async function readState(p) {
   return p.evaluate(async () => (await import('./vault.js')).transact());
 }
+async function readBackupState(p) {
+  return p.evaluate(async () => {
+    const {transact} = await import('./vault.js');
+    const {validateBackup} = await import('./store.js');
+    return validateBackup(await transact());
+  });
+}
 async function rawRecord(p) {
   return p.evaluate(async () => {
     const {directory} = (await import('./vault.js')).folderConnection();
@@ -152,6 +159,7 @@ async function checkReplyActions(session, a) {
     await b.locator('#archive-search').fill(updated);
     await b.locator('#archive-list mark').waitFor();
     await b.locator('#archive-list button').first().click();
+    await b.locator('.linked-reply p').getByText(updated, {exact:true}).waitFor();
     assert.equal(await b.locator('.linked-reply p').innerText(), updated);
     const edited = await readState(b);
     assert.deepEqual(edited.memos.find(item => item.id === memo.id).replies[1], {...target, text: updated});
@@ -184,6 +192,7 @@ async function createSource(session) {
   const setup = await session.tab(monday, folder);
   await write(setup, folderMemo);
   const plain = await rawRecord(setup);
+  const plainState = await readBackupState(setup);
   await setup.close();
   await seedLegacy(session.worker);
   const existing = await session.tab(monday, folder);
@@ -196,7 +205,7 @@ async function createSource(session) {
     await assertLocked(existing);
     assert.deepEqual(await rawRecord(existing), encrypted);
     await unlock(existing);
-    assert.deepEqual((await readState(existing)).memos, plain.payload.state.memos);
+    assert.deepEqual((await readState(existing)).memos, plainState.memos);
   } finally { await existing.close(); }
   // The untouched profile can still be migrated into a separate, empty directory.
   const a = await session.tab(monday, null);
@@ -234,6 +243,7 @@ async function createSource(session) {
   await a.keyboard.press('ArrowUp');
   assert.ok(await a.locator('#archive-search').evaluate(input => input === document.activeElement));
   await a.locator('#archive-search').press('Enter');
+  await a.locator('.linked-reply p').getByText(reply, {exact:true}).waitFor();
   assert.equal(await a.locator('.linked-reply p').innerText(), reply);
   await a.setViewportSize({width:390,height:840});
   await copyText(a,'#copy-memo',note);
@@ -245,7 +255,7 @@ async function createSource(session) {
   assert.notEqual(one.salt,two.salt);
   assert.notEqual(one.iv,two.iv);
   assert.notEqual(one.ciphertext,two.ciphertext);
-  const state = await readState(a);
+  const state = await readBackupState(a);
   await doneSettings(a);
   console.log('PASS  legacy IDB, native new tab, Korean composition, original/reply clipboard paste, randomized encrypted exports');
   return {a, bytes, state};
@@ -326,6 +336,7 @@ async function checkVault(session, a) {
   await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill(reply);
   await a.locator('#archive-list button').first().click();
+  await a.locator('.linked-reply p').getByText(reply, {exact:true}).waitFor();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
   console.log('PASS  encryption transition rollback, encrypted live record, two-tab lock and draft scrubbing, wrong password and bookstore recovery');
 }
@@ -383,6 +394,7 @@ async function checkRecovery(session, bytes, initial) {
   await openSection(a, 'memo-search');
   await a.locator('#archive-search').fill(reply);
   await a.locator('#archive-list button').first().click();
+  await a.locator('.linked-reply p').getByText(reply, {exact:true}).waitFor();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
   const previousUndo = await a.evaluate(async ()=>(await (await import('./vault.js')).readPayload()).payload.undo);
   assert.ok(previousUndo);
@@ -393,6 +405,7 @@ async function checkRecovery(session, bytes, initial) {
   await write(b,localNote);
   // A later change to a previously imported note must survive selective undo.
   await b.locator('#archive-list button').filter({hasText:legacyText}).click();
+  await b.locator('#detail-original').getByText(legacyText, {exact:true}).waitFor();
   await openSection(b, 'memo-tools');
   await b.locator('#edit-memo').click();
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');
@@ -472,6 +485,14 @@ async function run() {
     session = await launch(path.join(directory, 'folder-profile'));
     await require('./folder.cjs').checkFolder(session);
     assert.deepEqual(session.external,[]);
+    await session.context.close();
+    session = await launch(path.join(directory, 'documents-profile'));
+    await require('./documents.cjs').checkDocuments(session);
+    assert.deepEqual(session.external, []);
+    await session.context.close();
+    session = await launch(path.join(directory, 'rendering-profile'));
+    await require('./rendering.cjs').checkRendering(session);
+    assert.deepEqual(session.external, []);
     await session.context.close();
     session = await launch(path.join(directory, 'regulars-profile'));
     await require('./regulars.cjs').checkRegulars(session);

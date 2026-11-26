@@ -1,4 +1,4 @@
-import { createTime, element } from './dom.js';
+import { createTime, element, memoExcerpt } from './dom.js';
 
 function searchText(text) {
   return text.normalize('NFC').toLocaleLowerCase('ko-KR');
@@ -68,7 +68,9 @@ export function renderArchive(memos, selectedId, openDetail) {
   let focusTarget;
   for (const memo of memos) {
     const matchedReply = query ? memo.replies.findLast((reply) => searchText(reply.text).includes(query)) : undefined;
-    if (query && !matchedReply && !searchText(memo.text).includes(query)) continue;
+    const path = memo.documentPath;
+    const matchedText = query && searchText(memo.text).includes(query);
+    if (query && !matchedReply && !matchedText && !searchText(path ?? '').includes(query)) continue;
     if (list.childElementCount >= visibleLimit) {
       more.hidden = false;
       more.onclick = () => {
@@ -86,12 +88,20 @@ export function renderArchive(memos, selectedId, openDetail) {
     if (memo.id === selectedId) row.setAttribute('aria-current', 'true');
     const text = document.createElement('span');
     text.className = 'archive-text';
-    showMatchingText(text, memo.text, query);
+    const excerpt = matchedText ? memo.text : memoExcerpt(memo, 180);
+    showMatchingText(text, memo.documentMissing ? '파일 연결 끊김' : excerpt || '빈 문서', query);
     const meta = document.createElement('span');
     meta.className = 'archive-meta';
     meta.append(createTime(memo.createdOn));
     if (memo.replies.length) meta.append(` · 답장 ${memo.replies.length}개`);
-    row.append(text, meta);
+    row.append(text);
+    if (path) {
+      const location = document.createElement('span');
+      location.className = 'archive-path';
+      showMatchingText(location, path, query);
+      row.append(location);
+    }
+    row.append(meta);
     if (matchedReply) {
       const snippet = document.createElement('span');
       snippet.className = 'archive-snippet';

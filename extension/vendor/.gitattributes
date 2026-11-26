@@ -1,0 +1,2 @@
+markdown-it-*.mjs -text -diff linguist-vendored
+mermaid-*.js -text -diff linguist-vendored

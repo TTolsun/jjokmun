@@ -70,6 +70,8 @@ async function checkJournalLayout(session) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.locator('#memo-input').fill('창가의 책을 다시 펼쳤다.');
     await click('#memo-save');
+    await page.locator(':is(#detail-original, #detail-preview):visible')
+      .getByText('창가의 책을 다시 펼쳤다.', {exact: true}).waitFor();
     await openSection(page, 'reply-compose');
     await page.locator('#reply-input').fill('책 사이에 편지가 있었다.');
     await click('#reply-save');

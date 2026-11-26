@@ -10,3 +10,9 @@ export function createTime(date) {
   time.textContent = formatDate(date);
   return time;
 }
+
+export function memoExcerpt(memo, limit) {
+  if (memo.documentMissing) return '파일 연결 끊김 · ' + memo.documentPath;
+  const characters = Array.from(memo.text.slice(0, 2 * limit + 2));
+  return characters.length > limit ? characters.slice(0, limit).join('') + '…' : memo.text;
+}

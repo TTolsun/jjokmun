@@ -1,7 +1,7 @@
 import { advanceBusiness, currentLayout, currentShift, defaultLayout, firstBusiness, floorPoint,
   FURNITURE, memoBooks, moveFurniture, placementError } from '../business.js';
 import { DEFAULT_NAME, REGULAR_TIER, bondOf, newShop, regularOf } from '../shop.js';
-import { element } from './dom.js';
+import { element, memoExcerpt } from './dom.js';
 import { project } from './shop-interior.js';
 import { paintHeart, paintRoom, pixelPerson } from './shop-scene.js';
 
@@ -10,8 +10,7 @@ function text(id, value) {
   if (element(id).textContent !== value) element(id).textContent = value;
 }
 function excerpt(memo) {
-  const characters = Array.from(memo.text);
-  return '「' + (characters.length > 24 ? characters.slice(0, 24).join('') + '…' : memo.text) + '」';
+  return '「' + memoExcerpt(memo, 24) + '」';
 }
 function floorDelta(dx, dy) {
   const det = .82 * .58 + .86 * .32;
@@ -300,7 +299,7 @@ export function bindSalesFloor(change, { openMemo }) {
     soldKey = undefined;
     const memo = state.memos.find(item => item.id === state.shop?.displayMemoId);
     element('business-pick').parentElement.hidden = !memo;
-    text('business-pick', memo?.text || '');
+    text('business-pick', memo ? memoExcerpt(memo, 240) : '');
     text('floor-title', state.shop?.name || DEFAULT_NAME);
     const key = JSON.stringify([layout, Boolean(memo)]);
     if (artKey !== key) {

@@ -31,7 +31,7 @@ export function selectDaily(state, date) {
     }
   }
 
-  const candidates = state.memos.filter((memo) => memo.createdOn < date);
+  const candidates = state.memos.filter((memo) => !memo.documentMissing && memo.createdOn < date);
   const yesterday = previousDate(date);
   const mostRecent = [...lastSeen].find(([, seenOn]) => seenOn === yesterday)?.[0];
   const eligible = candidates.length > 1 ? candidates.filter((memo) => memo.id !== mostRecent) : candidates;
@@ -55,8 +55,14 @@ function previousDate(date) {
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-const validText = (value) => typeof value === 'string' && value.length <= NOTE_LIMIT && Boolean(value.trim()) && !/[\r\n]/.test(value);
+const validReply = (value) => typeof value === 'string' && value.length <= NOTE_LIMIT && Boolean(value.trim()) && !/[\r\n]/.test(value);
+const validText = (value) => typeof value === 'string' && value.length <= 4 * 1024 * 1024;
+const formats = new Set(['markdown', 'text', 'plantuml', 'mermaid']);
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
+
+export function backupSnapshot(state) {
+  return validateBackup(state, { local: true });
+}
 
 export function validateBackup(value, { local = false } = {}) {
   function require(condition) {
@@ -77,12 +83,16 @@ export function validateBackup(value, { local = false } = {}) {
     require(local || replyCount <= 30_000);
     const replyIds = new Set();
     const replies = memo.replies.map((reply) => {
-      require(object(reply) && validId(reply.id) && !replyIds.has(reply.id) && validText(reply.text)
+      require(object(reply) && validId(reply.id) && !replyIds.has(reply.id) && validReply(reply.text)
         && validDate(reply.createdOn) && validTime(reply.createdAt));
       replyIds.add(reply.id);
       return { id: reply.id, text: reply.text, createdOn: reply.createdOn, createdAt: reply.createdAt };
     });
     const clean = { id: memo.id, text: memo.text, createdOn: memo.createdOn, updatedAt: memo.updatedAt, replies };
+    if (memo.documentFormat !== undefined) {
+      require(formats.has(memo.documentFormat));
+      clean.documentFormat = memo.documentFormat;
+    }
     if (memo.createdAt !== undefined) {
       require(validTime(memo.createdAt));
       clean.createdAt = memo.createdAt;

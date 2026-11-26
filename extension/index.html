@@ -114,11 +114,13 @@
         <h2 id="archive-title">전체 메모</h2>
         <span id="memo-count" class="count" aria-label="메모 수">0</span>
       </div>
+      <button id="refresh-documents" class="document-action" type="button" hidden>폴더 문서 새로고침</button>
+      <p id="document-refresh-status" class="status" role="status"></p>
       <details id="memo-search" class="journal-disclosure">
         <summary>메모 검색</summary>
         <label class="search-field">
           <span class="search-icon" aria-hidden="true"></span>
-          <input id="archive-search" type="search" aria-label="원문과 답장 검색" placeholder="원문과 답장 검색">
+          <input id="archive-search" type="search" aria-label="원문, 답장, 파일 경로 검색" placeholder="원문, 답장, 파일 경로 검색">
         </label>
       </details>
       <div id="archive-list" class="archive-list"></div>
@@ -146,7 +148,18 @@
           <button type="button" id="detail-close" class="close" aria-label="메모 선택 해제">×</button>
         </div>
         <div class="note-byline"><time id="detail-date"></time></div>
+        <p id="detail-path" class="detail-path" hidden></p>
+        <p id="document-missing" class="status" hidden>폴더에서 이 파일을 찾거나 읽을 수 없습니다. 답장과 책방 기록은 남아 있어요.</p>
+        <form id="relink-document" hidden>
+          <label for="document-path-choice" class="field-label">옮긴 파일 다시 연결</label>
+          <div class="inline-form">
+            <select id="document-path-choice" required></select>
+            <button id="relink-document-submit" class="document-action" type="submit">연결</button>
+          </div>
+        </form>
+        <button id="toggle-document-source" class="document-action" type="button" aria-controls="detail-original detail-preview" aria-pressed="false" hidden>원문 보기</button>
         <p class="original" id="detail-original"></p>
+        <div id="detail-preview" class="document-preview" hidden></div>
         <div class="shelf-action">
           <button type="button" id="display-memo">매대에 놓기</button>
           <p id="shelf-previous" hidden></p>
@@ -187,11 +200,28 @@
           </div>
           <form id="edit-form" hidden>
             <label class="field-label" for="edit-input">원문 수정</label>
-            <input id="edit-input" type="text" maxlength="2000" required>
+            <textarea id="edit-input" rows="7"></textarea>
             <div class="inline-form edit-actions">
               <button id="edit-save" type="submit">수정 저장</button>
               <button id="edit-cancel" type="button">취소</button>
             </div>
+            <section id="edit-conflict" class="edit-conflict" aria-labelledby="edit-conflict-title" hidden>
+              <h3 id="edit-conflict-title">편집을 시작한 뒤 원본이 바뀌었어요</h3>
+              <div class="edit-versions">
+                <div>
+                  <h4>작성 중인 내용</h4>
+                  <pre id="edit-conflict-draft" tabindex="0"></pre>
+                </div>
+                <div>
+                  <h4>현재 파일 내용</h4>
+                  <pre id="edit-conflict-disk" tabindex="0"></pre>
+                </div>
+              </div>
+              <div class="inline-form edit-actions">
+                <button id="keep-edit-draft" class="document-action" type="button">작성본을 새 메모로 저장</button>
+                <button id="use-disk-edit" class="document-action" type="button">파일 내용으로 편집 다시 시작</button>
+              </div>
+            </section>
           </form>
         </details>
         <p class="status" id="detail-status" role="status"></p>
@@ -232,6 +262,7 @@
   <dialog id="file-dialog" aria-labelledby="file-title">
     <div class="section-heading"><h2 id="file-title"></h2><button type="button" id="file-close">닫기</button></div>
     <p id="file-info"></p><pre id="file-content"></pre>
+    <button id="open-file-memo" class="document-action" type="button" hidden>메모장에서 열기</button>
     <a id="file-download" download>원본 파일 저장</a>
   </dialog>
 
