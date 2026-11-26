@@ -88,7 +88,8 @@ export function renderArchive(memos, selectedId, openDetail) {
     if (memo.id === selectedId) row.setAttribute('aria-current', 'true');
     const text = document.createElement('span');
     text.className = 'archive-text';
-    const excerpt = matchedText ? memo.text : memoExcerpt(memo, 180);
+    let excerpt = memoExcerpt(memo, 180);
+    if (matchedText && !searchText(excerpt).includes(query)) excerpt = memo.text;
     showMatchingText(text, memo.documentMissing ? '파일 연결 끊김' : excerpt || '빈 문서', query);
     const meta = document.createElement('span');
     meta.className = 'archive-meta';

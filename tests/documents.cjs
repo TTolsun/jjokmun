@@ -100,7 +100,7 @@ async function checkDocuments(session) {
     await refreshDocuments(page);
     assert.equal(await page.locator('#archive-list button').filter({hasText: newText}).count(), 0);
     await page.locator('#memo-save').click();
-    await page.locator('#detail-original').getByText(newText, {exact: true}).waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText(newText, {exact: true}).waitFor();
     assert.equal(await page.locator('#archive-list button').filter({hasText: newText}).count(), 1);
     const createdPath = await page.locator('#detail-path').textContent();
     assert.match(createdPath, /\.md$/);
@@ -141,10 +141,10 @@ async function checkDocuments(session) {
     page = await session.tab('2031-05-12', folder);
     await openDocument(page, moved);
     await page.locator('#detail-replies').getByText(reply, {exact: true}).waitFor();
-    await page.locator('#detail-original').getByText(/옮긴 뒤 외부에서 추가한 셋째 줄/).waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText(/옮긴 뒤 외부에서 추가한 셋째 줄/).waitFor();
     await page.reload();
     await openDocument(page, moved);
-    await page.locator('#detail-original').getByText(/옮긴 뒤 외부에서 추가한 셋째 줄/).waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText(/옮긴 뒤 외부에서 추가한 셋째 줄/).waitFor();
     await page.locator('#detail-replies').getByText(reply, {exact: true}).waitFor();
     assert.equal(await page.locator('#archive-list button').count(), 4);
     assert.equal(await page.locator('#archive-list button').filter({hasText: newText}).count(), 1);
@@ -215,7 +215,7 @@ async function checkDocuments(session) {
       await disk(page, 'write', filename, Array.from(initial));
       await refreshDocuments(page);
       await openDocument(page, filename);
-      await page.locator('#detail-original').getByText(/윈도우에서 쓴 첫 줄/).waitFor();
+      await page.locator(':is(#detail-original, #detail-preview):visible').getByText(/윈도우에서 쓴 첫 줄/).waitFor();
       await expectBytes(page, filename, initial);
       await openEditor(page);
       await page.locator('#edit-input').fill('쪽문에서 수정한 첫 줄\n셋째 줄 😀\n');
@@ -247,7 +247,7 @@ async function checkDocuments(session) {
     const beforeEncryptedWrite = await disk(page, 'list', '');
     await page.locator('#memo-input').fill('암호화 저장소에서 쓴 메모');
     await page.locator('#memo-save').click();
-    await page.locator('#detail-original').getByText('암호화 저장소에서 쓴 메모', {exact: true}).waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('암호화 저장소에서 쓴 메모', {exact: true}).waitFor();
     assert.deepEqual((await disk(page, 'list', '')).sort(), beforeEncryptedWrite.sort());
     await expectBytes(page, '서가/책.md', '암호화 중 외부에서 쓴 원문');
     console.log('PASS  encrypted snapshot ignores external changes and writes no new plaintext memo files');

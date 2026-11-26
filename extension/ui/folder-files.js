@@ -1,5 +1,7 @@
 import { VAULT_FILE, scanFiles } from '../folder.js';
 import { element } from './dom.js';
+import { bindDocumentPreview } from './document-preview.js';
+import { documentFormat, MAX_DOCUMENT_BYTES } from '../documents.js';
 
 export function bindFolderFiles({ canOpenMemo, openMemo }) {
   const panel = element('folder-files');
@@ -9,9 +11,19 @@ export function bindFolderFiles({ canOpenMemo, openMemo }) {
   const openInJournal = element('open-file-memo');
   const search = element('file-search');
   let connection, scan, files = [], limit = 100, skipped = 0, objectUrl, previewId = 0;
+  const documentPreview = bindDocumentPreview({
+    raw: element('file-content'), preview: element('file-preview'), toggle: element('toggle-file-source'),
+    folder: () => connection?.directory,
+    hasDocument: canOpenMemo,
+    openDocument(path) {
+      preview.close();
+      openMemo(path, document.activeElement);
+    }
+  });
 
   function clearPreview() {
     previewId++;
+    documentPreview.reset(false);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = undefined;
     openInJournal.hidden = true;
@@ -34,7 +46,9 @@ export function bindFolderFiles({ canOpenMemo, openMemo }) {
     preview.showModal();
     try {
       const file = await entry.handle.getFile();
-      const bytes = new Uint8Array(await file.slice(0, 128 * 1024).arrayBuffer());
+      const format = documentFormat(entry.path);
+      const renderable = format && format !== 'text' && file.size <= MAX_DOCUMENT_BYTES;
+      const bytes = new Uint8Array(await (renderable ? file : file.slice(0, 128 * 1024)).arrayBuffer());
       if (expected !== previewId || !preview.open) return;
       objectUrl = URL.createObjectURL(file);
       download.href = objectUrl;
@@ -50,6 +64,9 @@ export function bindFolderFiles({ canOpenMemo, openMemo }) {
       element('file-info').textContent = file.size.toLocaleString('ko-KR') + '바이트 · ' +
         (content === undefined ? '원본 파일을 저장해서 열 수 있습니다.' : partial ? '앞부분 128 KiB 미리보기' : '전체 내용');
       element('file-content').textContent = content ?? '';
+      if (renderable && content !== undefined) {
+        documentPreview.update({ documentPath: entry.path, documentFormat: format, text: content });
+      }
     } catch {
       if (expected === previewId) element('file-info').textContent = '파일을 열 수 없습니다. 폴더를 새로고침해 주세요.';
     }

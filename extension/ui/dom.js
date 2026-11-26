@@ -1,3 +1,5 @@
+import { markdownTitle } from './markdown.js';
+
 export const element = (id) => document.getElementById(id);
 
 export const longDate = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'UTC' });
@@ -13,6 +15,7 @@ export function createTime(date) {
 
 export function memoExcerpt(memo, limit) {
   if (memo.documentMissing) return '파일 연결 끊김 · ' + memo.documentPath;
-  const characters = Array.from(memo.text.slice(0, 2 * limit + 2));
-  return characters.length > limit ? characters.slice(0, limit).join('') + '…' : memo.text;
+  const text = markdownTitle(memo) || memo.text;
+  const characters = Array.from(text.slice(0, 2 * limit + 2));
+  return characters.length > limit ? characters.slice(0, limit).join('') + '…' : text;
 }

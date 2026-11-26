@@ -261,7 +261,10 @@
   </div>
   <dialog id="file-dialog" aria-labelledby="file-title">
     <div class="section-heading"><h2 id="file-title"></h2><button type="button" id="file-close">닫기</button></div>
-    <p id="file-info"></p><pre id="file-content"></pre>
+    <p id="file-info"></p>
+    <button id="toggle-file-source" class="document-action" type="button" hidden>원문 보기</button>
+    <div id="file-preview" class="document-preview" hidden></div>
+    <pre id="file-content"></pre>
     <button id="open-file-memo" class="document-action" type="button" hidden>메모장에서 열기</button>
     <a id="file-download" download>원본 파일 저장</a>
   </dialog>

@@ -18,7 +18,7 @@ async function checkJournalLayout(session) {
     });
     await yesterday.locator('#memo-input').fill('입간판에 걸어 둘 메모');
     await yesterday.locator('#memo-save').click();
-    await yesterday.locator('#detail-original').getByText('입간판에 걸어 둘 메모').waitFor();
+    await yesterday.locator(':is(#detail-original, #detail-preview):visible').getByText('입간판에 걸어 둘 메모').waitFor();
   } finally { await yesterday.close(); }
   const page = await session.tab('2050-01-02');
   const click = selector => page.locator(selector).click();

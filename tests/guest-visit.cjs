@@ -62,7 +62,7 @@ async function checkGuestVisit(session) {
     }
     await first.locator('#guest-choose').click();
     await first.locator('#archive-list button').filter({ hasText: picked }).click();
-    await first.locator('#detail-original').getByText(picked, {exact: true}).waitFor();
+    await first.locator(':is(#detail-original, #detail-preview):visible').getByText(picked, {exact: true}).waitFor();
     await first.locator('#give-memo').click();
     await first.locator('#guest-page').getByText(picked, { exact: true }).waitFor();
     assert.match(await first.locator('#guest-reaction').innerText(), /골목/);
