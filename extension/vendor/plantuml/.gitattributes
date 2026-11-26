@@ -1,0 +1,3 @@
+plantuml.js -text -diff linguist-vendored
+viz-global.js -text -diff linguist-vendored
+LICENSE -text

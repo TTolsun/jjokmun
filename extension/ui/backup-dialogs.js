@@ -1,6 +1,6 @@
 import { BACKUP_FORMAT, MAX_BACKUP_BYTES, encryptBackup, decryptBackup } from '../crypto.js';
 import { mergeImport, undoImport } from '../imports.js';
-import { validateBackup } from '../store.js';
+import { backupSnapshot, validateBackup } from '../store.js';
 import { LockedError, disableVault, enableVault, readPayload } from '../vault.js';
 import { element } from './dom.js';
 
@@ -16,7 +16,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
   const passwordPrompts = {
     export: ['암호화 백업 내보내기', '이 파일을 복원할 때 사용할 비밀번호를 정하세요.', true],
     import: ['암호화 백업 열기', '이 백업을 만들 때 정한 비밀번호를 입력하세요.', false],
-    enable: ['저장소 암호화', '이 비밀번호가 있어야 저장소를 다시 열 수 있습니다. 이전에 만든 평문 백업 파일은 별도로 관리해 주세요.', true],
+    enable: ['저장소 암호화', '메모를 쪽문 저장 파일에 암호화해 보관합니다. 기존 .md, .txt와 평문 백업은 폴더에 남으며 그대로 열 수 있습니다. 저장소를 다시 열려면 이 비밀번호가 필요합니다.', true],
     disable: ['저장소 암호화 해제', '계속하면 이 기기에 남은 기록과 되돌리기 기록을 평문으로 저장합니다.', false]
   };
 
@@ -133,7 +133,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
       if (action === 'export') {
         const result = await readPayload();
         rejectStaleView(expected);
-        const backup = await encryptBackup(validateBackup(result.payload.state), password);
+        const backup = await encryptBackup(validateBackup(backupSnapshot(result.payload.state)), password);
         // Recheck access after encryption in case another tab locked the vault.
         await readPayload();
         rejectStaleView(expected);

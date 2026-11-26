@@ -1,8 +1,14 @@
 import { readVaultFile, writeVaultFile, FolderAccessError } from './folder.js';
 import { rememberFolder } from './last-folder.js';
 import { legacySnapshot, removeMigratedProfile } from './legacy-profile.js';
-import { emptyState, validateBackup } from './store.js';
+import { backupSnapshot, emptyState, validateBackup } from './store.js';
 import { deriveKey, newSalt, requireNewPassword, seal, unseal } from './crypto.js';
+import {
+  invalidateDocumentInventory, openDocuments, persistentDocuments, prepareDocuments,
+  relinkInPayload, rememberDocumentRevision, resumeDocuments, storeDocumentHandles, suspendDocuments
+} from './documents.js';
+
+export { DocumentConflictError, DocumentWriteError } from './documents.js';
 
 export class LockedError extends Error {
   constructor() {
@@ -42,7 +48,7 @@ function access(write) {
     const current = await fileRecord(connection);
     if (!write) return current;
     let replacement;
-    const result = write(current, value => { replacement = value; });
+    const result = await write(current, value => { replacement = value; }, connection.directory);
     if (replacement) await writeVaultFile(connection.directory, replacement);
     return result;
   });
@@ -61,7 +67,18 @@ export function useFolder(directory, { reopen = false, remember = true, copyCurr
       if (existing.mode === 'plain') validateBackup(existing.payload.state, { local: true });
     } else {
       const legacy = previous ? null : await legacySnapshot();
-      const current = previous ? await fileRecord(previous) : normalize(legacy?.state);
+      let current = previous ? await fileRecord(previous) : normalize(legacy?.state);
+      if (previous && current.mode === 'plain' && current.payload.documents) {
+        await openDocuments(previous.directory, current.payload);
+        const state = validateBackup(backupSnapshot(current.payload.state), { local: true });
+        current = { ...current, payload: { state, undo: current.payload.undo } };
+      } else if (previous && current.mode === 'encrypted' && session?.location === previous.id && session.epoch === current.epoch) {
+        const payload = await unseal(current, session.key, 'vault');
+        if (payload.documents) {
+          delete payload.documents;
+          current = { ...current, ...await seal(payload, session.key, current.salt, 'vault') };
+        }
+      }
       assertGeneration(expected);
       await writeVaultFile(directory, current, true);
       if (legacy) {
@@ -94,6 +111,7 @@ export async function reconnectFolder() {
 }
 
 export function dropVaultKey() {
+  if (connection) invalidateDocumentInventory(connection.directory);
   session = undefined;
   generation += 1;
 }
@@ -123,19 +141,20 @@ export async function vaultStatus() {
   return { mode: record.mode, locked };
 }
 
-export async function readPayload(change) {
+export async function readPayload(change, { createFiles = true } = {}) {
   const expected = generation;
   for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
     const record = await access();
     assertGeneration(expected);
+    if (record.mode === 'plain') return plainPayload(change, expected, record, { createFiles });
     const active = session;
     if ((active && (active.location !== record[locationKey] || active.epoch !== record.epoch || record.mode !== 'encrypted'))
       || (record.mode === 'encrypted' && !active)) throw new LockedError();
-    const payload = record.mode === 'plain' ? record.payload : await unseal(record, active.key, 'vault');
+    const payload = await unseal(record, active.key, 'vault');
     assertGeneration(expected);
     let revision = record.revision;
     if (change && change(payload.state, payload, revision) !== false) {
-      const contents = record.mode === 'plain' ? { payload } : await seal(payload, active.key, record.salt, 'vault');
+      const contents = await seal(payload, active.key, record.salt, 'vault');
       revision += 1;
       const replacement = { format: 2, revision, epoch: record.epoch, mode: record.mode, ...contents };
       if (!await saveCompared(record, replacement, expected)) continue;
@@ -147,8 +166,57 @@ export async function readPayload(change) {
   throw new Error('다른 탭에서 저장 작업이 진행 중입니다. 다시 시도해 주세요.');
 }
 
+function plainPayload(change, expected, record, { createFiles, relink }) {
+  return access(async (current, _put, directory) => {
+    assertGeneration(expected);
+    assertEpoch(current, record);
+    const { payload } = current;
+    const rollback = change && structuredClone(current);
+    const documents = await openDocuments(directory, payload, !change || Boolean(relink), current.revision);
+    assertGeneration(expected);
+    let revision = current.revision + Number(documents.changed);
+    const beforeUndo = payload.undo;
+    const before = change && new Map(payload.state.memos.map(memo => [memo.id, { text: memo.text }]));
+    const scanned = documents.changed ? persistentDocuments(payload) : null;
+    let writeDocument;
+    if (relink) {
+      relinkInPayload(payload, documents, relink.id, relink.path);
+      revision += 1;
+    } else if (change && change(payload.state, payload, revision) !== false) {
+      writeDocument = await prepareDocuments(directory, payload, documents, before, createFiles && payload.undo === beforeUndo);
+      revision += 1;
+    }
+    if (revision > current.revision) {
+      const stored = revision > current.revision + Number(documents.changed) ? persistentDocuments(payload) : scanned;
+      assertGeneration(expected);
+      // Commit identifiers and links before the document, so a sidecar failure cannot orphan a new file.
+      await writeVaultFile(directory, { ...current, revision, payload: stored });
+      if (writeDocument) {
+        try {
+          await writeDocument();
+        } catch (error) {
+          try { await writeVaultFile(directory, { ...rollback, revision: revision + 1 }); }
+          catch { /* The next scan reconciles the prepared metadata with the document on disk. */ }
+          throw error;
+        }
+      }
+      await storeDocumentHandles(documents);
+      rememberDocumentRevision(directory, revision);
+    }
+    assertGeneration(expected);
+    return { payload, revision };
+  });
+}
+
+export async function relinkDocument(id, path) {
+  const expected = generation;
+  const record = await access();
+  if (record.mode !== 'plain') throw new LockedError();
+  return plainPayload(undefined, expected, record, { relink: { id, path } });
+}
+
 export async function transact(change) {
-  return (await readPayload(change)).payload.state;
+  return (await readPayload(change, { createFiles: false })).payload.state;
 }
 
 export async function enableVault(password) {
@@ -156,22 +224,24 @@ export async function enableVault(password) {
   const expected = generation;
   const salt = newSalt();
   const key = await deriveKey(password, salt);
-  for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
-    const record = await access();
+  const { replacement, location } = await access(async (record, put, directory) => {
     assertGeneration(expected);
     if (record.mode !== 'plain') throw new LockedError();
+    const documents = await openDocuments(directory, record.payload);
+    await suspendDocuments(record.payload);
+    invalidateDocumentInventory(directory);
     const replacement = {
       format: 2, revision: record.revision + 1, epoch: record.epoch + 1, mode: 'encrypted',
       ...await seal(record.payload, key, salt, 'vault')
     };
-    if (await saveCompared(record, replacement, expected)) {
-      assertGeneration(expected);
-      session = { epoch: replacement.epoch, location: record[locationKey], key };
-      generation += 1;
-      return;
-    }
-  }
-  throw new Error('다른 탭에서 저장 중입니다. 다시 시도해 주세요.');
+    await storeDocumentHandles(documents);
+    assertGeneration(expected);
+    put(replacement);
+    return { replacement, location: record[locationKey] };
+  });
+  assertGeneration(expected);
+  session = { epoch: replacement.epoch, location, key };
+  generation += 1;
 }
 
 export async function unlockVault(password) {
@@ -198,7 +268,8 @@ export async function disableVault(password) {
     assertGeneration(expected);
     assertEpoch(record, first);
     const payload = await unseal(record, key, 'vault');
-    const replacement = { format: 2, revision: record.revision + 1, epoch: record.epoch + 1, mode: 'plain', payload };
+    await resumeDocuments(payload);
+    const replacement = { format: 2, revision: record.revision + 1, epoch: record.epoch + 1, mode: 'plain', payload: persistentDocuments(payload) };
     if (await saveCompared(record, replacement, expected)) {
       assertGeneration(expected);
       dropVaultKey();

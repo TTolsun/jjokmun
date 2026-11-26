@@ -3,7 +3,7 @@ const {selectFolder} = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkFolder(session) {
-  const page = await session.tab(undefined, null);
+  const page = await session.tab('2031-05-12', null);
   await page.locator('#choose-first-folder').waitFor();
   await page.evaluate(() => { window.showDirectoryPicker = () => Promise.reject(new DOMException('취소', 'AbortError')); });
   await page.locator('#choose-first-folder').click();
@@ -106,7 +106,7 @@ async function checkFolder(session) {
       const folder = await vault.folderConnection();
       const handle = await folder.directory.getFileHandle('jjokmun-vault.json');
       const read = async () => JSON.parse(await (await handle.getFile()).text());
-      const titles = (await read()).payload.state.memos.map(m => m.text);
+      const titles = (await vault.transact()).memos.map(m => m.text);
       const profileState = (await indexedDB.databases()).find(db => db.name === 'memo-alley');
       await vault.enableVault('sample folder password');
       const encrypted = await read();
@@ -114,11 +114,11 @@ async function checkFolder(session) {
       await vault.unlockVault('sample folder password');
       return {titles, profileState, encrypted, decrypted:(await vault.transact()).memos.length};
     });
-    assert.deepEqual(stored.titles.sort(), ['옮길 메모','같은 폴더 A','같은 폴더 B'].sort());
+    assert.deepEqual(stored.titles.sort(), ['옮길 메모','같은 폴더 A','같은 폴더 B','첫 안내','둘째 안내','# 책'].sort());
     assert.equal(stored.profileState, undefined);
     assert.equal(stored.encrypted.mode, 'encrypted');
     assert.equal(stored.encrypted.payload, undefined);
-    assert.equal(stored.decrypted, 3);
+    assert.equal(stored.decrypted, 6);
     const retry = await session.context.newPage();
     try {
       await retry.addInitScript(() => {

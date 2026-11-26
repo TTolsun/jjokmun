@@ -1,4 +1,4 @@
-import { element } from './dom.js';
+import { element, memoExcerpt } from './dom.js';
 
 // Each response is the reader's own association with a word on the page.
 const associations = [
@@ -51,13 +51,14 @@ export function bindGuestVisit() {
       element('guest-status').textContent = '';
       previousStage = stage;
     }
+    const excerpt = memo ? memoExcerpt(memo, 500) : '';
     const association = memo && (associations.find(item => item.words.test(memo.text)) || firstPage);
     const title = element('writing-title');
     const speech = element('guest-speech');
     const reaction = element('guest-reaction');
     const page = element('guest-page');
     page.hidden = !memo;
-    page.textContent = memo?.text || '';
+    page.textContent = excerpt;
     reaction.hidden = !memo;
     element('guest-form').hidden = Boolean(memo && (!returning || reply));
     element('guest-choose').hidden = Boolean(memo) || !state.memos.length;

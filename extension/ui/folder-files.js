@@ -1,11 +1,12 @@
 import { VAULT_FILE, scanFiles } from '../folder.js';
 import { element } from './dom.js';
 
-export function bindFolderFiles() {
+export function bindFolderFiles({ canOpenMemo, openMemo }) {
   const panel = element('folder-files');
   const list = element('file-list');
   const preview = element('file-dialog');
   const download = element('file-download');
+  const openInJournal = element('open-file-memo');
   const search = element('file-search');
   let connection, scan, files = [], limit = 100, skipped = 0, objectUrl, previewId = 0;
 
@@ -13,16 +14,23 @@ export function bindFolderFiles() {
     previewId++;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = undefined;
+    openInJournal.hidden = true;
+    openInJournal.onclick = null;
     download.removeAttribute('href');
     download.removeAttribute('download');
     for (const id of ['file-title', 'file-content', 'file-info']) element(id).textContent = '';
   }
 
-  async function openFile(entry) {
+  async function openFile(entry, source) {
     clearPreview();
     const expected = previewId;
     element('file-title').textContent = entry.path;
     element('file-info').textContent = '파일을 여는 중입니다.';
+    openInJournal.hidden = !canOpenMemo(entry.path);
+    openInJournal.onclick = () => {
+      preview.close();
+      openMemo(entry.path, source);
+    };
     preview.showModal();
     try {
       const file = await entry.handle.getFile();
@@ -55,7 +63,7 @@ export function bindFolderFiles() {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = entry.path;
-      button.addEventListener('click', () => openFile(entry));
+      button.addEventListener('click', () => openFile(entry, button));
       li.append(button);
       return li;
     });

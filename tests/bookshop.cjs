@@ -9,6 +9,7 @@ async function checkBookshop(session) {
     document.getElementById(id).textContent === value, [id, value]);
   const pick = async name => {
     await page.locator('#archive-list button').filter({hasText:name}).click();
+    await waitText(page, 'detail-original', name);
     await page.locator('#display-memo').click();
     await waitText(page, 'detail-status', '책방 매대에 추천글을 올렸어요.');
     assert.equal(await page.locator('#display-memo').textContent(), '책방에서 보기');
@@ -23,13 +24,31 @@ async function checkBookshop(session) {
     }
     await pick('겨울의 기록');
     await page.locator('#archive-list button').filter({hasText:'봄의 기록'}).click();
-    assert.match(await page.locator('#shelf-previous').innerText(), /겨울의 기록/);
-    // Commit a remote shelf change before its notification reaches this tab.
+    await waitText(page, 'shelf-previous', '지금 매대에 놓인 글 · 겨울의 기록');
+    // Pause the replacement before its vault read so the other tab can commit first.
+    const replacement = await page.getByRole('button', {name:'이 글로 교체하기'}).evaluate(button => {
+      const locks = navigator.locks;
+      const request = locks.request;
+      let paused = false;
+      const gate = new Promise(resolve => { window.resumeShelfWrite = resolve; });
+      locks.request = function (...args) {
+        if (args[0] !== 'jjokmun-storage') return request.apply(this, args);
+        paused = true;
+        return gate.then(() => request.apply(this, args));
+      };
+      try { button.click(); }
+      finally { locks.request = request; }
+      return paused;
+    });
+    assert.equal(replacement, true);
     await second.evaluate(async () => {
       const {readPayload} = await import('./vault.js');
       await readPayload(draft => { delete draft.shop.displayMemoId; });
     });
-    await page.getByRole('button', {name:'이 글로 교체하기'}).click();
+    await page.evaluate(() => {
+      window.resumeShelfWrite();
+      delete window.resumeShelfWrite;
+    });
     await waitText(page, 'detail-status', '다른 탭에서 매대의 글이 바뀌었어요. 교체할 글을 다시 확인해 주세요.');
     await second.locator('.owners-pick').waitFor({state:'hidden'});
     await pick('봄의 기록');
@@ -75,6 +94,7 @@ async function checkBookshop(session) {
     for (let count = 2; count > 0; count--) {
       await page.locator('#archive-toggle').click();
       await page.locator('#archive-list button').first().click();
+      await page.locator('#detail-title:focus').waitFor();
       await openSection(page, 'memo-tools');
       await page.locator('#delete-memo').click();
       await page.locator('#delete-confirm').click();

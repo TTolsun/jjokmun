@@ -47,7 +47,9 @@ export function mergeImport(state, backup, date) {
       continue;
     }
     if (existing.text !== incoming.text) {
-      if (incoming.updatedAt > existing.updatedAt) {
+      if (existing.documentPath) {
+        conflict(summary, '폴더 파일의 원문은 백업으로 덮어쓰지 않습니다.');
+      } else if (incoming.updatedAt > existing.updatedAt) {
         delta.before = core(existing);
         delta.after = core(incoming);
         Object.assign(existing, delta.after);
