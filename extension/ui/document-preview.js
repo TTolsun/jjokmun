@@ -1,4 +1,6 @@
 import { element } from './dom.js';
+import { markdown } from './markdown.js';
+import { memoFormat } from '../documents.js';
 import { readMarkdownImage, resolveMarkdownPath } from './markdown-assets.js';
 import { renderMermaid, resetMermaid } from './mermaid.js';
 import { renderPlantuml, resetPlantuml } from './plantuml.js';
@@ -15,18 +17,6 @@ const svgTags = new Set(['svg', 'g', 'title', 'desc', 'style', 'defs', 'symbol',
   'polygon', 'rect', 'circle', 'ellipse', 'text', 'tspan', 'textPath', 'marker', 'clipPath', 'mask', 'pattern',
   'linearGradient', 'radialGradient', 'stop', 'filter', 'feFlood', 'feGaussianBlur', 'feOffset', 'feComposite',
   'feMerge', 'feMergeNode', 'feColorMatrix', 'feDropShadow', 'a']);
-let markdown;
-
-function previewFormat(memo) {
-  if (memo.documentMissing) return undefined;
-  return memo.documentFormat || formats.get(memo.documentPath?.split('.').at(-1)?.toLowerCase());
-}
-
-function plainParagraph(tokens, source) {
-  const content = tokens[1]?.children;
-  return tokens.length === 3 && tokens[0].type === 'paragraph_open'
-    && content?.length === 1 && content[0].type === 'text' && content[0].content === source;
-}
 
 function codeBlock(source, className) {
   const pre = document.createElement('pre');
@@ -58,10 +48,8 @@ function diagramImage(svg) {
   return new Blob([clean], { type: 'image/svg+xml' });
 }
 
-export function bindDocumentPreview({ folder, hasDocument, openDocument }) {
-  const raw = element('detail-original');
-  const preview = element('detail-preview');
-  const toggle = element('toggle-document-source');
+export function bindDocumentPreview({ folder, hasDocument, openDocument,
+  raw = element('detail-original'), preview = element('detail-preview'), toggle = element('toggle-document-source') }) {
   const urls = new Set();
   let active;
 
@@ -206,10 +194,10 @@ export function bindDocumentPreview({ folder, hasDocument, openDocument }) {
     }
   }
 
-  async function update(memo) {
-    const format = previewFormat(memo);
+  function update(memo) {
+    const format = memo.documentMissing ? undefined : memoFormat(memo);
     const directory = folder();
-    if (active?.id === memo.id && active.text === memo.text && active.format === format
+    if (active && active.id === memo.id && active.text === memo.text && active.format === format
       && active.path === memo.documentPath && active.directory === directory) return;
     reset(false);
     if (!names[format] && format !== 'markdown') return;
@@ -217,11 +205,7 @@ export function bindDocumentPreview({ folder, hasDocument, openDocument }) {
     active = view;
     if (format === 'markdown') {
       try {
-        markdown ??= import('../vendor/markdown-it-15.0.3.mjs').then(({ default: parser }) => parser({ html: false }));
-        const parser = await markdown;
-        if (view !== active) return;
-        const tokens = parser.parse(memo.text, {});
-        if (!tokens.length || plainParagraph(tokens, memo.text)) return;
+        const tokens = markdown.parse(memo.text, {});
         appendTokens(preview, tokens, view);
       } catch {
         if (view !== active) return;

@@ -123,7 +123,7 @@ async function checkSalesFloor(session) {
     await sold.waitFor();
     assert.match(await page.locator('#floor-sold').textContent(), /^[1-9]\d*권$/);
     await sold.click();
-    await page.locator('#detail-original').getByText('골목 끝 나무 아래에서 쓴 첫 책').waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('골목 끝 나무 아래에서 쓴 첫 책').waitFor();
     assert.equal(await page.locator('#reply-input').evaluate(input => input === document.activeElement), true);
     await page.locator('#reply-compose > summary').click();
     assert.equal(await page.locator('.owners-pick').isVisible(), false);
@@ -131,7 +131,7 @@ async function checkSalesFloor(session) {
     assert.deepEqual(await page.locator('.workspace input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input']);
     await page.locator('#memo-input').fill('주인이 권하는 여행기');
     await page.locator('#memo-save').click();
-    await page.locator('#detail-original').getByText('주인이 권하는 여행기').waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('주인이 권하는 여행기').waitFor();
     assert.deepEqual(await page.locator('.workspace input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input']);
     assert.equal(await page.locator('#edit-memo').isVisible(), false);
     await page.keyboard.press('Control+k');

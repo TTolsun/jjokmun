@@ -20,7 +20,7 @@ async function checkBookshop(session) {
     for (const name of ['봄의 기록', '겨울의 기록']) {
       await page.locator('#memo-input').fill(name);
       await page.locator('#memo-save').click();
-      await page.locator('#detail-original').getByText(name).waitFor();
+      await page.locator(':is(#detail-original, #detail-preview):visible').getByText(name).waitFor();
     }
     await pick('겨울의 기록');
     await page.locator('#archive-list button').filter({hasText:'봄의 기록'}).click();

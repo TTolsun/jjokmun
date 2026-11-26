@@ -13,7 +13,7 @@ async function checkFolder(session) {
   try {
     await page.locator('#memo-input').fill('옮길 메모');
     await page.locator('#memo-save').click();
-    await page.locator('#detail-original').getByText('옮길 메모').waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('옮길 메모').waitFor();
     await page.evaluate(async () => {
       const root = await navigator.storage.getDirectory();
       const library = await root.getDirectoryHandle('내 책장', {create:true});
@@ -66,7 +66,7 @@ async function checkFolder(session) {
     await page.reload();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
-    await page.locator('#detail-original').getByText('옮길 메모').waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('옮길 메모').waitFor();
     const another = await session.tab(undefined, null);
     try {
       await another.locator('#memo-input').waitFor();
@@ -160,7 +160,7 @@ async function checkFolder(session) {
     });
     assert.ok(!remainingFiles.includes('jjokmun-vault.json'));
     await selectFolder(page, 'test-vault');
-    await page.locator('#detail-original').getByText('옮길 메모').waitFor();
+    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('옮길 메모').waitFor();
     console.log('PASS  automatic folder restore, permission retry, encrypted startup and missing vault recovery');
     console.log('PASS  folder migration, nested text/source/binary files, reload, concurrent writes and encrypted disk record');
   } finally { await page.close(); }

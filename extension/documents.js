@@ -2,7 +2,7 @@ import { scanFiles } from './folder.js';
 import { readDocumentHandle, rememberDocumentHandles } from './last-folder.js';
 import { localDate } from './store.js';
 
-const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 const MAX_PREFIX_BYTES = 32 * 1024 * 1024;
 const INVENTORY_TTL = 2000;
 const documentFormats = new Map([
@@ -25,6 +25,10 @@ export class DocumentWriteError extends Error {}
 
 export function documentFormat(path) {
   return documentFormats.get(path.match(/\.([^.\/]+)$/)?.[1].toLowerCase());
+}
+
+export function memoFormat(memo) {
+  return memo.documentFormat ?? (memo.documentPath ? documentFormat(memo.documentPath) : 'markdown');
 }
 
 async function digest(bytes) {

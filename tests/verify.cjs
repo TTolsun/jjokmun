@@ -197,7 +197,7 @@ async function createSource(session) {
   await seedLegacy(session.worker);
   const existing = await session.tab(monday, folder);
   try {
-    await existing.locator('#detail-original').getByText(folderMemo, {exact:true}).waitFor();
+    await existing.locator(':is(#detail-original, #detail-preview):visible').getByText(folderMemo, {exact:true}).waitFor();
     assert.deepEqual(await rawRecord(existing), plain);
     await existing.evaluate(async pass => (await import('./vault.js')).enableVault(pass), vaultPass);
     const encrypted = await rawRecord(existing);
@@ -405,7 +405,7 @@ async function checkRecovery(session, bytes, initial) {
   await write(b,localNote);
   // A later change to a previously imported note must survive selective undo.
   await b.locator('#archive-list button').filter({hasText:legacyText}).click();
-  await b.locator('#detail-original').getByText(legacyText, {exact:true}).waitFor();
+  await b.locator(':is(#detail-original, #detail-preview):visible').getByText(legacyText, {exact:true}).waitFor();
   await openSection(b, 'memo-tools');
   await b.locator('#edit-memo').click();
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');

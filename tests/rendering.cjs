@@ -39,12 +39,13 @@ async function openSource(page, path) {
   await page.waitForFunction(path => document.querySelector('#detail-path').textContent === path, path);
 }
 
-async function assertDiagrams(page, expected) {
-  await page.waitForFunction(count => {
-    const images = Array.from(document.querySelectorAll('#detail-preview .diagram-image'));
+async function assertDiagrams(page, expected, preview = '#detail-preview') {
+  const selector = preview + ' .diagram-image';
+  await page.waitForFunction(({selector, count}) => {
+    const images = Array.from(document.querySelectorAll(selector));
     return images.length === count && images.every(image => image.complete && image.naturalWidth > 0);
-  }, expected.length, {timeout: 30000});
-  const labels = await page.locator('#detail-preview .diagram-image').evaluateAll(async images => {
+  }, {selector, count: expected.length}, {timeout: 30000});
+  const labels = await page.locator(selector).evaluateAll(async images => {
     return Promise.all(images.map(async image => {
       const blob = window.testDiagramBlobs.get(image.src);
       if (!blob) throw new Error('The preview did not generate a local SVG image.');
@@ -63,12 +64,16 @@ async function checkRendering(session) {
   const markdownPath = '그림/기록.md';
   const png = Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'));
   const markdown = [
-    '# 기록 보관',
+    '#기록 **보관**',
     '',
     '**중요한 기록**과 `보기()`를 확인한다.',
     '',
     '- 첫째 문서',
     '- 둘째 문서',
+    '',
+    '######작은 제목',
+    '',
+    fence('text', '#코드 속 기호'),
     '',
     '[외부 자료](https://example.invalid/reference)',
     '',
@@ -130,16 +135,35 @@ async function checkRendering(session) {
       '그림/목차.markdown': '# 문서 목차',
       '원시.txt': plain,
       '그림/흐름.mmd': flowchart,
+      '그림/흐름.mermaid': flowchart,
       '그림/구조.puml': plantumlClass,
+      '그림/구조.plantuml': plantumlClass,
       '그림/가짜.png': '<svg xmlns="http://www.w3.org/2000/svg"/>'
     }});
     await selectFolder(page, folder);
+    await page.locator('#memo-input').fill('#111');
+    await page.locator('#memo-save').click();
+    await page.locator('#detail-preview').getByRole('heading', {name: '111', exact: true, level: 1}).waitFor();
+    await page.locator('#archive-list .archive-text').getByText('111', {exact: true}).waitFor();
+    await page.locator('#toggle-document-source').click();
+    assert.equal(await page.locator('#detail-original:visible').innerText(), '#111');
+    const fileName = await page.locator('#detail-path').innerText();
+    const saved = await page.evaluate(async ({folder, fileName}) => {
+      const root = await navigator.storage.getDirectory();
+      const directory = await root.getDirectoryHandle(folder);
+      const handle = await directory.getFileHandle(fileName);
+      return (await handle.getFile()).text();
+    }, {folder, fileName});
+    assert.equal(saved, '#111');
     await openSource(page, '그림/목차.markdown');
     await page.locator('#detail-preview').getByRole('heading', {name: '문서 목차', level: 1}).waitFor();
     await openSource(page, markdownPath);
     const preview = page.locator('#detail-preview');
     await preview.getByRole('heading', {name: '기록 보관', level: 1}).waitFor();
-    assert.equal(await preview.locator('strong').textContent(), '중요한 기록');
+    assert.equal(await preview.locator('h1 strong').textContent(), '보관');
+    assert.equal(await preview.locator('p strong').textContent(), '중요한 기록');
+    await preview.getByRole('heading', {name: '작은 제목', level: 6}).waitFor();
+    assert.equal(await preview.locator('pre code').first().textContent(), '#코드 속 기호\n');
     assert.deepEqual(await preview.locator('ul > li').allTextContents(), ['첫째 문서', '둘째 문서']);
     assert.deepEqual(await preview.locator('table th').allTextContents(), ['항목', '값']);
     assert.deepEqual(await preview.locator('table td').allTextContents(), ['기록', '둘']);
@@ -162,12 +186,13 @@ async function checkRendering(session) {
         '%00그림.png', '..%2F..%2F탈출.png', '%FF그림.png'].map(href => resolveMarkdownPath(markdownPath, href));
     }, markdownPath);
     assert.deepEqual(assetPaths, ['표지 그림.png', ...Array(9).fill(null)]);
-    await assertDiagrams(page, [
+    const diagramLabels = [
       ['자료 접수', '분류 완료'],
       ['독자', '서점원', '책을 물어봄'],
       ['기록자', '동료', '기록을 보냄'],
       ['자료함', '책갈피']
-    ]);
+    ];
+    await assertDiagrams(page, diagramLabels);
     await preview.locator('.diagram-status:visible').first().waitFor();
     assert.match(await preview.locator('.diagram-source:visible').last().textContent(), /A --> \[/);
     await preview.getByRole('heading', {name: '다이어그램 아래 문장', level: 2}).waitFor();
@@ -186,7 +211,25 @@ async function checkRendering(session) {
     assert.equal(await preview.isVisible(), false);
 
     await openSection(page, 'folder-files');
+    for (const [path, source, labels] of [
+      ['그림/흐름.mmd', flowchart, diagramLabels[0]],
+      ['그림/흐름.mermaid', flowchart, diagramLabels[0]],
+      ['그림/구조.puml', plantumlClass, diagramLabels[3]],
+      ['그림/구조.plantuml', plantumlClass, diagramLabels[3]]
+    ]) {
+      await page.locator('#file-list').getByRole('button', {name: path, exact: true}).click();
+      await page.locator('#file-preview:visible').waitFor();
+      await assertDiagrams(page, [labels], '#file-preview');
+      await page.locator('#toggle-file-source').click();
+      assert.equal(await page.locator('#file-content:visible').textContent(), source);
+      await page.locator('#file-close').click();
+    }
     await page.locator('#file-list').getByRole('button', {name: markdownPath, exact: true}).click();
+    await page.locator('#file-preview').getByRole('heading', {name: '기록 보관', level: 1}).waitFor();
+    assert.equal(await page.locator('#file-preview li').count(), 2);
+    await assertDiagrams(page, diagramLabels, '#file-preview');
+    await page.locator('#toggle-file-source').click();
+    assert.equal(await page.locator('#file-content:visible').textContent(), markdown);
     await page.locator('#open-file-memo').click();
     await preview.getByRole('heading', {name: '기록 보관', level: 1}).waitFor();
 
