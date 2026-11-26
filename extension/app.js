@@ -1,7 +1,7 @@
 import { localDate, validDate, emptyState, selectDaily } from './store.js';
 import { LockedError, readPayload, vaultStatus, dropVaultKey, lockVault, unlockVault } from './vault.js';
 import { createTime, element, formatDate, longDate } from './ui/dom.js';
-import { newestMemos, renderArchive, resetArchive } from './ui/archive.js';
+import { focusArchiveReturn, newestMemos, renderArchive, resetArchive, setArchiveOpen } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
 import { folderConnection, useFolder, reconnectFolder } from './vault.js';
@@ -130,6 +130,11 @@ function switchView() {
   if (journal) salesFloor.reset();
   else if (workspaceReady) salesFloor.update(state, displayedDate);
   if (leavingJournal) {
+    if (pickingMemo) {
+      pickingMemo = false;
+      refreshArchive();
+    }
+    setArchiveOpen(false);
     element('floor-title').focus({ preventScroll: true });
     window.scrollTo(0, 0);
   }
@@ -628,6 +633,7 @@ function openDetail(id, replyId, source) {
     pickingMemo = false;
   }
   renderSelection();
+  if (source?.dataset.memoId) setArchiveOpen(false);
   refreshArchive();
   if (source) element('detail-title').focus();
 }
@@ -659,6 +665,7 @@ function renderSelection() {
 function chooseFromArchive(message) {
   showView('#journal');
   pickingMemo = true;
+  setArchiveOpen(true);
   element('memo-search').open = true;
   const search = element('archive-search');
   search.value = '';
@@ -667,6 +674,13 @@ function chooseFromArchive(message) {
   setStatus('archive-status', message);
 }
 element('guest-choose').addEventListener('click', () => chooseFromArchive('메모를 열고 ‘이 글을 연두에게 건네기’를 눌러 주세요.'));
+element('archive-toggle').addEventListener('click', (event) => {
+  if (event.currentTarget.getAttribute('aria-expanded') === 'false' && pickingMemo) {
+    pickingMemo = false;
+    element('memo-search').open = false;
+    refreshArchive();
+  }
+});
 
 
 element('display-memo').addEventListener('click', async () => {
@@ -701,8 +715,7 @@ element('display-memo').addEventListener('click', async () => {
 function closeDetail(restoreFocus = true) {
   replyDialog.reset();
   if (restoreFocus && returnFocus?.dataset.memoId) {
-    const row = [...element('archive-list').children].find((item) => item.dataset.memoId === detailId);
-    (row || element('archive-search')).focus();
+    focusArchiveReturn(detailId);
   } else if (restoreFocus && returnFocus?.isConnected && !returnFocus.closest('[hidden]') && !returnFocus.disabled) {
     returnFocus.focus();
   } else if (restoreFocus) {
