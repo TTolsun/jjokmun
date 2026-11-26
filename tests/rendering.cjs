@@ -127,12 +127,15 @@ async function checkRendering(session) {
       await write(root, '탈출.png', Uint8Array.from(png));
     }, {folder, png, files: {
       [markdownPath]: markdown,
+      '그림/목차.markdown': '# 문서 목차',
       '원시.txt': plain,
       '그림/흐름.mmd': flowchart,
       '그림/구조.puml': plantumlClass,
       '그림/가짜.png': '<svg xmlns="http://www.w3.org/2000/svg"/>'
     }});
     await selectFolder(page, folder);
+    await openSource(page, '그림/목차.markdown');
+    await page.locator('#detail-preview').getByRole('heading', {name: '문서 목차', level: 1}).waitFor();
     await openSource(page, markdownPath);
     const preview = page.locator('#detail-preview');
     await preview.getByRole('heading', {name: '기록 보관', level: 1}).waitFor();

@@ -6,7 +6,7 @@ const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 const MAX_PREFIX_BYTES = 32 * 1024 * 1024;
 const INVENTORY_TTL = 2000;
 const documentFormats = new Map([
-  ['md', 'markdown'], ['txt', 'text'], ['puml', 'plantuml'], ['plantuml', 'plantuml'],
+  ['md', 'markdown'], ['markdown', 'markdown'], ['txt', 'text'], ['puml', 'plantuml'], ['plantuml', 'plantuml'],
   ['mmd', 'mermaid'], ['mermaid', 'mermaid']
 ]);
 const decoder = new TextDecoder('utf-8', { fatal: true });
