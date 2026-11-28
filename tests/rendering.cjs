@@ -249,6 +249,62 @@ async function checkRendering(session) {
     await assertDiagrams(page, [['자료 접수', '검토 끝']]);
     console.log('PASS  standalone diagrams, exact text source, and rendered edits');
 
+    // The memo field stays one row, keeps typed and filled line breaks, and saves on Enter.
+    const memoInput = page.locator('#memo-input');
+    await memoInput.click();
+    await page.keyboard.type('첫 줄');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('둘째 줄');
+    assert.equal(await memoInput.inputValue(), '첫 줄\n둘째 줄');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('#detail-path').textContent.startsWith('첫 줄-'));
+    assert.equal(await memoInput.inputValue(), '');
+    assert.equal(await raw.textContent(), '첫 줄\n둘째 줄');
+    // A pasted diagram source becomes a .puml or .mmd file and renders without a code fence.
+    const diskFile = path => page.evaluate(async ({folder, path}) => {
+      const directory = await (await navigator.storage.getDirectory()).getDirectoryHandle(folder);
+      return (await (await directory.getFileHandle(path)).getFile()).text();
+    }, {folder, path});
+    for (const [source, extension, labels] of [
+      [plantumlSequence, 'puml', diagramLabels[2]],
+      [mermaidSequence, 'mmd', diagramLabels[1]]
+    ]) {
+      await memoInput.fill(source);
+      await memoInput.press('Enter');
+      await page.waitForFunction(extension => /^다이어그램-[0-9a-f]{8}\.(\w+)$/.exec(
+        document.querySelector('#detail-path').textContent)?.[1] === extension, extension);
+      await assertDiagrams(page, [labels]);
+      assert.equal(await diskFile(await page.locator('#detail-path').innerText()), source);
+    }
+    // A Markdown memo whose whole text is a diagram renders as that diagram.
+    await openSource(page, fileName);
+    await openSection(page, 'memo-tools');
+    await page.locator('#edit-memo').click();
+    await editor.fill(plantumlClass);
+    await page.locator('#edit-save').click();
+    await assertDiagrams(page, [diagramLabels[3]]);
+    assert.equal(await diskFile(fileName), plantumlClass);
+    const detected = await page.evaluate(async () => {
+      const {detectFormat} = await import('./documents.js');
+      return ['graph 공부하기\n내일 다시', 'timeline', 'timeline\n  2031 : 개점', '@startuml\nA -> B', '%% 메모\ngraph LR\n  A --> B']
+        .map(detectFormat);
+    });
+    assert.deepEqual(detected, ['markdown', 'markdown', 'mermaid', 'markdown', 'mermaid']);
+    // Single-line fields turn pasted line breaks into spaces instead of gluing words.
+    await page.locator('#reply-compose > summary').click();
+    await page.locator('#reply-input').evaluate(input => {
+      input.focus();
+      input.value = '앞 ';
+      input.setSelectionRange(2, 2);
+      const data = new DataTransfer();
+      data.setData('text/plain', '첫 줄\r\n둘째 줄\n');
+      input.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));
+    });
+    assert.equal(await page.locator('#reply-input').inputValue(), '앞 첫 줄 둘째 줄');
+    await page.locator('#detail-status').getByText('이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.').waitFor();
+    await page.locator('#reply-input').fill('');
+    console.log('PASS  multi-line memo field, diagram file extensions, whole-diagram Markdown and single-line paste');
+
     // Queue a Markdown render and immediately switch to a standalone diagram.
     await page.evaluate(markdownPath => {
       const rows = Array.from(document.querySelectorAll('#archive-list button'));

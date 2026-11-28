@@ -27,6 +27,21 @@ export function documentFormat(path) {
   return documentFormats.get(path.match(/\.([^.\/]+)$/)?.[1].toLowerCase());
 }
 
+const extensions = { markdown: 'md', text: 'txt', plantuml: 'puml', mermaid: 'mmd' };
+const mermaidHeader = new RegExp('^(?:(?:graph|flowchart)\\s+(?:TB|TD|BT|RL|LR)\\s*;?|pie(?:\\s+(?:showData|title\\s.+))?|'
+  + '(?:sequenceDiagram|classDiagram(?:-v2)?|stateDiagram(?:-v2)?|erDiagram|journey|gantt|quadrantChart|requirementDiagram'
+  + '|gitGraph|mindmap|timeline|kanban|C4(?:Context|Container|Component|Dynamic|Deployment)'
+  + '|(?:sankey|xychart|block|packet|architecture)-beta)\\s*)$');
+
+// Recognize a whole-diagram source by its header so a pasted diagram renders
+// without a code fence. Only unambiguous headers count, so prose stays Markdown.
+export function detectFormat(text) {
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('%%'));
+  if (/^@start[a-z]+\b/i.test(lines[0] ?? '') && /^@end[a-z]+$/i.test(lines.at(-1))) return 'plantuml';
+  if (lines.length > 1 && mermaidHeader.test(lines[0])) return 'mermaid';
+  return 'markdown';
+}
+
 export function memoFormat(memo) {
   return memo.documentFormat ?? (memo.documentPath ? documentFormat(memo.documentPath) : 'markdown');
 }
@@ -298,10 +313,12 @@ export function relinkInPayload(payload, documents, id, path) {
   annotate(missing, documents.bindings[id], file, payload);
 }
 
-function newDocumentPath(text) {
-  const title = text.trimStart().split(/\r?\n/, 1)[0]
+function newDocumentPath(text, format = 'markdown') {
+  // A diagram's first line is its @start or header keyword, which says nothing about the content.
+  const title = format === 'plantuml' || format === 'mermaid' ? '다이어그램' : text.trimStart().split(/\r?\n/, 1)[0]
     .replace(/[<>:"/\\|?*.\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
-  return `${Array.from(title).slice(0, 48).join('').trim() || '메모'}-${crypto.randomUUID().slice(0, 8)}.md`;
+  const extension = extensions[format] ?? 'md';
+  return `${Array.from(title).slice(0, 48).join('').trim() || '메모'}-${crypto.randomUUID().slice(0, 8)}.${extension}`;
 }
 
 async function assertPathAvailable(directory, path) {
@@ -352,7 +369,7 @@ export async function prepareDocuments(directory, payload, documents, before, cr
     } else if (previous || !createFiles) continue;
     if (write) throw new Error('파일로 저장한 메모는 한 번에 하나씩 바꿀 수 있습니다.');
     const body = await prepareBody(memo.text, file);
-    const path = file?.path ?? newDocumentPath(memo.text);
+    const path = file?.path ?? newDocumentPath(memo.text, memo.documentFormat);
     if (!file) await assertPathAvailable(directory, path);
     const updated = { ...file, ...body, path };
     documents.bindings[memo.id] = descriptor(updated, false);

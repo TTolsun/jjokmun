@@ -1,6 +1,6 @@
 import { element } from './dom.js';
 import { markdown } from './markdown.js';
-import { memoFormat } from '../documents.js';
+import { detectFormat, memoFormat } from '../documents.js';
 import { readMarkdownImage, resolveMarkdownPath } from './markdown-assets.js';
 import { renderMermaid, resetMermaid } from './mermaid.js';
 import { renderPlantuml, resetPlantuml } from './plantuml.js';
@@ -195,7 +195,9 @@ export function bindDocumentPreview({ folder, hasDocument, openDocument,
   }
 
   function update(memo) {
-    const format = memo.documentMissing ? undefined : memoFormat(memo);
+    let format = memo.documentMissing ? undefined : memoFormat(memo);
+    // A Markdown memo or .md file that holds only a diagram source renders as that diagram.
+    if (format === 'markdown') format = detectFormat(memo.text);
     const directory = folder();
     if (active && active.id === memo.id && active.text === memo.text && active.format === format
       && active.path === memo.documentPath && active.directory === directory) return;

@@ -7,7 +7,7 @@ import { bindReplyDialog } from './ui/reply-dialog.js';
 import { DocumentConflictError, DocumentWriteError, folderConnection, useFolder, reconnectFolder, relinkDocument } from './vault.js';
 import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
-import { documentChanged } from './documents.js';
+import { detectFormat, documentChanged } from './documents.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindPortraits } from './ui/bookshop.js';
@@ -410,10 +410,29 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; });
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && (composing || event.isComposing || event.keyCode === 229)) {
+    if (event.key !== 'Enter') return;
+    if (composing || event.isComposing || event.keyCode === 229) {
       event.preventDefault();
+    } else if ('enterSubmits' in input.dataset && !event.shiftKey) {
+      // Memo fields are textareas that still save on Enter; Shift+Enter adds a line.
+      event.preventDefault();
+      form.requestSubmit();
     }
   });
+  if (input.type === 'text') {
+    // A single-line field drops pasted line breaks silently, gluing words together.
+    input.addEventListener('paste', (event) => {
+      const pasted = event.clipboardData?.getData('text/plain') ?? '';
+      if (!/[\r\n]/.test(pasted)) return;
+      event.preventDefault();
+      const room = input.maxLength < 0 ? Infinity
+        : input.maxLength - input.value.length + (input.selectionEnd - input.selectionStart);
+      const line = pasted.replace(/\s*[\r\n]+\s*/g, ' ').trim().slice(0, Math.max(0, room));
+      input.setRangeText(line, input.selectionStart, input.selectionEnd, 'end');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      setStatus(statusId, '이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.');
+    });
+  }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (composing || pending) return;
@@ -456,7 +475,7 @@ function textSaveError(error) {
 
 function newMemo(text, date) {
   const now = Date.now();
-  return { id: crypto.randomUUID(), text, documentFormat: 'markdown', createdOn: date, createdAt: now, updatedAt: now, replies: [] };
+  return { id: crypto.randomUUID(), text, documentFormat: detectFormat(text), createdOn: date, createdAt: now, updatedAt: now, replies: [] };
 }
 
 bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text) => {

@@ -90,7 +90,7 @@ async function assertLocked(p) {
   for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#floor-memo-input', '#daily-memo', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
-  const contents = await p.evaluate(() => document.body.textContent + [...document.querySelectorAll('input')].map(i => i.value).join(' '));
+  const contents = await p.evaluate(() => document.body.textContent + [...document.querySelectorAll('input, textarea')].map(i => i.value).join(' '));
   for (const secret of [note, reply, legacyText, '미저장 비밀 문장']) assert.ok(!contents.includes(secret),'locked DOM retained text');
   assert.equal(await p.evaluate(async () => {
     try { await (await import('./vault.js')).transact(); return true; } catch { return false; }
