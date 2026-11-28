@@ -41,8 +41,16 @@ window.addEventListener('message', event => {
   if (event.source !== frame?.contentWindow || event.origin !== 'null') return;
   const { type, id, svg, error } = event.data || {};
   if (type !== 'plantuml-result' || !requests.has(id)) return;
-  requests.get(id)(svg, error);
+  requests.get(id)(svg, error, event.data);
 });
+
+function syntaxError({ line, code, detail }, offset) {
+  const number = Number.isSafeInteger(line) ? Math.max(1, line - offset) : undefined;
+  const error = new Error((number ? `PlantUML ${number}번째 줄을 해석하지 못했습니다.` : 'PlantUML 코드를 해석하지 못했습니다.')
+    + ' 선언과 메시지를 한 줄에 하나씩 적었는지 확인해 주세요.');
+  error.details = [number && `${number} | ${String(code ?? '').trim()}`, detail].filter(Boolean).join('\n');
+  return error;
+}
 
 export function resetPlantuml() {
   const message = 'PlantUML 미리보기가 닫혔습니다.';
@@ -66,10 +74,12 @@ export async function renderPlantuml(source) {
   return new Promise((resolve, reject) => {
     const id = ++nextId;
     const timer = setTimeout(() => done(undefined, 'PlantUML 미리보기가 오래 걸립니다.'), TIMEOUT);
-    function done(svg, error) {
+    function done(svg, error, result) {
       requests.delete(id);
       clearTimeout(timer);
-      if (error) reject(new Error(error));
+      // Line numbers count the @startuml line this module added to a bare fence.
+      if (error === 'syntax') reject(syntaxError(result, wrapped === input ? 0 : 1));
+      else if (error) reject(new Error(error));
       else resolve(svg);
     }
     requests.set(id, done);

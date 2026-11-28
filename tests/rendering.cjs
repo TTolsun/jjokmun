@@ -193,7 +193,9 @@ async function checkRendering(session) {
       ['자료함', '책갈피']
     ];
     await assertDiagrams(page, diagramLabels);
-    await preview.locator('.diagram-status:visible').first().waitFor();
+    // A failed diagram names the failing line and keeps the engine's report.
+    await preview.locator('.diagram-status:visible').getByText('Mermaid 2번째 줄을 해석하지 못했습니다.', {exact: true}).waitFor();
+    assert.match(await preview.locator('.diagram-error:visible').last().textContent(), /Parse error on line 2:[\s\S]*Expecting/);
     assert.match(await preview.locator('.diagram-source:visible').last().textContent(), /A --> \[/);
     await preview.getByRole('heading', {name: '다이어그램 아래 문장', level: 2}).waitFor();
     console.log('PASS  offline Markdown and Korean Mermaid and PlantUML diagrams with malformed fallback');
@@ -276,6 +278,19 @@ async function checkRendering(session) {
       await assertDiagrams(page, [labels]);
       assert.equal(await diskFile(await page.locator('#detail-path').innerText()), source);
     }
+    // Declarations glued onto one line fail with the line, its text and PlantUML's verdict.
+    await memoInput.fill('@startuml\nparticipant 기록자 as Foo actor 동료 as Foo1 Foo -> Foo1 : 보냄\n@enduml');
+    await memoInput.press('Enter');
+    await preview.locator('.diagram-status:visible').getByText(
+      'PlantUML 2번째 줄을 해석하지 못했습니다. 선언과 메시지를 한 줄에 하나씩 적었는지 확인해 주세요.', {exact: true}).waitFor();
+    assert.equal(await preview.locator('.diagram-error:visible').textContent(),
+      '2 | participant 기록자 as Foo actor 동료 as Foo1 Foo -> Foo1 : 보냄\nSyntax Error? (Assumed diagram type: sequence)');
+    // A bare fence counts lines from its own first line, not the @startuml this app adds.
+    const bare = await page.evaluate(async () => {
+      const {renderPlantuml} = await import('./ui/plantuml.js');
+      try { await renderPlantuml('Alice -> Bob : 인사\nclass A {'); return 'rendered'; } catch (error) { return error.message; }
+    });
+    assert.match(bare, /^PlantUML 2번째 줄을 해석하지 못했습니다/);
     // A Markdown memo whose whole text is a diagram renders as that diagram.
     await openSource(page, fileName);
     await openSection(page, 'memo-tools');
