@@ -89,7 +89,7 @@ async function checkSalesFloor(session) {
     }, state);
     // Writing on the floor puts a book on the cart; the next cart reader opens
     // it, buys it, and the sold book leads straight to a reply.
-    assert.deepEqual(await page.locator('#floor input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['floor-memo-input', 'guest-input']);
+    assert.deepEqual(await page.locator('#floor :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['floor-memo-input', 'guest-input']);
     await page.locator('#sold-empty').getByText('아직 내 책이 없어요').waitFor();
     const third = await page.evaluate(async () => {
       const { currentShift } = await import('./business.js');
@@ -126,11 +126,11 @@ async function checkSalesFloor(session) {
     assert.equal(await page.locator('#reply-input').evaluate(input => input === document.activeElement), true);
     assert.equal(await page.locator('.owners-pick').isVisible(), false);
     await page.locator('#open-archive').click();
-    assert.deepEqual(await page.locator('.workspace input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
+    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
     await page.locator('#memo-input').fill('주인이 권하는 여행기');
     await page.locator('#memo-save').click();
     await page.locator(':is(#detail-original, #detail-preview):visible').getByText('주인이 권하는 여행기').waitFor();
-    assert.deepEqual(await page.locator('.workspace input:visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
+    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
     assert.ok(await page.locator('#edit-memo').isVisible());
     await page.keyboard.press('Control+k');
     assert.equal(await page.locator('#archive-search').evaluate(input => input === document.activeElement), true);

@@ -258,11 +258,19 @@ h1 { font-family: var(--display); font-weight: 400; }
 #storage-recovery { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 1rem auto; }
 #memo-form, .inline-form { display: flex; align-items: stretch; gap: 7px; }
 #memo-form { width: min(100%, 465px); }
-#memo-form input, #floor-memo-input { background: var(--surface); border: 1px solid var(--line); }
-#memo-form input:focus-visible, #floor-memo-input:focus-visible { border-color: var(--ink); }
+#memo-form, #floor-memo-form .inline-form { align-items: flex-end; }
+#memo-form textarea, #floor-memo-input { background: var(--surface); border: 1px solid var(--line); }
+#memo-form textarea:focus-visible, #floor-memo-input:focus-visible { border-color: var(--ink); }
+/* One row until the text needs more; Shift+Enter or a multi-line paste grows the field. */
 #memo-input, #floor-memo-input {
   flex: 1;
   min-width: 0;
+  field-sizing: content;
+  min-height: 40px;
+  max-height: 40vh;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.45;
   background: transparent;
   border: 0;
   border-radius: 4px;
