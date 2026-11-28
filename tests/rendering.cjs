@@ -334,6 +334,13 @@ async function checkRendering(session) {
     // Replies take several lines and render Markdown and diagrams, each in its own preview.
     const replyInput = page.locator('#reply-input');
     await replyInput.click();
+    // Windows Chrome sends Shift+Enter after a Korean syllable only as a composing keydown;
+    // its line break must survive, while a composing plain Enter must not save.
+    const composingEnter = (selector, shiftKey) => page.locator(selector).evaluate((input, shiftKey) =>
+      input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 229, isComposing: true,
+        shiftKey, bubbles: true, cancelable: true})), shiftKey);
+    assert.equal(await composingEnter('#reply-input', true), true);
+    assert.equal(await composingEnter('#reply-input', false), false);
     await page.keyboard.type('**굵은** 답장');
     await page.keyboard.press('Shift+Enter');
     await page.keyboard.type('- 항목');
@@ -363,6 +370,8 @@ async function checkRendering(session) {
     await replyArticle('항목').locator('[data-action="edit"]').click();
     const replyEditor = page.locator('#reply-edit-input');
     assert.equal(await replyEditor.inputValue(), '**굵은** 답장\n- 항목');
+    assert.equal(await composingEnter('#reply-edit-input', true), true);
+    assert.equal(await composingEnter('#reply-edit-input', false), false);
     await replyEditor.fill('수정한 답장');
     await replyEditor.press('Shift+Enter');
     await replyEditor.press('End');

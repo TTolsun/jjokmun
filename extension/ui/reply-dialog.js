@@ -48,7 +48,11 @@ export function bindReplyDialog(change) {
   });
   input.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
-    if (event.isComposing || event.keyCode === 229) event.preventDefault();
+    // A composing Enter can be the only keydown for Shift+Enter after a Korean syllable,
+    // so let it insert the line break.
+    if (event.isComposing || event.keyCode === 229) {
+      if (!event.shiftKey) event.preventDefault();
+    }
     // Enter saves as before; Shift+Enter starts a new line in the textarea.
     else if (!event.shiftKey) {
       event.preventDefault();
