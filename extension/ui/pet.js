@@ -1,5 +1,6 @@
-import { petView, applyPetAction, petEvolution, dominantPetHabit, PET_FAMILIES, PET_FORM_DETAILS } from '../pet.js';
+import { petView, applyPetAction, petEvolution, dominantPetHabit, PET_FORM_DETAILS } from '../pet.js';
 import { element } from './dom.js';
+import { bindPetCollection, familyPath, STAGE_NAMES } from './pet-collection.js';
 import { bindPetDevice } from './pet-device.js';
 import { FAMILY_NAMES, familyHabit, familyPrecursor, familyReaction } from './pet-family-motion.js';
 
@@ -22,7 +23,6 @@ const ACTIVE_HABITS = {
   explore: '이번 성장기에는 정원을 가장 자주 탐색했어요.',
   affection: '이번 성장기에는 쓰다듬으며 가장 자주 교감했어요.'
 };
-const STAGES = ['알', '아기', '첫 번째 진화', '두 번째 진화'];
 const FIRE_MOTIONS = {
   'fire-runner': ['play', 'look-back', '앞발부터 내딛고서야 뒤를 힐끗 봐요.'],
   'fire-scout': ['explore', 'nose-first', '코부터 흙에 대요. 긴 귀는 한 박자 늦게 따라 내려와요.'],
@@ -62,7 +62,6 @@ const FIRE_PRECURSORS = {
     affection: ['nestle', '곁에 앉아 앞발을 포개자 갈기가 둥글게 퍼져 발을 덮어요.']
   }
 };
-const LEGACY_FORMS = ['baby', 'runner', 'scout', 'cuddler'];
 const NEEDS = {
   feed: '빈 그릇을 바라보고 있어요. 배가 고픈가 봐요.', play: '같이 놀고 싶어요.', clean: '정원을 청소해 주세요.',
   sleep: '자꾸 눈을 비비네요. 졸린가 봐요.', heal: '몸이 아파요.', pet: '곁에서 돌봐 주세요.'
@@ -72,14 +71,6 @@ const ADULT_NEED_SYMBOLS = { feed: '🍎', sleep: '🌙', heal: '🩹', clean: '
 
 function formName(form) {
   return PET_FORM_DETAILS[form]?.name;
-}
-
-function familyPath(form) {
-  const path = [];
-  for (let key = form; FAMILY_NAMES[PET_FORM_DETAILS[key]?.lineage]; key = PET_FORM_DETAILS[key].parent) {
-    path.unshift(formName(key));
-  }
-  return path.join(' → ');
 }
 
 function precursor(form, habit) {
@@ -108,6 +99,7 @@ export function bindPet(change, saveError, editorReturn) {
   const summarySprite = element('pet-summary-sprite');
   const spriteButton = element('pet-sprite-button');
   const device = bindPetDevice(act, editorReturn);
+  const collection = bindPetCollection();
   const status = element('pet-status');
   const meters = METERS.map(key => [key, element('pet-' + key)]);
   let current;
@@ -116,7 +108,6 @@ export function bindPet(change, saveError, editorReturn) {
   let effectTimer;
   let growthTimer;
   let scheduledGrowth;
-  let collectionKey;
   let habit;
   let lastHabit = 0;
   let retryGrowthAt = 0;
@@ -148,80 +139,6 @@ export function bindPet(change, saveError, editorReturn) {
     return HABITS[details?.stage === 1 ? dominantPetHabit(pet) : details?.habit];
   }
 
-  function renderCollection(discovered, activeForm) {
-    const key = discovered.join('|');
-    if (collectionKey === key) return;
-    collectionKey = key;
-    const collection = element('pet-collection');
-    const openSections = new Set([...collection.querySelectorAll('details[open]')].map(section => section.dataset.group));
-    const forms = Object.keys(PET_FORM_DETAILS);
-    const hasLegacy = LEGACY_FORMS.some(form => discovered.includes(form));
-    const total = hasLegacy ? forms.length : forms.length - LEGACY_FORMS.length;
-    element('pet-collection-count').textContent = `${discovered.length} / ${total} 발견`;
-    function cardFor(form) {
-      const name = formName(form);
-      const card = document.createElement('li');
-      const unlocked = discovered.includes(form);
-      card.classList.toggle('undiscovered', !unlocked);
-      if (unlocked) {
-        card.dataset.discoveredForm = form;
-        const thumbnail = document.createElement('img');
-        thumbnail.src = `art/${form}.png`;
-        thumbnail.alt = '';
-        thumbnail.loading = 'lazy';
-        card.append(thumbnail);
-      } else {
-        const question = document.createElement('b');
-        question.textContent = '?';
-        question.setAttribute('aria-hidden', 'true');
-        card.append(question);
-      }
-      const label = document.createElement('span');
-      label.textContent = unlocked ? name : '미발견';
-      card.append(label);
-      if (unlocked) {
-        const details = PET_FORM_DETAILS[form];
-        const journeyPath = familyPath(form);
-        if (journeyPath && journeyPath !== name) {
-          const path = document.createElement('p');
-          path.className = 'pet-card-path';
-          path.textContent = journeyPath;
-          card.append(path);
-        }
-        const journey = document.createElement('p');
-        journey.textContent = details.description;
-        card.append(journey);
-      }
-      return card;
-    }
-    function group(key, title, keys, rows = [keys]) {
-      const section = document.createElement('details');
-      section.dataset.group = key;
-      section.open = openSections.has(key) || keys.includes(activeForm) || (!activeForm && keys.includes('egg'));
-      const summary = document.createElement('summary');
-      const count = document.createElement('span');
-      count.textContent = `${keys.filter(form => discovered.includes(form)).length} / ${keys.length}`;
-      summary.append(title, count);
-      section.append(summary);
-      for (const row of rows) {
-        const list = document.createElement('ul');
-        list.append(...row.map(cardFor));
-        section.append(list);
-      }
-      return section;
-    }
-    const sections = [group('egg', '알', ['egg'])];
-    for (const [lineage, baby] of Object.entries(PET_FAMILIES)) {
-      const family = forms.filter(form => PET_FORM_DETAILS[form].lineage === lineage);
-      if (!family.some(form => discovered.includes(form))) continue;
-      const first = family.filter(form => PET_FORM_DETAILS[form].stage === 2);
-      const finals = first.map(parent => family.filter(form => PET_FORM_DETAILS[form].parent === parent));
-      sections.push(group(lineage, FAMILY_NAMES[lineage], family, [[baby], first, ...finals]));
-    }
-    if (hasLegacy) sections.push(group('legacy', '예전 정원', LEGACY_FORMS));
-    collection.replaceChildren(...sections);
-  }
-
   function render(value) {
     active = true;
     current = value;
@@ -243,8 +160,8 @@ export function bindPet(change, saveError, editorReturn) {
     element('pet-lcd-name').textContent = name;
     const stageLabel = element('pet-stage-label');
     stageLabel.hidden = !pet;
-    stageLabel.textContent = stage > 0 && FAMILY_NAMES[pet?.lineage] ? FAMILY_NAMES[pet.lineage] + ' · ' + STAGES[stage]
-      : form !== 'egg' && form !== 'baby' ? '새싹이 가족 · 성장 완료' : STAGES[stage];
+    stageLabel.textContent = stage > 0 && FAMILY_NAMES[pet?.lineage] ? FAMILY_NAMES[pet.lineage] + ' · ' + STAGE_NAMES[stage]
+      : form !== 'egg' && form !== 'baby' ? '새싹이 가족 · 성장 완료' : STAGE_NAMES[stage];
     const path = element('pet-path');
     path.textContent = stage > 1 ? familyPath(form) : '';
     path.hidden = !path.textContent;
@@ -293,7 +210,7 @@ export function bindPet(change, saveError, editorReturn) {
       }
     }
     device.update(pet, Boolean(pending));
-    renderCollection(pet?.discovered || [], pet?.form);
+    collection.update(pet?.discovered || [], pet?.form);
   }
 
   function clearEffect() {
@@ -428,12 +345,12 @@ export function bindPet(change, saveError, editorReturn) {
 
   function reset() {
     active = false;
-    current = pending = collectionKey = undefined;
+    current = pending = undefined;
     scheduleGrowth(undefined, Date.now());
     device.reset();
     status.textContent = '';
     clearEffect();
-    element('pet-collection').replaceChildren();
+    collection.reset();
     element('pet-name').textContent = '';
     element('pet-lcd-name').textContent = '';
     element('pet-condition').textContent = '';
@@ -446,7 +363,6 @@ export function bindPet(change, saveError, editorReturn) {
     habit = undefined;
     lastHabit = 0;
     retryGrowthAt = 0;
-    element('pet-collection-count').textContent = '';
     element('pet-memo-excerpt').textContent = '';
     element('pet-memo-excerpt').hidden = true;
     element('pet-need-symbol').textContent = '';

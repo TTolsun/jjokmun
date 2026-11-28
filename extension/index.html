@@ -242,12 +242,23 @@
           <p id="pet-habit" hidden></p>
           <p id="pet-status" role="status"></p>
           <blockquote id="pet-memo-excerpt" hidden></blockquote>
-          <details id="pet-collection-panel" class="pet-collection journal-disclosure">
-            <summary><span id="pet-collection-title">성장 도감</span><span id="pet-collection-count"></span></summary>
-            <div id="pet-collection"></div>
-          </details>
+          <button type="button" id="pet-collection-open" aria-haspopup="dialog" aria-controls="pet-collection-dialog">
+            성장 도감<span id="pet-collection-count"></span>
+          </button>
         </div>
       </div>
+      <dialog id="pet-collection-dialog" aria-labelledby="pet-collection-title">
+        <header class="collection-header">
+          <h2 id="pet-collection-title">성장 도감</h2>
+          <form method="dialog"><button class="close" aria-label="성장 도감 닫기" autofocus>×</button></form>
+          <div class="collection-progress">
+            <span id="pet-discovery-total"></span>
+            <progress id="pet-discovery-progress" aria-label="전체 발견 수"></progress>
+          </div>
+        </header>
+        <div id="pet-collection-families" role="group" aria-label="계열 선택"></div>
+        <div id="pet-collection" tabindex="0" role="region" aria-label="성장 단계별 모습"></div>
+      </dialog>
     </section>
 
   </main>
