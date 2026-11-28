@@ -1,3 +1,4 @@
+import { MAX_VAULT_BYTES } from './crypto.js';
 import { validateShop } from './shop.js';
 import { validateBusiness } from './business.js';
 
@@ -59,7 +60,7 @@ const validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/
 // appVersion stamp can tell the user to update instead.
 export const REPLY_LIMIT = 64 * 1024;
 const validReply = (value) => typeof value === 'string' && value.length <= REPLY_LIMIT && Boolean(value.trim());
-const validText = (value) => typeof value === 'string' && value.length <= 4 * 1024 * 1024;
+const validText = (value) => typeof value === 'string' && value.length <= MAX_VAULT_BYTES;
 const formats = new Set(['markdown', 'text', 'plantuml', 'mermaid']);
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 

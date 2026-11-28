@@ -24,11 +24,17 @@ export function unreadableVaultMessage(record, fallback) {
   return fallback;
 }
 
-export async function readVaultFile(directory, optional = false) {
+export const COPY_FORMAT = 'jjokmun-folder-copy';
+
+export async function readVaultFile(directory, optional = false, allowPendingCopy = false) {
   try {
     const handle = await directory.getFileHandle(VAULT_FILE);
     const file = await handle.getFile();
     const record = JSON.parse(await file.text());
+    if (record?.format === COPY_FORMAT) {
+      if (allowPendingCopy) return record;
+      throw new Error('이 폴더는 아직 복사 중입니다. 기존 암호화 저장소를 열고 같은 대상 폴더를 다시 선택해 주세요.');
+    }
     if (record?.format !== 2 || !Number.isSafeInteger(record.revision) || !Number.isSafeInteger(record.epoch)
       || !(record.mode === 'plain' && Array.isArray(record.payload?.state?.memos) && Array.isArray(record.payload?.state?.daily)
         && Array.isArray(record.payload?.state?.props) || record.mode === 'encrypted' && typeof record.salt === 'string'

@@ -1,3 +1,4 @@
+import { MAX_VAULT_BYTES } from './crypto.js';
 import { scanFiles } from './folder.js';
 import { readDocumentHandle, rememberDocumentHandles } from './last-folder.js';
 import { localDate } from './store.js';
@@ -27,7 +28,7 @@ export function documentFormat(path) {
   return documentFormats.get(path.match(/\.([^.\/]+)$/)?.[1].toLowerCase());
 }
 
-const extensions = { markdown: 'md', text: 'txt', plantuml: 'puml', mermaid: 'mmd' };
+export const extensions = { markdown: 'md', text: 'txt', plantuml: 'puml', mermaid: 'mmd' };
 const mermaidHeader = new RegExp('^(?:(?:graph|flowchart)\\s+(?:TB|TD|BT|RL|LR)\\s*;?|pie(?:\\s+(?:showData|title\\s.+))?|'
   + '(?:sequenceDiagram|classDiagram(?:-v2)?|stateDiagram(?:-v2)?|erDiagram|journey|gantt|quadrantChart|requirementDiagram'
   + '|gitGraph|mindmap|timeline|kanban|C4(?:Context|Container|Component|Dynamic|Deployment)'
@@ -42,18 +43,22 @@ export function detectFormat(text) {
   return 'markdown';
 }
 
+export function checkMemoSize(text) {
+  if (encoder.encode(text).length > MAX_DOCUMENT_BYTES) throw new DocumentWriteError('새로 쓰거나 수정하는 메모는 4 MiB까지 저장할 수 있습니다.');
+}
+
 export function memoFormat(memo) {
   return memo.documentFormat ?? (memo.documentPath ? documentFormat(memo.documentPath) : 'markdown');
 }
 
-async function digest(bytes) {
+export async function digest(bytes) {
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function inspect(handle, cached) {
+async function inspect(handle, cached, limit = MAX_DOCUMENT_BYTES) {
   const file = await handle.getFile();
-  if (file.size > MAX_DOCUMENT_BYTES) return null;
+  if (file.size > limit) return null;
   if (cached?.bytes.length === file.size && cached.time === file.lastModified) return { ...cached, handle };
   const bytes = new Uint8Array(await file.arrayBuffer());
   const encoding = bytes[0] === 255 && bytes[1] === 254 ? 'utf-16le'
@@ -72,7 +77,7 @@ export async function documentChanged(directory, memo) {
   try {
     let parent = directory;
     for (const part of components) parent = await parent.getDirectoryHandle(part);
-    const file = await inspect(await parent.getFileHandle(name));
+    const file = await inspect(await parent.getFileHandle(name), undefined, MAX_VAULT_BYTES + 3);
     if (!file) return !memo.documentMissing;
     if (memo.documentMissing) return true;
     return memo.documentHash ? file.hash !== memo.documentHash : file.text !== memo.text;
@@ -124,7 +129,7 @@ export function clearDocumentFields(memo) {
 async function inventoryFor(directory, force, revision, bindings) {
   const current = inventories.get(directory);
   if (!force && current && current.revision === revision && Date.now() - current.time < INVENTORY_TTL) return current;
-  const expectedHashes = new Map(Object.values(bindings).map(binding => [binding.path, binding.hash]));
+  const byPath = new Map(Object.values(bindings).map(binding => [binding.path, binding]));
   const inventory = await scanFiles(directory, new AbortController().signal);
   const eligible = inventory.files.filter(file => documentFormat(file.path));
   const files = new Map();
@@ -135,8 +140,9 @@ async function inventoryFor(directory, force, revision, bindings) {
       const { handle, path } = eligible[next++];
       try {
         const cached = current?.files.get(path);
-        const expected = expectedHashes.get(path);
-        const file = await inspect(handle, force || (expected && cached?.hash !== expected) ? undefined : cached);
+        const binding = byPath.get(path);
+        const limit = binding?.size > MAX_DOCUMENT_BYTES ? MAX_VAULT_BYTES + 3 : MAX_DOCUMENT_BYTES;
+        const file = await inspect(handle, force || (binding && cached?.hash !== binding.hash) ? undefined : cached, limit);
         if (file) files.set(path, { ...file, path });
       } catch (error) {
         if (!(error instanceof TypeError) && !['NotFoundError', 'NotReadableError', 'NotAllowedError'].includes(error.name)) throw error;
@@ -267,10 +273,10 @@ async function writeDocument(handle, bytes, before) {
   let writer;
   try {
     writer = await handle.createWritable({ mode: 'exclusive' });
-    const current = await inspect(handle);
+    const current = await inspect(handle, undefined, MAX_VAULT_BYTES + 3);
     if (!current || current.hash !== before.hash || current.time !== before.time) throw new DocumentConflictError();
     await writer.write(bytes);
-    const latest = await inspect(handle);
+    const latest = await inspect(handle, undefined, MAX_VAULT_BYTES + 3);
     if (!latest || latest.hash !== current.hash || latest.time !== current.time) throw new DocumentConflictError();
     await writer.close();
   } catch (error) {
@@ -386,22 +392,4 @@ export async function prepareDocuments(directory, payload, documents, before, cr
 
 export function storeDocumentHandles(documents) {
   return rememberDocumentHandles(documents.handles).catch(() => {});
-}
-
-export async function suspendDocuments(payload) {
-  await Promise.all(payload.state.memos.map(async memo => {
-    if (memo.documentPath) payload.documents[memo.id].encryptedTextHash = await digest(encoder.encode(memo.text));
-    clearDocumentFields(memo);
-  }));
-}
-
-export async function resumeDocuments(payload) {
-  if (!payload.documents) return;
-  const memos = new Map(payload.state.memos.map(memo => [memo.id, memo]));
-  await Promise.all(Object.entries(payload.documents).map(async ([id, binding]) => {
-    const memo = memos.get(id);
-    if (!memo) binding.removed = true;
-    else if (binding.encryptedTextHash !== await digest(encoder.encode(memo.text))) delete payload.documents[id];
-    delete binding.encryptedTextHash;
-  }));
 }

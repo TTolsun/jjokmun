@@ -1,5 +1,7 @@
 export const BACKUP_FORMAT = 'memo-alley-encrypted';
-export const MAX_BACKUP_BYTES = 8 * 1024 * 1024;
+// The on-disk backup includes the base64 encoding of an encrypted payload.
+export const MAX_VAULT_BYTES = 32 * 1024 * 1024;
+export const MAX_BACKUP_BYTES = 48 * 1024 * 1024;
 const ITERATIONS = 600_000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -57,8 +59,7 @@ export async function seal(value, key, salt, purpose) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const bytes = encoder.encode(JSON.stringify(value));
   try {
-    const limit = purpose === 'backup' ? MAX_BACKUP_BYTES : 32 * 1024 * 1024;
-    if (bytes.byteLength + 16 > limit) throw new Error('암호화할 기록이 저장 가능한 크기를 넘었습니다.');
+    if (bytes.byteLength + 16 > MAX_VAULT_BYTES) throw new Error('암호화할 기록이 저장 가능한 크기를 넘었습니다.');
     const ciphertext = await crypto.subtle.encrypt(cipherOptions(purpose, salt, iv), key, bytes);
     return { salt, iv: encode(iv), ciphertext: encode(new Uint8Array(ciphertext)) };
   } finally {
@@ -68,8 +69,7 @@ export async function seal(value, key, salt, purpose) {
 
 export async function unseal(envelope, key, purpose) {
   const iv = decode(envelope.iv, 12);
-  const limit = purpose === 'backup' ? MAX_BACKUP_BYTES : 32 * 1024 * 1024;
-  const ciphertext = decode(envelope.ciphertext, 16, limit);
+  const ciphertext = decode(envelope.ciphertext, 16, MAX_VAULT_BYTES);
   let clear;
   try {
     clear = new Uint8Array(await crypto.subtle.decrypt(cipherOptions(purpose, envelope.salt, iv), key, ciphertext));
@@ -93,7 +93,7 @@ export async function encryptBackup(state, password) {
 export async function decryptBackup(envelope, password) {
   if (envelope.version !== 1 || !password || password.length > 256) throw new Error('백업 버전이나 비밀번호 형식을 확인해 주세요.');
   decode(envelope.iv, 12);
-  decode(envelope.ciphertext, 16, MAX_BACKUP_BYTES);
+  decode(envelope.ciphertext, 16, MAX_VAULT_BYTES);
   const key = await deriveKey(password, envelope.salt);
   return unseal(envelope, key, 'backup');
 }

@@ -1,10 +1,10 @@
 import { BACKUP_FORMAT, MAX_BACKUP_BYTES, encryptBackup, decryptBackup } from '../crypto.js';
 import { mergeImport, undoImport } from '../imports.js';
 import { backupSnapshot, validateBackup } from '../store.js';
-import { LockedError, disableVault, enableVault, readPayload } from '../vault.js';
+import { LockedError, readPayload } from '../vault.js';
 import { element } from './dom.js';
 
-export function bindBackupDialogs({ activeView, today, setStatus, announce, refresh, renderResult }) {
+export function bindBackupDialogs({ activeView, today, setStatus, announce, renderResult }) {
   const passwordDialog = element('backup-password-dialog');
   const previewDialog = element('import-preview-dialog');
   const undoDialog = element('undo-dialog');
@@ -15,9 +15,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
 
   const passwordPrompts = {
     export: ['암호화 백업 내보내기', '이 파일을 복원할 때 사용할 비밀번호를 정하세요.', true],
-    import: ['암호화 백업 열기', '이 백업을 만들 때 정한 비밀번호를 입력하세요.', false],
-    enable: ['저장소 암호화', '메모를 쪽문 저장 파일에 암호화해 보관합니다. 기존 .md, .txt와 평문 백업은 폴더에 남으며 그대로 열 수 있습니다. 저장소를 다시 열려면 이 비밀번호가 필요합니다.', true],
-    disable: ['저장소 암호화 해제', '계속하면 이 기기에 남은 기록과 되돌리기 기록을 평문으로 저장합니다.', false]
+    import: ['암호화 백업 열기', '이 백업을 만들 때 정한 비밀번호를 입력하세요.', false]
   };
 
   function askPassword(action) {
@@ -39,7 +37,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
 
   function downloadBackup(backup) {
     const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-    if (blob.size > MAX_BACKUP_BYTES) throw new Error('백업이 가져오기 제한인 8 MiB를 넘습니다.');
+    if (blob.size > MAX_BACKUP_BYTES) throw new Error('백업이 가져오기 제한인 48 MiB를 넘습니다.');
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -93,8 +91,6 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
   }
 
   element('export-backup').addEventListener('click', () => askPassword('export'));
-  element('enable-vault').addEventListener('click', () => askPassword('enable'));
-  element('disable-vault').addEventListener('click', () => askPassword('disable'));
   for (const [dialog, cancelId, confirmId] of [
     [passwordDialog, 'backup-password-cancel', 'backup-password-submit'],
     [previewDialog, 'import-cancel', 'import-confirm'],
@@ -145,14 +141,6 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
         const next = await createPreview(backup, expected);
         passwordDialog.close();
         showPreview(next);
-      } else {
-        if (action === 'enable') await enableVault(password);
-        else await disableVault(password);
-        announce('security');
-        rejectStaleView(expected);
-        passwordDialog.close();
-        await refresh();
-        setStatus('settings-status', action === 'enable' ? '저장소를 암호화했어요.' : '저장소 암호화를 해제했어요.');
       }
     } catch (error) {
       if (expected === activeView()) setStatus('password-status', error.message || '요청을 처리하지 못했습니다.');
@@ -172,7 +160,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
     if (expected === undefined || !file) return;
     if (file.size > MAX_BACKUP_BYTES) {
       input.value = '';
-      setStatus('settings-status', '8 MiB 이하의 백업 파일을 선택해 주세요.');
+      setStatus('settings-status', '48 MiB 이하의 백업 파일을 선택해 주세요.');
       return;
     }
     const button = element('choose-backup');
