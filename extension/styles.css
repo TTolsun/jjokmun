@@ -223,7 +223,7 @@ nav [aria-current="page"] { background: var(--raised); color: var(--olive); font
 #guest-portrait { width: 30px; height: 40px; image-rendering: pixelated; }
 .guest-visit #writing-title { margin: 8px 0 15px; font-size: clamp(1.8rem, 3.5vw, 3.35rem); }
 #guest-speech, #guest-reaction { max-width: 36em; line-height: 1.65; word-break: keep-all; }
-#guest-reaction { overflow-wrap: anywhere; }
+#guest-reaction { overflow-wrap: anywhere; white-space: pre-line; }
 #guest-page { max-height: 7em; overflow: auto; overflow-wrap: anywhere; margin: 12px 0; padding: 8px 14px; background: var(--surface); border-left: 3px solid var(--olive); }
 #guest-form { margin-top: 14px; }
 #guest-input { min-width: 0; flex: 1; }
@@ -258,7 +258,7 @@ h1 { font-family: var(--display); font-weight: 400; }
 #storage-recovery { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 1rem auto; }
 #memo-form, .inline-form { display: flex; align-items: stretch; gap: 7px; }
 #memo-form { width: min(100%, 465px); }
-#memo-form, #floor-memo-form .inline-form { align-items: flex-end; }
+#memo-form, #floor-memo-form .inline-form, #reply-form .inline-form { align-items: flex-end; }
 #memo-form textarea, #floor-memo-input { background: var(--surface); border: 1px solid var(--line); }
 #memo-form textarea:focus-visible, #floor-memo-input:focus-visible { border-color: var(--ink); }
 /* One row until the text needs more; Shift+Enter or a multi-line paste grows the field. */
@@ -348,6 +348,7 @@ h1 { font-family: var(--display); font-weight: 400; }
 .document-diagram { margin: 12px 0; padding: 9px; border: 1px solid var(--line); border-radius: 8px; overflow: auto; }
 .document-diagram .diagram-image { display: block; max-height: 68vh; margin: auto; }
 .diagram-status { color: var(--muted); font-size: .82rem; }
+.diagram-error { margin: 6px 0; padding: 7px 9px; border-left: 3px solid var(--line); font-size: .78rem; white-space: pre-wrap; }
 .document-renderer { position: fixed; top: 0; left: -1600px; width: 1200px; height: 760px; border: 0; pointer-events: none; }
 .document-action {
   padding: 6px 9px;
@@ -376,7 +377,9 @@ h1 { font-family: var(--display); font-weight: 400; }
   padding: 9px 12px;
   margin-bottom: 7px;
 }
-.replies article p { margin-top: 4px; font-size: .92rem; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.replies article .reply-original, .replies .reply-preview { margin-top: 4px; font-size: .92rem; line-height: 1.6; overflow-wrap: anywhere; }
+.replies article .reply-original { white-space: pre-wrap; }
+.replies .reply-source-toggle { margin-top: 6px; }
 .replies article time, .reply-tag { color: var(--muted); font-size: .73rem; }
 .replies .linked-reply { border-color: var(--line); border-left-color: var(--olive); background: var(--raised); }
 .reply-tag { display: block; font-weight: 680; color: var(--ink); margin-bottom: 2px; }
@@ -467,7 +470,7 @@ dialog p { margin: 8px 0 13px; font-size: .9rem; line-height: 1.6; color: var(--
 .close { border: 1px solid var(--line); border-radius: 5px; min-width: 28px; min-height: 30px; color: var(--muted); background: var(--surface); font-size: 1.1rem; line-height: 1; }
 .confirm-actions, .backup-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .confirm-actions { justify-content: flex-end; }
-#reply-delete-text { margin: 0; max-height: 8em; overflow: auto; overflow-wrap: anywhere; }
+#reply-delete-text { margin: 0; max-height: 8em; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
 #delete-confirm, #reply-dialog-confirm.danger { background: var(--clay); color: white; border-color: var(--clay); }
 #delete-confirm:hover, #reply-dialog-confirm.danger:hover { background: var(--olive); color: var(--canvas); }
 
@@ -569,6 +572,9 @@ dialog p { margin: 8px 0 13px; font-size: .9rem; line-height: 1.6; color: var(--
 #storage-start button { margin-block: 8px 4px; padding: 7px 10px; border: 1px solid var(--muted); border-radius: 6px; color: var(--ink); background: transparent; font: inherit; cursor: pointer; }
 #storage-start #reopen-last-folder, #reopen-last-folder[hidden] + #choose-first-folder { background: var(--olive); border-color: var(--olive); color: white; }
 .lock-screen form { margin-top: 19px; }
+/* The reply field grows like the memo field; the edit dialog gives a fixed, resizable area. */
+#reply-input { field-sizing: content; min-height: 40px; max-height: 40vh; resize: none; line-height: 1.45; }
+#reply-edit-input { resize: vertical; line-height: 1.5; }
 .lock-screen input, #backup-password-form input, #reply-edit-input {
   color: var(--ink);
   background: var(--surface);

@@ -2,7 +2,6 @@ import { validateShop } from './shop.js';
 import { validateBusiness } from './business.js';
 
 const VERSION = 1;
-export const NOTE_LIMIT = 2000;
 export const PROP_KINDS = ['chair', 'plant', 'books'];
 
 export function validDate(value) {
@@ -55,7 +54,11 @@ function previousDate(date) {
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-const validReply = (value) => typeof value === 'string' && value.length <= NOTE_LIMIT && Boolean(value.trim()) && !/[\r\n]/.test(value);
+// Replies may span lines so they can hold Markdown and diagram sources. Releases up to 1.8.1
+// reject a multi-line reply and with it the whole vault; only releases that read the vault's
+// appVersion stamp can tell the user to update instead.
+export const REPLY_LIMIT = 64 * 1024;
+const validReply = (value) => typeof value === 'string' && value.length <= REPLY_LIMIT && Boolean(value.trim());
 const validText = (value) => typeof value === 'string' && value.length <= 4 * 1024 * 1024;
 const formats = new Set(['markdown', 'text', 'plantuml', 'mermaid']);
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;

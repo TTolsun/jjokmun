@@ -89,9 +89,11 @@ export function bindDocumentPreview({ folder, hasDocument, openDocument,
     figure.append(status);
     parent.append(figure);
 
-    function failed(message) {
+    function failed(message, details) {
       if (view !== active) return;
       status.textContent = message;
+      // The engine's own report names the failing line and what it expected there.
+      if (details) figure.append(codeBlock(details, 'diagram-error'));
       figure.append(codeBlock(source, 'diagram-source'));
     }
 
@@ -117,7 +119,7 @@ export function bindDocumentPreview({ folder, hasDocument, openDocument,
       img.addEventListener('load', () => { status.hidden = true; }, { once: true });
       img.src = url;
       figure.append(img);
-    }).catch(() => failed(names[format] + ' 다이어그램을 렌더링하지 못했습니다.'));
+    }).catch(error => failed(error?.message || names[format] + ' 다이어그램을 렌더링하지 못했습니다.', error?.details));
   }
 
   function appendImage(parent, token, view) {

@@ -19,7 +19,9 @@ window.addEventListener('message', event => {
     const labels = Array.from(root.querySelectorAll('text'), label => label.textContent.trim());
     const line = labels.find(label => /^\[From .+ \(line \d+\)\s*\]$/.test(label));
     if (line && labels[0]?.startsWith('PlantUML version ')) {
-      return failure(`PlantUML 코드를 확인해 주세요. ${line.match(/\(line (\d+)\)/)[1]}번째 줄에 오류가 있습니다.`);
+      // The error image echoes the source up to the failing line, then the parser's verdict.
+      return reply({ type: 'plantuml-result', id, error: 'syntax', line: Number(line.match(/\(line (\d+)\)/)[1]),
+        code: String(labels.at(-2) ?? '').slice(0, 300), detail: String(labels.at(-1) ?? '').trim().slice(0, 300) });
     }
     const container = document.createElement('div');
     document.body.append(container);
