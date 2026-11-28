@@ -55,7 +55,6 @@ async function refreshDocuments(page) {
 }
 
 async function openEditor(page) {
-  await openSection(page, 'memo-tools');
   await page.locator('#edit-memo').click();
 }
 
@@ -110,7 +109,6 @@ async function checkDocuments(session) {
     assert.match(Buffer.from(await disk(page, 'read', newMarkdown)).toString('utf8'), /새 마크다운 메모/);
 
     await openDocument(page, '안내.txt');
-    await openSection(page, 'reply-compose');
     await page.locator('#reply-input').fill(reply);
     await page.locator('#reply-save').click();
     await page.locator('#detail-replies').getByText(reply, {exact: true}).waitFor();
@@ -179,7 +177,6 @@ async function checkDocuments(session) {
 
     const ambiguousReply = '여러 후보 중 임의로 연결하면 안 되는 답장';
     await openDocument(page, '서가/안내.txt');
-    await openSection(page, 'reply-compose');
     await page.locator('#reply-input').fill(ambiguousReply);
     await page.locator('#reply-save').click();
     await page.locator('#detail-replies').getByText(ambiguousReply, {exact: true}).waitFor();

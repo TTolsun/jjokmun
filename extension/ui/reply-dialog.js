@@ -38,9 +38,7 @@ export function bindReplyDialog(change) {
     const { replyId, action } = target;
     reset();
     const row = element('detail-replies').querySelector(`[data-reply-id="${CSS.escape(replyId)}"]`);
-    const compose = element('reply-compose');
-    const fallback = compose.open ? element('reply-input') : compose.querySelector('summary');
-    (row?.querySelector(`[data-action="${action}"]`) || fallback).focus();
+    (row?.querySelector(`[data-action="${action}"]`) || element('reply-input')).focus();
   }
 
   cancel.addEventListener('click', closeAndFocus);

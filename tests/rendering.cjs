@@ -241,7 +241,6 @@ async function checkRendering(session) {
     await assertDiagrams(page, [['자료함', '책갈피']]);
 
     await openSource(page, markdownPath);
-    await openSection(page, 'memo-tools');
     await page.locator('#edit-memo').click();
     const editor = page.locator('#edit-input');
     assert.equal(await editor.inputValue(), markdown);
@@ -293,7 +292,6 @@ async function checkRendering(session) {
     assert.match(bare, /^PlantUML 2번째 줄을 해석하지 못했습니다/);
     // A Markdown memo whose whole text is a diagram renders as that diagram.
     await openSource(page, fileName);
-    await openSection(page, 'memo-tools');
     await page.locator('#edit-memo').click();
     await editor.fill(plantumlClass);
     await page.locator('#edit-save').click();
@@ -319,7 +317,6 @@ async function checkRendering(session) {
     console.log('PASS  multi-line memo field, diagram file extensions, whole-diagram Markdown and single-line paste');
 
     // Replies take several lines and render Markdown and diagrams, each in its own preview.
-    await page.locator('#reply-compose > summary').click();
     const replyInput = page.locator('#reply-input');
     await replyInput.click();
     await page.keyboard.type('**굵은** 답장');
@@ -348,7 +345,6 @@ async function checkRendering(session) {
     assert.ok(storedReplies.includes('**굵은** 답장\n- 항목'));
     assert.ok(storedReplies.includes(mermaidSequence));
     // The edit dialog keeps line breaks typed with Shift+Enter and still saves on Enter.
-    await openSection(page, 'memo-tools');
     await replyArticle('항목').locator('[data-action="edit"]').click();
     const replyEditor = page.locator('#reply-edit-input');
     assert.equal(await replyEditor.inputValue(), '**굵은** 답장\n- 항목');

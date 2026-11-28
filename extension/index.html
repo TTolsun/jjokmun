@@ -164,34 +164,7 @@
           <button type="button" id="display-memo">매대에 놓기</button>
           <p id="shelf-previous" hidden></p>
         </div>
-        <div id="detail-replies" class="replies"></div>
-        <template id="reply-actions-template">
-          <div class="detail-actions">
-            <button type="button" class="copy-button copy-reply" data-action="copy" aria-label="답장 복사"><span class="copy-icon" aria-hidden="true"></span></button>
-            <button type="button" data-action="edit" aria-label="답장 수정">수정</button>
-            <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
-          </div>
-        </template>
-        <details id="reply-compose" class="journal-disclosure">
-          <summary>답장 쓰기</summary>
-          <div id="regular-card" class="regular-card">
-            <canvas id="regular-portrait" width="24" height="32" aria-hidden="true"></canvas>
-            <div>
-              <p class="regular-heading"><strong id="regular-name"></strong><span id="regular-title"></span></p>
-              <progress id="regular-progress" max="1" value="0" aria-labelledby="regular-name"></progress>
-              <p id="regular-hint"></p>
-            </div>
-          </div>
-          <form id="reply-form" autocomplete="off">
-            <label class="field-label" for="reply-input">답장 남기기</label>
-            <div class="inline-form">
-              <textarea id="reply-input" rows="1" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
-              <button type="submit" id="reply-save">답장 저장</button>
-            </div>
-          </form>
-        </details>
-        <details id="memo-tools" class="journal-disclosure">
-          <summary>메모·답장 관리</summary>
+        <div id="memo-tools">
           <div class="detail-actions">
             <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
             <button type="button" id="edit-memo">원문 수정</button>
@@ -223,7 +196,22 @@
               </div>
             </section>
           </form>
-        </details>
+        </div>
+        <div id="detail-replies" class="replies"></div>
+        <template id="reply-actions-template">
+          <div class="detail-actions">
+            <button type="button" class="copy-button copy-reply" data-action="copy" aria-label="답장 복사"><span class="copy-icon" aria-hidden="true"></span></button>
+            <button type="button" data-action="edit" aria-label="답장 수정">수정</button>
+            <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
+          </div>
+        </template>
+        <form id="reply-form" autocomplete="off">
+          <label class="field-label" for="reply-input">답장 쓰기</label>
+          <div class="inline-form">
+            <textarea id="reply-input" rows="1" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
+            <button type="submit" id="reply-save">답장 저장</button>
+          </div>
+        </form>
         <p class="status" id="detail-status" role="status"></p>
         <p class="status" id="copy-status" role="status"></p>
       </section>

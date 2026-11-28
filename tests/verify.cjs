@@ -86,8 +86,7 @@ async function forceNextWriteToFail(p) {
 }
 async function assertLocked(p) {
   await p.locator('#lock-screen').waitFor();
-  assert.deepEqual(await p.locator('#regular-progress').evaluate(bar => [bar.value, bar.max]), [0, 1]);
-  for (const selector of ['#copy-memo', '.copy-reply', '#memo-input', '#floor-memo-input', '#daily-memo', '#archive-search']) {
+  for (const selector of ['#copy-memo', '.copy-reply', '#reply-input', '#memo-input', '#floor-memo-input', '#daily-memo', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
   const contents = await p.evaluate(() => document.body.textContent + [...document.querySelectorAll('input, textarea')].map(i => i.value).join(' '));
@@ -112,7 +111,6 @@ async function seedLegacy(worker) {
 }
 
 async function copyText(p, selector, expected, keyboard = false) {
-  await openSection(p, 'memo-tools');
   const button = p.locator(selector).first();
   assert.ok(await button.getAttribute('aria-label'));
   await p.bringToFront();
@@ -131,7 +129,6 @@ async function copyText(p, selector, expected, keyboard = false) {
 async function checkReplyActions(session, a) {
   const original = '두 번째 답장의 원문';
   const updated = '두 번째 답장을 수정한 내용';
-  await openSection(a, 'reply-compose');
   await a.locator('#reply-input').fill(original);
   await a.locator('#reply-save').click();
   await a.locator('#detail-replies').getByText(original,{exact:true}).waitFor();
@@ -141,10 +138,8 @@ async function checkReplyActions(session, a) {
   const row = `article[data-reply-id="${target.id}"]`;
   const b = await session.tab(monday);
   try {
-    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await b.locator('#reply-edit-input').fill('다른 탭의 초안');
-    await openSection(a, 'memo-tools');
     await a.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await a.locator('#reply-edit-input').fill('   ');
     await a.locator('#reply-dialog-confirm').click();
@@ -164,13 +159,11 @@ async function checkReplyActions(session, a) {
     const edited = await readState(b);
     assert.deepEqual(edited.memos.find(item => item.id === memo.id).replies[1], {...target, text: updated});
     assert.deepEqual(edited.props, before.props);
-    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     assert.equal(await b.locator('#reply-delete-text').innerText(), updated);
     assert.match(await b.locator('#reply-delete-message').innerText(), /되돌릴 수 없습니다/);
     await b.keyboard.press('Escape');
     assert.deepEqual(await readState(b), edited);
-    await openSection(b, 'memo-tools');
     await b.locator(row).getByRole('button', {name: '답장 삭제'}).click();
     await b.locator('#reply-dialog-confirm').click();
     await a.locator(row).waitFor({state: 'detached'});
@@ -225,7 +218,6 @@ async function createSource(session) {
   assert.equal((await readState(a)).memos.length,1);
   await cdp.send('Input.insertText',{text:'한글'});
   await write(a,note);
-  await openSection(a, 'reply-compose');
   await a.locator('#reply-input').fill(reply);
   await a.locator('#reply-save').click();
   await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
@@ -294,12 +286,10 @@ async function checkVault(session, a) {
   await b.locator('#import-preview-dialog').waitFor();
   const editor = await session.tab(monday);
   await unlock(editor);
-  await openSection(editor, 'memo-tools');
   await editor.getByRole('button', {name: '답장 수정'}).click();
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
-  await openSection(owner, 'memo-tools');
   await owner.locator('#display-memo').click();
   await owner.locator('#detail-status').getByText('책방 매대에 추천글을 올렸어요.').waitFor();
   await settings(owner);
@@ -406,7 +396,6 @@ async function checkRecovery(session, bytes, initial) {
   // A later change to a previously imported note must survive selective undo.
   await b.locator('#archive-list button').filter({hasText:legacyText}).click();
   await b.locator(':is(#detail-original, #detail-preview):visible').getByText(legacyText, {exact:true}).waitFor();
-  await openSection(b, 'memo-tools');
   await b.locator('#edit-memo').click();
   await b.locator('#edit-input').fill('가져오기 뒤 수정한 원문');
   await b.locator('#edit-save').click();

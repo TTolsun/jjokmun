@@ -164,7 +164,8 @@ mark { color: var(--canvas); background: var(--olive); padding: 0 1px; border-ra
 .journal-view .notebook { grid-area: notebook; }
 .journal-disclosure > summary { width: fit-content; padding: 7px 2px; cursor: pointer; color: var(--olive); font-weight: 600; }
 #memo-tools .detail-actions { flex-wrap: wrap; }
-#detail-dialog:not(:has(#memo-tools[open])) .reply-heading .detail-actions { display: none; }
+#memo-tools { margin-bottom: 18px; }
+#reply-form { border-top: 1px solid var(--line); padding-top: 14px; }
 #memo-search .search-field { margin-top: 2px; }
 .journal-view .writing h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 8px 0 18px; }
 body:not(.journal-view) #floor-link { display: none; }
@@ -440,22 +441,6 @@ h1 { font-family: var(--display); font-weight: 400; }
 #roster-list strong { font-size: .76rem; font-weight: 650; overflow-wrap: anywhere; }
 #roster-list span { color: var(--muted); font-size: .7rem; }
 
-.regular-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding: 9px 12px;
-  border: 1px dashed #c8a565;
-  border-radius: 10px;
-  background: #fff5df;
-}
-.regular-card > div { min-width: 0; flex: 1; }
-#regular-portrait { flex: none; width: 36px; height: 48px; image-rendering: pixelated; }
-.regular-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: .82rem; }
-.regular-heading span { color: #874721; font-size: .74rem; font-weight: 650; }
-#regular-progress { display: block; width: 100%; height: 6px; margin: 6px 0 4px; accent-color: #b5563f; }
-#regular-hint { color: var(--muted); font-size: .74rem; line-height: 1.5; }
 html:has(dialog[open]) { overflow: hidden; }
 dialog {
   width: min(455px, calc(100% - 28px));
