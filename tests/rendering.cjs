@@ -362,6 +362,12 @@ async function checkRendering(session) {
       return validateBackup(state).memos[0].replies[0].text;
     });
     assert.equal(accepted, '첫 줄\n둘째 줄');
+    // The fields stop at the stored limit, so a saved reply never makes the vault unreadable.
+    const limits = await page.evaluate(async () => {
+      const {REPLY_LIMIT} = await import('./store.js');
+      return ['reply-input', 'reply-edit-input'].map(id => document.getElementById(id).maxLength === REPLY_LIMIT);
+    });
+    assert.deepEqual(limits, [true, true]);
     console.log('PASS  multi-line replies with per-reply Markdown and diagram previews, edit dialog and backup validation');
 
     // Queue a Markdown render and immediately switch to a standalone diagram.
