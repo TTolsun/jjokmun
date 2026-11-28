@@ -168,7 +168,6 @@ mark { color: var(--canvas); background: var(--olive); padding: 0 1px; border-ra
 #reply-form { border-top: 1px solid var(--line); padding-top: 14px; }
 #memo-search .search-field { margin-top: 2px; }
 .journal-view .writing h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 8px 0 18px; }
-body:not(.journal-view) #floor-link { display: none; }
 .writing-copy { min-width: 0; }
 body:not(.journal-view) .workspace > :not(#floor), .journal-view #floor { display: none; }
 body:not(.journal-view) .site-header .brand { display: flex; }

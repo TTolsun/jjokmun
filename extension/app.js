@@ -151,7 +151,7 @@ function renderPayload(result, date, storageMode = mode) {
 }
 
 function switchView() {
-  const journal = location.hash === '#journal';
+  const journal = location.hash !== '#floor';
   const leavingJournal = !journal && document.body.classList.contains('journal-view');
   document.body.classList.toggle('journal-view', journal);
   element('floor-link').setAttribute('aria-current', journal ? 'false' : 'page');
