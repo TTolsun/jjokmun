@@ -442,6 +442,7 @@ async function run() {
   await require('./pet.cjs').checkGrowthStability();
   await require('./pet.cjs').checkAdoptionBackups();
   await require('./pet.cjs').checkLegacyPetBackups();
+  await require('./memo-pet.cjs').checkMemoCareRules();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));
   assert.equal(manifest.chrome_url_overrides,undefined);
   assert.equal(manifest.host_permissions,undefined);
@@ -475,6 +476,10 @@ async function run() {
     await require('./pet.cjs').checkPet(session);
     await require('./pet.cjs').checkFamilyCollection(session);
     await require('./pet.cjs').checkPetDeviceGeometry(session);
+    assert.deepEqual(session.external, []);
+    await session.context.close();
+    session = await launch(path.join(directory, 'found-note-profile'));
+    await require('./memo-pet.cjs').checkFoundNotes(session);
     assert.deepEqual(session.external, []);
     await session.context.close();
     session = await launch(path.join(directory, 'folder-profile'));
