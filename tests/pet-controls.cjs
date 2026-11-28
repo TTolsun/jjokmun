@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 
 const menus = {
   adopt: 'egg', pet: 'activity', feed: 'food', snack: 'food',
-  play: 'activity', explore: 'activity', newEgg: 'restart'
+  play: 'activity', explore: 'activity', sleep: 'lamp', newEgg: 'restart'
 };
 
 function petButton(page, letter) {

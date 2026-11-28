@@ -254,9 +254,9 @@ async function checkLegacyPetBackups() {
   assert.deepEqual(grass.pet.discovered, ['egg', 'grass-hamster', 'baby', 'runner']);
 
   const egg = {pet: legacyPet(now)};
-  applyPetAction(egg, 'pet', now + HATCH_MS);
+  applyPetAction(egg, 'play', now + HATCH_MS);
   assert.equal(egg.pet.form, 'baby');
-  applyPetAction(egg, 'play', now + HATCH_MS + 1);
+  assert.equal(egg.pet.play, 2);
   applyPetAction(egg, 'pet', now + HATCH_MS + FIRST_GROWTH_MS);
   assert.equal(egg.pet.form, 'runner');
   console.log('PASS  old eggs still hatch into legacy pets, and old backups preserve pets, discoveries and memos');
