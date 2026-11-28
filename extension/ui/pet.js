@@ -1,9 +1,10 @@
 import { petView, applyPetAction, petEvolution, dominantPetHabit, PET_FAMILIES, PET_FORM_DETAILS } from '../pet.js';
 import { element } from './dom.js';
 import { bindPetDevice } from './pet-device.js';
-import { FAMILY_NAMES, GROWTH_SIGNS, familyHabit, familyPrecursor, familyReaction } from './pet-family-motion.js';
+import { FAMILY_NAMES, familyHabit, familyPrecursor, familyReaction } from './pet-family-motion.js';
 
 const METERS = ['hunger', 'happiness', 'energy', 'health', 'growth'];
+const MAX_TIMEOUT_DELAY = 2_147_483_647;
 const EFFECTS = { feed: '♪', snack: '♪', play: '✦', explore: '✧', clean: '✧', sleep: 'z z', wake: '☀', heal: '✚', pet: '♥', memo: '♥' };
 const BABY_POSES = { feed: 'feed', snack: 'feed', play: 'play', explore: 'explore', pet: 'pet', memo: 'pet' };
 const HABITS = {
@@ -81,10 +82,6 @@ function familyPath(form) {
   return path.join(' → ');
 }
 
-function isNearGrowth(pet) {
-  return Boolean(FAMILY_NAMES[pet?.lineage]) && pet.stage > 0 && pet.stage < 3 && pet.growth >= 85 && pet.habitReady;
-}
-
 function precursor(form, habit) {
   const next = FIRE_PRECURSORS[form]?.[habit];
   if (next) return { action: HABIT_ACTIONS[habit], reaction: next[0], description: next[1], preview: true };
@@ -93,15 +90,16 @@ function precursor(form, habit) {
 
 function growthHint(pet) {
   if (!FAMILY_NAMES[pet?.lineage] || pet.stage < 1 || pet.stage >= 3) return '';
-  const leading = dominantPetHabit(pet);
-  if (pet.growth >= 85 && pet.habitReady === false) {
-    return '조금 더 함께 놀거나 탐색하거나 쓰다듬어 주세요.';
-  }
-  if (isNearGrowth(pet) && leading) {
-    return GROWTH_SIGNS[pet.lineage][leading] + ' 곧 자랄 것 같아요.';
-  }
-  if (leading) return ACTIVE_HABITS[leading];
-  return '';
+  return ACTIVE_HABITS[dominantPetHabit(pet)] || '';
+}
+
+function growthTime(pet, now) {
+  if (!Number.isFinite(pet?.nextGrowthAt)) return '완료';
+  const remaining = Math.max(0, pet.nextGrowthAt - now);
+  if (remaining < 60000) return '1분 미만';
+  const minutes = Math.ceil(remaining / 60000);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}시간${minutes % 60 ? ' ' + (minutes % 60) + '분' : ''} 남음`;
+  return `${minutes}분 남음`;
 }
 
 export function bindPet(change, saveError, editorReturn) {
@@ -116,10 +114,24 @@ export function bindPet(change, saveError, editorReturn) {
   let pending;
   let active = false;
   let effectTimer;
+  let growthTimer;
+  let scheduledGrowth;
   let collectionKey;
   let habit;
   let lastHabit = 0;
   let retryGrowthAt = 0;
+
+  function scheduleGrowth(at, now) {
+    if (at === scheduledGrowth) return;
+    clearTimeout(growthTimer);
+    scheduledGrowth = Number.isFinite(at) ? at : undefined;
+    if (scheduledGrowth === undefined) return;
+    const delay = Math.min(MAX_TIMEOUT_DELAY, Math.max(0, scheduledGrowth - now));
+    growthTimer = setTimeout(() => {
+      scheduledGrowth = undefined;
+      if (active) render(current);
+    }, delay);
+  }
 
   function habitOf(pet) {
     const next = pet?.stage === 2 && precursor(pet.form, dominantPetHabit(pet));
@@ -213,11 +225,11 @@ export function bindPet(change, saveError, editorReturn) {
   function render(value) {
     active = true;
     current = value;
-    const pet = petView(current);
-    if (pet?.form !== current?.form && !pending && !document.hidden
-        && Date.now() >= retryGrowthAt) {
-      void saveGrowth();
-    }
+    const now = Date.now();
+    const pet = petView(current, now);
+    const evolved = pet?.form !== current?.form;
+    if (evolved && !pending && now >= retryGrowthAt) void saveGrowth();
+    scheduleGrowth(evolved && !pending ? retryGrowthAt : pet?.nextGrowthAt, now);
     const form = pet?.form || 'egg';
     const stage = pet?.stage ?? (form === 'egg' ? 0 : form === 'baby' ? 1 : 3);
     const motion = habitat.dataset.motion;
@@ -248,7 +260,6 @@ export function bindPet(change, saveError, editorReturn) {
     hint.hidden = !hint.textContent;
     habitat.dataset.form = form;
     habitat.dataset.stage = stage;
-    habitat.classList.toggle('pet-near-growth', isNearGrowth(pet));
     habitat.classList.toggle('pet-night', Boolean(pet?.night));
     habitat.classList.toggle('pet-sleeping', Boolean(pet?.sleeping));
     habitat.classList.toggle('pet-sick', Boolean(pet?.needs.includes('heal')));
@@ -273,7 +284,13 @@ export function bindPet(change, saveError, editorReturn) {
       const score = Math.round(pet?.[key] ?? 0);
       meter.closest('div').hidden = form === 'egg' && key !== 'growth';
       meter.value = score;
-      meter.nextElementSibling.textContent = score;
+      if (key === 'growth') {
+        const time = pet ? growthTime(pet, now) : '';
+        meter.nextElementSibling.textContent = time;
+        meter.setAttribute('aria-valuetext', time);
+      } else {
+        meter.nextElementSibling.textContent = score;
+      }
     }
     device.update(pet, Boolean(pending));
     renderCollection(pet?.discovered || [], pet?.form);
@@ -340,7 +357,7 @@ export function bindPet(change, saveError, editorReturn) {
     status.textContent = FAMILY_NAMES[PET_FORM_DETAILS[form]?.lineage] && FAMILY_NAMES[PET_FORM_DETAILS[previousForm]?.lineage]
       ? `${formName(previousForm)}에서 ${formName(form)} 모습으로 자랐어요. 앞서 함께 지낸 날들은 그대로 이어져요.`
       : event;
-    showEffect('evolve');
+    if (!document.hidden && device.isIdle()) showEffect('evolve');
   }
 
   async function act(action, gameOwner) {
@@ -354,11 +371,13 @@ export function bindPet(change, saveError, editorReturn) {
       let previousForm;
       await change(state => {
         previousForm = state.pet?.form;
-        if (gameOwner && (previousForm !== gameOwner.form || state.pet.startedAt !== gameOwner.startedAt)) {
+        const now = Date.now();
+        const playable = gameOwner && petView(state.pet, now);
+        if (gameOwner && (playable?.form !== gameOwner.form || playable?.startedAt !== gameOwner.startedAt)) {
           result = { changed: false, event: '펫 상태가 바뀌어 이번 공놀이를 기록하지 못했어요.' };
           return false;
         }
-        result = applyPetAction(state, action, Date.now(), roll === undefined ? undefined : () => roll);
+        result = applyPetAction(state, action, now, roll === undefined ? undefined : () => roll);
         return result.changed;
       });
       if (pending !== request) return;
@@ -394,6 +413,9 @@ export function bindPet(change, saveError, editorReturn) {
   spriteButton.addEventListener('click', () => {
     if (device.isIdle()) act('pet');
   });
+  document.addEventListener('visibilitychange', () => {
+    if (active && !document.hidden) render(current);
+  });
   setInterval(() => {
     if (!active || document.hidden) return;
     render(current);
@@ -407,6 +429,7 @@ export function bindPet(change, saveError, editorReturn) {
   function reset() {
     active = false;
     current = pending = collectionKey = undefined;
+    scheduleGrowth(undefined, Date.now());
     device.reset();
     status.textContent = '';
     clearEffect();
@@ -432,9 +455,10 @@ export function bindPet(change, saveError, editorReturn) {
     element('pet-meters').hidden = true;
     for (const [, meter] of meters) {
       meter.removeAttribute('value');
+      meter.removeAttribute('aria-valuetext');
       meter.nextElementSibling.textContent = '';
     }
-    habitat.classList.remove('pet-night', 'pet-sleeping', 'pet-sick', 'pet-near-growth');
+    habitat.classList.remove('pet-night', 'pet-sleeping', 'pet-sick');
     delete habitat.dataset.form;
     delete habitat.dataset.stage;
     sprite.removeAttribute('src');

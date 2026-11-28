@@ -7,6 +7,10 @@ const {petAction, petButton, liftPet, layPet, finishBallGame, confirmNewEgg} = r
 const families = [['fire', 0], ['water', 0.4], ['grass', 0.8]];
 const stages = [['runner', 'play'], ['scout', 'explore'], ['cuddler', 'pet']];
 const clock = '2050-01-01T12:00:00+09:00';
+const MINUTE = 60_000;
+const HATCH_MS = 2 * MINUTE;
+const FIRST_GROWTH_MS = 30 * MINUTE;
+const SECOND_GROWTH_MS = 24 * 60 * MINUTE;
 
 function legacyPet(now, form = 'egg', discovered = ['egg']) {
   return {
@@ -22,12 +26,12 @@ async function checkPetClock() {
   const noon = new Date(2050, 0, 1, 12).getTime();
   const state = {};
   applyPetAction(state, 'adopt', noon, () => 0);
-  applyPetAction(state, 'pet', noon);
-  assert.equal(petView(state.pet, noon + 60_000).form, 'egg');
-  assert.equal(petView(state.pet, noon + 120_000).form, 'fire-pup');
+  assert.equal(petView(state.pet, noon).nextGrowthAt, noon + HATCH_MS);
+  assert.equal(petView(state.pet, noon + HATCH_MS - 1).form, 'egg');
+  assert.equal(petView(state.pet, noon + HATCH_MS).form, 'fire-pup');
   assert.equal(state.pet.form, 'egg', 'view should not mutate persisted state');
-  applyPetAction(state, 'feed', noon + 120_000);
-  const afterMeal = noon + 120_000 + PET_TICK_MS;
+  applyPetAction(state, 'feed', noon + HATCH_MS);
+  const afterMeal = noon + HATCH_MS + PET_TICK_MS;
   assert.equal(petView(state.pet, afterMeal).poop, 1);
   applyPetAction(state, 'clean', afterMeal);
   assert.equal(petView(state.pet, afterMeal).poop, 0);
@@ -38,13 +42,16 @@ async function checkPetClock() {
   assert.equal(petView(state.pet, evening + PET_TICK_MS).sleeping, true);
   assert.equal(petView(state.pet, morning).sleeping, false);
   assert.ok(petView(state.pet, evening + PET_TICK_MS).energy > state.pet.energy);
-  console.log('PASS  timed hatching, digestion, cleaning and overnight sleep');
+  console.log('PASS  automatic two-minute hatching, digestion, cleaning and overnight sleep');
 }
 
 async function checkGrowthPaths() {
   const {PET_FAMILIES, PET_FORM_DETAILS, applyPetAction, petEvolution, petView} =
     await import(pathToFileURL(path.join(extension, 'pet.js')).href);
   const noon = new Date(clock).getTime();
+  const hatchedAt = noon + HATCH_MS;
+  const firstAt = hatchedAt + FIRST_GROWTH_MS;
+  const finalAt = firstAt + SECOND_GROWTH_MS;
   const act = (state, action, time) => assert.ok(applyPetAction(state, action, time).changed, action);
   for (const [index, [family, draw]] of families.entries()) {
     const child = PET_FAMILIES[family];
@@ -54,56 +61,128 @@ async function checkGrowthPaths() {
         assert.ok(applyPetAction(state, 'adopt', noon, () => draw).changed);
         assert.equal(state.pet.lineage, family);
         assert.equal(petView(state.pet, noon).lineage, undefined);
-        for (let i = 0; i < 3; i++) act(state, 'pet', noon);
+        assert.equal(petView(state.pet, hatchedAt - 1).form, 'egg');
+        state.pet = petEvolution(state.pet, hatchedAt).pet;
         assert.equal(state.pet.form, child);
-        assert.equal(petEvolution(state.pet, noon + 60 * 60_000), null, 'time cannot grow a stage without habits');
-        for (let i = 0; i < 3; i++) act(state, firstAction, noon);
-        const firstForm = family + '-' + first;
-        assert.equal(petView(state.pet, noon).form, child, 'activity cannot skip minimum stage time');
-        state.pet = petEvolution(state.pet, noon + 30 * 60_000).pet;
-        assert.equal(state.pet.form, firstForm);
-        assert.deepEqual([state.pet.play, state.pet.explore, state.pet.affection], [0, 0, 0]);
-        assert.equal(petEvolution(state.pet, state.pet.startedAt + 60 * 60_000), null, 'stage one habits cannot grow stage two');
+        assert.equal(state.pet.startedAt, hatchedAt);
 
-        const secondStart = noon + 30 * 60_000;
-        for (let i = 0; i < 3; i++) act(state, secondAction, secondStart);
-        assert.equal(petView(state.pet, secondStart).form, firstForm);
-        state.pet = petEvolution(state.pet, secondStart + 30 * 60_000).pet;
+        for (let i = 0; i < 3; i++) act(state, firstAction, hatchedAt);
+        const firstForm = family + '-' + first;
+        assert.equal(petView(state.pet, firstAt - 1).form, child);
+        assert.equal(petView(state.pet, firstAt).form, firstForm);
+        state.pet = petEvolution(state.pet, firstAt).pet;
+        assert.equal(state.pet.startedAt, firstAt);
+        assert.deepEqual([state.pet.play, state.pet.explore, state.pet.affection], [0, 0, 0]);
+
+        for (let i = 0; i < 3; i++) act(state, secondAction, firstAt);
+        assert.equal(petView(state.pet, finalAt - 1).form, firstForm);
+        state.pet = petEvolution(state.pet, finalAt).pet;
         const evolved = family + '-' + first + '-' + second;
         assert.equal(state.pet.form, evolved);
+        assert.equal(state.pet.startedAt, finalAt);
+        assert.equal(petView(state.pet, finalAt).nextGrowthAt, null);
         assert.equal(PET_FORM_DETAILS[evolved].parent, firstForm);
         assert.deepEqual(state.pet.discovered, ['egg', child, firstForm, evolved]);
-        const restAt = secondStart + 30 * 60_000;
-        act(state, 'sleep', restAt);
-        const reaction = applyPetAction(state, 'play', restAt + 60 * 60_000);
-        assert.equal(reaction.event, PET_FORM_DETAILS[evolved].ballReaction);
+        const rested = {pet: {...state.pet, energy: 100}};
+        assert.equal(applyPetAction(rested, 'play', finalAt).event, PET_FORM_DETAILS[evolved].ballReaction);
+
         const [nextFamily, nextDraw] = families[(index + 1) % families.length];
         const discovered = [...state.pet.discovered];
-        assert.ok(applyPetAction(state, 'newEgg', restAt + 60 * 60_000, () => nextDraw).changed);
+        assert.ok(applyPetAction(state, 'newEgg', finalAt, () => nextDraw).changed);
         assert.equal(state.pet.lineage, nextFamily);
         assert.deepEqual(state.pet.discovered, discovered);
       }
     }
   }
 
-  const fast = {};
-  applyPetAction(fast, 'adopt', noon, () => 0);
-  for (let i = 0; i < 3; i++) act(fast, 'pet', noon);
-  for (let i = 0; i < 10; i++) act(fast, 'pet', noon);
-  assert.equal(fast.pet.form, 'fire-pup', 'ten activities still need stage one time');
-  fast.pet = petEvolution(fast.pet, noon + 15_000).pet;
-  assert.equal(fast.pet.form, 'fire-cuddler');
-  for (let i = 0; i < 10; i++) act(fast, 'pet', fast.pet.startedAt);
-  assert.equal(fast.pet.form, 'fire-cuddler', 'ten activities still need stage two time');
-  assert.equal(petEvolution(fast.pet, noon + 60_000).pet.form, 'fire-cuddler-cuddler');
-
-  const clean = {pet: {...legacyPet(noon, 'fire-pup', ['egg', 'fire-pup']), lineage: 'fire', hunger: 90, poop: 1, health: 50}};
-  for (const action of ['feed', 'snack', 'clean', 'heal', 'sleep', 'wake', 'memo']) act(clean, action, noon);
+  const clean = {pet: {...legacyPet(hatchedAt, 'fire-pup', ['egg', 'fire-pup']), lineage: 'fire', hunger: 90, poop: 1, health: 50}};
+  for (const action of ['feed', 'snack', 'clean', 'heal', 'sleep', 'wake', 'memo']) act(clean, action, hatchedAt);
   assert.deepEqual([clean.pet.play, clean.pet.explore, clean.pet.affection], [0, 0, 0]);
-  assert.equal(petEvolution(clean.pet, noon + 60 * 60_000), null, 'maintenance alone cannot select a route');
+  assert.equal(petView(clean.pet, firstAt - 1).form, 'fire-pup');
+  assert.equal(PET_FORM_DETAILS[petView(clean.pet, firstAt).form].stage, 2);
   assert.equal(Object.values(PET_FORM_DETAILS).filter(form => form.lineage !== 'legacy').length, 40);
   assert.equal(Object.values(PET_FORM_DETAILS).filter(form => form.lineage !== 'legacy' && form.stage === 3).length, 27);
-  console.log('PASS  40 forms, all 27 ordered final routes, stage isolation and maintenance without an evolution bias');
+  console.log('PASS  exact growth boundaries for all 40 forms and 27 ordered final paths');
+}
+
+async function checkGrowthStability() {
+  const {PET_FORM_DETAILS, applyPetAction, petEvolution, petView, validatePet} =
+    await import(pathToFileURL(path.join(extension, 'pet.js')).href);
+  const noon = new Date(clock).getTime();
+  const hatchedAt = noon + HATCH_MS;
+  const firstAt = hatchedAt + FIRST_GROWTH_MS;
+  const finalAt = firstAt + SECOND_GROWTH_MS;
+  const fast = {};
+  applyPetAction(fast, 'adopt', noon, () => 0);
+  for (let i = 0; i < 25; i++) applyPetAction(fast, 'pet', hatchedAt - 1);
+  assert.equal(fast.pet.form, 'egg');
+  for (let i = 0; i < 25; i++) applyPetAction(fast, 'pet', firstAt - 1);
+  assert.equal(fast.pet.form, 'fire-pup');
+  for (let i = 0; i < 25; i++) applyPetAction(fast, 'pet', finalAt - 1);
+  assert.equal(fast.pet.form, 'fire-cuddler');
+  assert.equal(petView(fast.pet, finalAt).form, 'fire-cuddler-cuddler');
+
+  const boundary = {};
+  applyPetAction(boundary, 'adopt', noon, () => 0);
+  applyPetAction(boundary, 'play', firstAt - 1);
+  applyPetAction(boundary, 'explore', firstAt);
+  assert.equal(boundary.pet.form, 'fire-runner');
+  assert.deepEqual([boundary.pet.play, boundary.pet.explore, boundary.pet.affection], [0, 2, 0]);
+  applyPetAction(boundary, 'pet', finalAt);
+  assert.equal(boundary.pet.form, 'fire-runner-scout');
+
+  const firstTies = new Set();
+  const finalTies = new Set();
+  const absentFirst = new Set();
+  const absentFinal = new Set();
+  for (let i = 0; i < 30; i++) {
+    const state = {};
+    applyPetAction(state, 'adopt', noon, () => i / 90);
+    const egg = structuredClone(state.pet);
+    const absentUntil = finalAt + 72 * 60 * MINUTE;
+    const absent = petEvolution(egg, absentUntil).pet;
+    const warm = petEvolution(petEvolution(petEvolution(egg, hatchedAt).pet, firstAt).pet, finalAt).pet;
+    assert.equal(absent.form, warm.form);
+    assert.equal(absent.startedAt, finalAt);
+    assert.equal(absent.growthSeed, egg.growthSeed);
+    assert.deepEqual(absent.discovered, warm.discovered);
+    assert.equal(absent.discovered.length, 4);
+    assert.equal(PET_FORM_DETAILS[absent.form].stage, 3);
+    absentFirst.add(absent.discovered[2]);
+    absentFinal.add(absent.form.split('-').at(-1));
+    assert.equal(state.pet.form, 'egg', 'projecting a long absence leaves the original record intact');
+
+    applyPetAction(state, 'play', hatchedAt);
+    applyPetAction(state, 'explore', hatchedAt);
+    state.pet = petEvolution(state.pet, firstAt).pet;
+    assert.ok(['fire-runner', 'fire-scout'].includes(state.pet.form));
+    firstTies.add(state.pet.form);
+    applyPetAction(state, 'play', firstAt);
+    applyPetAction(state, 'pet', firstAt);
+    const final = petEvolution(state.pet, finalAt).pet;
+    assert.ok(['runner', 'cuddler'].includes(final.form.split('-').at(-1)));
+    finalTies.add(final.form.split('-').at(-1));
+    assert.deepEqual(petEvolution(JSON.parse(JSON.stringify(state.pet)), finalAt).pet, final);
+  }
+  assert.equal(firstTies.size, 2);
+  assert.equal(finalTies.size, 2);
+  assert.equal(absentFirst.size, 3);
+  assert.equal(absentFinal.size, 3);
+  const {emptyState, validateBackup} = await import(pathToFileURL(path.join(extension, 'store.js')).href);
+  const busy = emptyState();
+  busy.pet = {
+    ...legacyPet(firstAt, 'fire-runner', ['egg', 'fire-pup', 'fire-runner']),
+    lineage: 'fire', growthSeed: 0, play: 102
+  };
+  for (let i = 0; i < 60; i++) applyPetAction(busy, 'pet', firstAt + 1);
+  assert.equal(busy.pet.affection, 120);
+  assert.equal(busy.pet.play, 102);
+  assert.equal(petView(busy.pet, finalAt - 1).form, 'fire-runner');
+  assert.equal(petView(busy.pet, finalAt).form, 'fire-runner-cuddler');
+  assert.deepEqual(validateBackup(JSON.parse(JSON.stringify(busy))).pet, validatePet(busy.pet));
+  assert.throws(() => validatePet({...busy.pet, play: Number.MAX_SAFE_INTEGER + 1}));
+  console.log('PASS  more than 50 activities preserve exact scores through backup without early growth');
+  console.log('PASS  no instant growth from repeated care, exact-boundary action ordering, seeded ties and long absence catch-up');
 }
 
 async function checkAdoptionBackups() {
@@ -128,7 +207,8 @@ async function checkAdoptionBackups() {
     const restored = emptyState();
     mergeImport(restored, validateBackup(JSON.parse(JSON.stringify(source))), day);
     assert.deepEqual(restored.pet, source.pet);
-    for (let i = 0; i < 2; i++) applyPetAction(restored, 'pet', now, noRedraw);
+    assert.equal(restored.pet.growthSeed, source.pet.growthSeed);
+    applyPetAction(restored, 'pet', now + HATCH_MS, noRedraw);
     assert.equal(restored.pet.form, PET_FAMILIES[family]);
     assert.deepEqual(restored.pet.discovered, ['egg', PET_FAMILIES[family]]);
   }
@@ -168,14 +248,17 @@ async function checkLegacyPetBackups() {
 
   const grass = emptyState();
   applyPetAction(grass, 'adopt', now, () => 0.8);
-  for (let i = 0; i < 3; i++) applyPetAction(grass, 'pet', now);
+  applyPetAction(grass, 'pet', now + HATCH_MS);
   mergeImport(grass, legacy, day);
   assert.equal(grass.pet.form, 'grass-hamster');
   assert.deepEqual(grass.pet.discovered, ['egg', 'grass-hamster', 'baby', 'runner']);
 
   const egg = {pet: legacyPet(now)};
-  for (let i = 0; i < 3; i++) applyPetAction(egg, 'pet', now);
+  applyPetAction(egg, 'pet', now + HATCH_MS);
   assert.equal(egg.pet.form, 'baby');
+  applyPetAction(egg, 'play', now + HATCH_MS + 1);
+  applyPetAction(egg, 'pet', now + HATCH_MS + FIRST_GROWTH_MS);
+  assert.equal(egg.pet.form, 'runner');
   console.log('PASS  old eggs still hatch into legacy pets, and old backups preserve pets, discoveries and memos');
 }
 
@@ -200,8 +283,10 @@ async function checkPet(session) {
     await page.locator(selector).waitFor({state:'attached'});
     await peer.locator(selector).waitFor({state:'attached'});
   };
-  const later = async minutes => {
-    await page.clock.setFixedTime(new Date(startedAt + minutes * 60_000));
+  const firstGrowth = HATCH_MS + FIRST_GROWTH_MS;
+  const finalGrowth = firstGrowth + SECOND_GROWTH_MS;
+  const later = async elapsed => {
+    await page.clock.setFixedTime(startedAt + elapsed);
     await page.reload();
   };
   const discovered = page.locator('#pet-collection li:not(.undiscovered)');
@@ -220,9 +305,10 @@ async function checkPet(session) {
     assert.equal(egg.lineage, 'fire');
     assert.deepEqual(await readPet(peer), egg);
 
-    await action('pet');
-    await page.locator('#pet-status').getByText(/알이 손길에/).waitFor();
-    await later(2);
+    await later(HATCH_MS - 1);
+    await showForm('egg');
+    assert.deepEqual(await readPet(page), egg);
+    await later(HATCH_MS);
     await showForm('fire-pup');
     assert.equal((await readPet(peer)).form, 'fire-pup');
 
@@ -231,7 +317,7 @@ async function checkPet(session) {
     await idle.waitFor();
     await page.keyboard.press('b');
     await page.locator('#pet-device[data-mode="clock"] #pet-clock').waitFor();
-    assert.equal(await page.locator('#pet-clock-time').getAttribute('datetime'), new Date(startedAt + 120_000).toISOString());
+    assert.equal(await page.locator('#pet-clock-time').getAttribute('datetime'), new Date(startedAt + HATCH_MS).toISOString());
     await page.keyboard.press('Escape');
     await collapsed.waitFor();
     await liftPet(page);
@@ -295,17 +381,27 @@ async function checkPet(session) {
       await play();
       await closeGame();
     }
-    await page.locator('#pet-growth[value="40"]').waitFor({state:'attached'});
-    await later(20);
+    assert.equal((await readPet(page)).play, 6);
+    await later(firstGrowth - 1);
+    await showForm('fire-pup');
+    await action('play');
+    await petButton(page, 'b');
+    await page.locator('#pet-game[data-phase="aim"]').waitFor();
+    await page.clock.setFixedTime(startedAt + firstGrowth);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await showForm('fire-runner');
+    await page.locator('#pet-game').waitFor({state:'hidden'});
+    assert.equal(await page.locator('#pet-game').getAttribute('data-phase'), null);
+    assert.equal((await readPet(page)).play, 0);
     assert.ok((await readPet(peer)).discovered.includes('fire-runner'));
     for (let i = 0; i < 3; i++) await action('explore');
     await page.locator('#pet-habit').getByText(/꼬리 끝 불을 높이고/).waitFor();
     await page.locator('#pet-habitat[data-preview="true"]').waitFor();
     await page.locator('#pet-sprite[src$="fire-runner-habit-explore.png"]').evaluate(img => img.decode());
-    await page.waitForFunction(() => document.querySelector('#pet-growth').value >= 30, null, {timeout: 10000});
     assert.equal((await readPet(page)).explore, 6);
-    await later(50);
+    await later(finalGrowth - 1);
+    await showForm('fire-runner');
+    await later(finalGrowth);
     await showForm('fire-runner-scout');
     assert.ok((await readPet(peer)).discovered.includes('fire-runner-scout'));
     assert.equal(await discovered.count(), 4);
@@ -319,6 +415,10 @@ async function checkPet(session) {
     await page.locator('#pet-collection-panel > summary').click();
     await page.locator('[data-discovered-form="fire-runner-scout"]').getByText('봉홧불이', {exact: true}).waitFor();
     await page.locator('#pet-collection-panel > summary').click();
+    await action('sleep');
+    const wake = (await readPet(page)).sleepUntil;
+    assert.ok(wake > startedAt + finalGrowth);
+    await later(wake - startedAt);
     await play();
     await page.locator('#pet-status').getByText(/봉홧불이가.*공/).waitFor();
     await page.locator('#pet-habitat[data-reaction="beacon"]').waitFor();
@@ -340,7 +440,7 @@ async function checkPet(session) {
     assert.deepEqual((await readPet(page)).discovered, recorded);
 
     const reversed = {
-      ...legacyPet(startedAt + 50 * 60_000, 'fire-scout-runner', ['egg', 'fire-pup', 'fire-scout', 'fire-scout-runner']),
+      ...legacyPet(wake, 'fire-scout-runner', ['egg', 'fire-pup', 'fire-scout', 'fire-scout-runner']),
       lineage: 'fire'
     };
     await page.evaluate(async pet => {
@@ -359,7 +459,7 @@ async function checkPet(session) {
     await page.locator('#pet-sprite[src$="fire-scout-runner-play.png"]').evaluate(img => img.decode());
     await closeGame();
 
-    const old = legacyPet(startedAt + 50 * 60_000, 'cuddler', ['egg', 'baby', 'cuddler']);
+    const old = legacyPet(wake, 'cuddler', ['egg', 'baby', 'cuddler']);
     await page.evaluate(async oldPet => {
       const {transact} = await import('./vault.js');
       await transact(state => { state.pet = oldPet; });
@@ -402,8 +502,7 @@ async function checkFamilyCollection(session) {
       assert.equal(await collection.locator('img[src*="' + family + '-"]').count(), 0);
       assert.equal(await collection.locator('[data-discovered-form]').count(), 1);
       assert.doesNotMatch(await collection.textContent(), /불 강아지|물 고양이|풀 햄스터/);
-      await petAction(page, 'pet');
-      await page.clock.setFixedTime(now + 120_000);
+      await page.clock.setFixedTime(now + HATCH_MS);
       await page.reload();
       await page.locator('#pet-habitat[data-form="' + child + '"]').waitFor({state:'attached'});
       await page.locator('#pet-summary-sprite[src$="/' + child + '.png"]').evaluate(img => img.decode());
@@ -512,6 +611,6 @@ async function checkPetDeviceGeometry(session) {
 }
 
 module.exports = {
-  checkPet, checkPetClock, checkGrowthPaths, checkAdoptionBackups, checkLegacyPetBackups,
+  checkPet, checkPetClock, checkGrowthPaths, checkGrowthStability, checkAdoptionBackups, checkLegacyPetBackups,
   checkFamilyCollection, checkPetDeviceGeometry
 };

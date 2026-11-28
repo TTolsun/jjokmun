@@ -50,12 +50,6 @@ const PRECURSORS = {
     affection: '씨앗을 넣어 둔 쪽 볼을 한쪽 앞발로 받치고 몸을 둥글게 말아요.'
   }
 };
-export const GROWTH_SIGNS = {
-  fire: { play: '발끝에 불씨가 모여요.', explore: '귓가에 불빛이 일렁여요.', affection: '목 둘레로 온기가 번져요.' },
-  water: { play: '꼬리 끝에서 물결이 잇따라 퍼져요.', explore: '꼬리 끝을 물에 대고 가만히 기다려요.', affection: '젖은 꼬리를 앞발에 감고 살짝 기대요.' },
-  grass: { play: '씨앗을 넣은 볼이 통통 뛰는 발을 따라 흔들려요.', explore: '씨앗을 찾을 때마다 한쪽 볼이 더 불룩해져요.', affection: '씨앗이 든 볼을 앞발로 받친 채 곁에 바짝 붙어요.' }
-};
-
 export function familyPrecursor(form, habit) {
   const description = PRECURSORS[form]?.[habit];
   if (!description) return;

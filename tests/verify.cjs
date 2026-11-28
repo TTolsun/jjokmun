@@ -1,6 +1,6 @@
 const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const { openSection } = require('./browser.cjs');
-const {petAction, petButton} = require('./pet-controls.cjs');
+const {petAction, petButton, liftPet} = require('./pet-controls.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -291,8 +291,12 @@ async function checkVault(session, a) {
   const owner = await session.tab(monday);
   await unlock(owner);
   const pet = owner.locator('#pet');
-  for (let i = 0; i < 3; i++) await petAction(owner, 'pet');
-  await pet.locator('#pet-habitat[data-form="fire-pup"]').waitFor();
+  const egg = (await readState(owner)).pet;
+  await owner.clock.setFixedTime(egg.startedAt + 120_000);
+  await owner.reload();
+  await unlock(owner);
+  await pet.locator('#pet-summary-sprite[src$="/fire-pup.png"]').waitFor();
+  await liftPet(owner);
   await owner.locator('#archive-list button').filter({hasText:note}).click();
   await owner.locator(':is(#detail-original, #detail-preview):visible').getByText(note, {exact:true}).waitFor();
   await owner.locator('#pet-read-memo').click();
@@ -435,6 +439,7 @@ async function run() {
   await require('./undo.cjs').checkLegacyFieldOrder();
   await require('./pet.cjs').checkPetClock();
   await require('./pet.cjs').checkGrowthPaths();
+  await require('./pet.cjs').checkGrowthStability();
   await require('./pet.cjs').checkAdoptionBackups();
   await require('./pet.cjs').checkLegacyPetBackups();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));

@@ -136,19 +136,15 @@ export function mergeImport(state, backup, date) {
     summary.shop = 1;
   }
   if (backup.pet) {
+    const now = Date.now();
+    const incoming = petEvolution(backup.pet, now)?.pet ?? backup.pet;
     if (!state.pet) {
-      const restored = petEvolution(backup.pet)?.pet ?? structuredClone(backup.pet);
-      const now = Date.now();
-      const clockOffset = Math.max(0, restored.startedAt - now, restored.tickAt - now, restored.sleepTickAt - now);
-      for (const key of ['startedAt', 'tickAt', 'sleepStartedAt', 'sleepTickAt', 'sleepUntil']) {
-        restored[key] = Math.max(0, restored[key] - clockOffset);
-      }
+      const restored = structuredClone(incoming);
       state.pet = restored;
       undo.pet = { before: null, after: restored };
       summary.pet = '복원';
     } else {
-      const current = petEvolution(state.pet)?.pet ?? state.pet;
-      const incoming = petEvolution(backup.pet)?.pet ?? backup.pet;
+      const current = petEvolution(state.pet, now)?.pet ?? state.pet;
       const discovered = incoming.discovered.filter(form => !current.discovered.includes(form));
       if (discovered.length) {
         const restored = { ...current, discovered: [...current.discovered, ...discovered] };

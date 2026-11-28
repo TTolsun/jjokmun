@@ -86,17 +86,21 @@ export const PET_FORM_DETAILS = {
 export const PET_FORMS = Object.keys(PET_FORM_DETAILS);
 export const PET_FAMILIES = { fire: 'fire-pup', water: 'water-kitten', grass: 'grass-hamster' };
 export const PET_TICK_MS = 20 * 60_000;
+export const PET_HATCH_MS = 2 * 60_000;
+export const PET_FIRST_GROWTH_MS = 30 * 60_000;
+export const PET_SECOND_GROWTH_MS = 24 * 60 * 60_000;
 
-const HATCH_TIME = 2 * 60_000;
 const FAMILY_KEYS = Object.keys(PET_FAMILIES);
-const LEGACY_GROWTH = { duration: 8 * 60_000, minAge: 0 };
-const GROWTH_RULES = [null, { duration: 8 * 60_000, minAge: 15_000 }, { duration: 12 * 60_000, minAge: 45_000 }];
+const STAGE_DURATIONS = [PET_HATCH_MS, PET_FIRST_GROWTH_MS, PET_SECOND_GROWTH_MS];
+const SEED_SPACE = 2 ** 32;
+const HABIT_SCORE_MAX = Number.MAX_SAFE_INTEGER;
 const BRANCHES = { play: 'runner', explore: 'scout', affection: 'cuddler' };
 const CARE_ACTIONS = ['feed', 'snack', 'play', 'explore', 'clean', 'sleep', 'heal', 'pet'];
 const scores = ['affection', 'play', 'explore'];
 const clamp = (value) => Math.min(100, Math.max(0, value));
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 const range = (value, max) => Number.isInteger(value) && value >= 0 && value <= max;
+const scoreHabit = (value) => value + Math.min(2, HABIT_SCORE_MAX - value);
 
 function isNight(now) {
   const hour = new Date(now).getHours();
@@ -111,32 +115,31 @@ function sleepEnd(now) {
   return morning.getTime();
 }
 
-function growthRules(form) {
-  return form === 'baby' ? LEGACY_GROWTH : GROWTH_RULES[PET_FORM_DETAILS[form].stage];
-}
-
-function newEgg(now, lineage, discovered = ['egg']) {
+function newEgg(now, lineage, growthSeed, discovered = ['egg']) {
   return {
-    form: 'egg', lineage, startedAt: now, tickAt: now, hunger: 0, happiness: 70, energy: 90,
+    form: 'egg', lineage, growthSeed, startedAt: now, tickAt: now, hunger: 0, happiness: 70, energy: 90,
     health: 100, poop: 0, sleepStartedAt: 0, sleepTickAt: 0, sleepUntil: 0,
     care: 0, play: 0, explore: 0, affection: 0,
     digestion: 0, memoVisits: 0, discovered: [...discovered]
   };
 }
 
-function drawLineage(random) {
-  return FAMILY_KEYS[Math.floor(random() * FAMILY_KEYS.length)];
+function adoptEgg(now, random, discovered) {
+  const roll = random() * FAMILY_KEYS.length;
+  const family = Math.floor(roll);
+  return newEgg(now, FAMILY_KEYS[family], Math.floor((roll - family) * SEED_SPACE), discovered);
 }
 
 export function validatePet(value) {
   const fields = ['hunger', 'happiness', 'energy', 'health'];
-  const counts = ['care', ...scores];
   if (!value || !PET_FORMS.includes(value.form)
       || (value.lineage !== undefined && value.lineage !== 'legacy' && !FAMILY_KEYS.includes(value.lineage))
       || (value.form !== 'egg' && PET_FORM_DETAILS[value.form].lineage !== (value.lineage ?? 'legacy'))
+      || (value.growthSeed !== undefined && !range(value.growthSeed, SEED_SPACE - 1))
       || !validTime(value.startedAt) || !validTime(value.tickAt)
       || !fields.every(key => range(value[key], 100))
-      || !counts.every(key => range(value[key], 100))
+      || !range(value.care, 100)
+      || !scores.every(key => range(value[key], HABIT_SCORE_MAX))
       || !range(value.poop, 3) || !range(value.digestion, 1) || !range(value.memoVisits, 2)
       || !validTime(value.sleepStartedAt) || !validTime(value.sleepTickAt) || !validTime(value.sleepUntil)
       || value.sleepStartedAt > value.sleepTickAt || value.sleepTickAt > value.sleepUntil
@@ -146,11 +149,12 @@ export function validatePet(value) {
       || !value.discovered.includes(value.form) || !value.discovered.includes('egg')) {
     throw new Error('펫의 돌봄 기록이 올바르지 않습니다.');
   }
-  const clean = newEgg(value.startedAt, value.lineage, value.discovered);
+  const clean = newEgg(value.startedAt, value.lineage, value.growthSeed, value.discovered);
   for (const key of Object.keys(clean)) {
     if (key !== 'discovered') clean[key] = value[key];
   }
   if (value.lineage === undefined) delete clean.lineage;
+  if (value.growthSeed === undefined) delete clean.growthSeed;
   return clean;
 }
 
@@ -177,23 +181,50 @@ function advance(pet, now) {
   }
 }
 
-function hasHabits(pet) {
-  return pet.play + pet.explore + pet.affection >= 6;
+function leadingHabits(pet) {
+  const best = Math.max(...scores.map(key => pet[key]));
+  return scores.filter(key => pet[key] === best);
 }
 
 export function dominantPetHabit(pet) {
-  const strongest = scores.reduce((best, key) => pet[key] > pet[best] ? key : best);
-  return pet[strongest] > 0 ? strongest : undefined;
+  const leaders = leadingHabits(pet);
+  return leaders.length === 1 && pet[leaders[0]] > 0 ? leaders[0] : undefined;
+}
+
+function mixSeed(value) {
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+  return (value ^ (value >>> 16)) >>> 0;
+}
+
+function seedForExistingPet(pet) {
+  let seed = (pet.startedAt >>> 0) ^ Math.floor(pet.startedAt / SEED_SPACE);
+  for (const character of pet.lineage ?? 'legacy') {
+    seed = Math.imul(seed ^ character.charCodeAt(0), 0x01000193);
+  }
+  return mixSeed(seed);
+}
+
+function chooseBranch(pet) {
+  const leaders = leadingHabits(pet);
+  if (leaders.length === 1) return BRANCHES[leaders[0]];
+  const stage = PET_FORM_DETAILS[pet.form].stage;
+  let sample = mixSeed(pet.growthSeed ^ Math.imul(stage, 0x9e3779b9));
+  const limit = SEED_SPACE - SEED_SPACE % leaders.length;
+  // Reject the tail that cannot be split evenly across the tied habits.
+  while (sample >= limit) sample = mixSeed((sample + 0x9e3779b9) >>> 0);
+  return BRANCHES[leaders[sample % leaders.length]];
+}
+
+function growthDeadline(pet) {
+  const duration = STAGE_DURATIONS[PET_FORM_DETAILS[pet.form].stage];
+  const deadline = pet.startedAt + duration;
+  return validTime(deadline) ? deadline : Infinity;
 }
 
 function growthProgress(pet, now) {
-  const elapsed = Math.max(0, now - pet.startedAt);
-  if (pet.form === 'egg') return Math.min(1, Math.max(pet.care / 3, Math.min(pet.care, 1) * elapsed / HATCH_TIME));
-  const rules = growthRules(pet.form);
-  if (!rules) return 1;
-  const progress = Math.max(pet.care / 10, Math.min(pet.care / 5, 1) * elapsed / rules.duration);
-  const limit = !hasHabits(pet) ? 0.9 : elapsed < rules.minAge ? 0.99 : 1;
-  return Math.min(limit, progress);
+  const duration = STAGE_DURATIONS[PET_FORM_DETAILS[pet.form].stage];
+  return duration ? Math.floor(clamp(100 * (now - pet.startedAt) / duration)) : 100;
 }
 
 function startGrowthStage(pet) {
@@ -202,7 +233,6 @@ function startGrowthStage(pet) {
 }
 
 function mature(pet, now) {
-  if (growthProgress(pet, now) < 1) return null;
   const previous = pet.form;
   let event;
   if (previous === 'egg') {
@@ -212,8 +242,8 @@ function mature(pet, now) {
     startGrowthStage(pet);
     pet.tickAt = Math.max(pet.tickAt, now);
     event = '알에서 아기 펫이 태어났어요!';
-  } else if (growthRules(previous)) {
-    const branch = BRANCHES[dominantPetHabit(pet)];
+  } else {
+    const branch = chooseBranch(pet);
     if (previous === 'baby') pet.form = branch;
     else {
       const prefix = PET_FORM_DETAILS[previous].stage === 1 ? pet.lineage : previous;
@@ -224,35 +254,25 @@ function mature(pet, now) {
       pet.energy = Math.max(pet.energy, 80);
     }
     event = PET_FORM_DETAILS[pet.form].name + '의 모습으로 성장했어요!';
-  } else {
-    return null;
   }
-  pet.startedAt = Math.max(pet.startedAt, now);
+  pet.startedAt = now;
   if (!pet.discovered.includes(pet.form)) pet.discovered.push(pet.form);
   return event;
 }
 
-function timedGrowth(pet) {
-  if (pet.form === 'egg') return pet.care > 0 ? pet.startedAt + HATCH_TIME : Infinity;
-  const rules = growthRules(pet.form);
-  if (!rules || !hasHabits(pet)) return Infinity;
-  const delay = pet.care >= 10 ? 0 : Math.ceil(rules.duration / Math.min(pet.care / 5, 1));
-  return pet.startedAt + Math.max(rules.minAge, delay);
-}
-
 function settle(pet, now) {
-  const timedTransition = timedGrowth(pet);
   let event = null;
-  if (timedTransition <= now) {
-    advance(pet, timedTransition);
-    event = mature(pet, timedTransition);
+  for (let deadline = growthDeadline(pet); Number.isFinite(deadline) && deadline <= now; deadline = growthDeadline(pet)) {
+    pet.growthSeed ??= seedForExistingPet(pet);
+    advance(pet, deadline);
+    event = mature(pet, deadline);
   }
   advance(pet, now);
   return event;
 }
 
 export function petEvolution(pet, now = Date.now()) {
-  if (!pet || timedGrowth(pet) > now) return null;
+  if (!pet || growthDeadline(pet) > now) return null;
   const next = { ...pet, discovered: [...pet.discovered] };
   const event = settle(next, now);
   return event ? { pet: next, event } : null;
@@ -287,19 +307,20 @@ export function petView(pet, now = Date.now()) {
   if (next.poop) needs.push('clean');
   if (next.energy <= 30) needs.push('sleep');
   if (next.health < 85) needs.push('heal');
+  const deadline = growthDeadline(next);
   return {
     ...next, stage: PET_FORM_DETAILS[next.form].stage,
     lineage: next.form === 'egg' ? undefined : next.lineage ?? 'legacy',
-    habitReady: Boolean(growthRules(next.form)) && hasHabits(next),
+    nextGrowthAt: Number.isFinite(deadline) ? deadline : null,
     sleeping: next.sleepUntil > now, night: isNight(now),
-    growth: Math.floor(growthProgress(next, now) * 100), needs, available: actionList(next, now)
+    growth: growthProgress(next, now), needs, available: actionList(next, now)
   };
 }
 
 export function applyPetAction(state, action, now = Date.now(), random = Math.random) {
   if (!state.pet) {
     if (action !== 'adopt') return { changed: false, event: '' };
-    state.pet = newEgg(now, drawLineage(random));
+    state.pet = adoptEgg(now, random);
     return { changed: true, event: '따뜻한 알을 데려왔어요.' };
   }
   const pet = { ...state.pet, discovered: [...state.pet.discovered] };
@@ -314,7 +335,7 @@ export function applyPetAction(state, action, now = Date.now(), random = Math.ra
   }
   let event;
   if (action === 'newEgg') {
-    state.pet = newEgg(now, drawLineage(random), pet.discovered);
+    state.pet = adoptEgg(now, random, pet.discovered);
     return { changed: true, event: '새 알을 데려왔어요. 만난 펫은 도감에 남아요.' };
   }
   switch (action) {
@@ -333,14 +354,14 @@ export function applyPetAction(state, action, now = Date.now(), random = Math.ra
       pet.energy = clamp(pet.energy - 18);
       pet.hunger = clamp(pet.hunger + 8);
       pet.happiness = clamp(pet.happiness + 22);
-      pet.play += 2;
+      pet.play = scoreHabit(pet.play);
       event = PET_FORM_DETAILS[pet.form].ballReaction
         ?? (pet.energy < 18 ? '펫이 공을 물고 돌아오더니 바닥에 털썩 앉았어요.' : '펫이 통통 튀는 공을 쫓아갔어요!');
       break;
     case 'explore':
       pet.energy = clamp(pet.energy - 10);
       pet.happiness = clamp(pet.happiness + 12);
-      pet.explore += 2;
+      pet.explore = scoreHabit(pet.explore);
       event = PET_FORM_DETAILS[pet.form].exploreReaction
         ?? (pet.explore % 4 === 0 ? '펫이 바스락거리는 잎을 한 장 뒤집었어요.' : '펫이 바닥을 킁킁거리다가 씨앗 하나를 찾았어요.');
       break;
@@ -364,7 +385,7 @@ export function applyPetAction(state, action, now = Date.now(), random = Math.ra
       break;
     case 'pet':
       pet.happiness = clamp(pet.happiness + 7);
-      pet.affection += 2;
+      pet.affection = scoreHabit(pet.affection);
       event = PET_FORM_DETAILS[pet.form].petReaction
         ?? (pet.form === 'egg' ? '알이 손길에 살짝 흔들렸어요.' : '펫이 손길에 눈을 감았어요.');
       break;
@@ -374,10 +395,6 @@ export function applyPetAction(state, action, now = Date.now(), random = Math.ra
       event = '펫이 글을 읽는 동안 곁에 앉았어요.';
       break;
   }
-  if (pet.form === 'egg' || growthRules(pet.form)) {
-    if (action !== 'wake' && action !== 'sleep' && action !== 'memo') pet.care = clamp(pet.care + 1);
-  }
-  for (const key of scores) pet[key] = clamp(pet[key]);
   state.pet = pet;
-  return { changed: true, event: mature(pet, now) || evolution || event };
+  return { changed: true, event: evolution || event };
 }
