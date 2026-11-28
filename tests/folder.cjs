@@ -61,13 +61,13 @@ async function checkFolder(session) {
       window.showDirectoryPicker = async () => damaged;
     });
     await page.locator('#choose-folder').click();
-    await page.getByText('쪽문 저장 파일의 형식을 확인해 주세요.').waitFor();
+    await page.getByText('메모고치 저장 파일의 형식을 확인해 주세요.').waitFor();
     // A file from a newer release that this release rejects names the version gap.
     const appVersion = await page.evaluate(() => chrome.runtime.getManifest().version);
     for (const [name, stamp, message] of [
-      ['미래 책방', '99.0.0', `이 저장 파일은 쪽문 99.0.0에서 저장되었습니다. 지금 쓰는 쪽문(${appVersion})을 업데이트한 뒤 다시 열어 주세요.`],
-      ['버전 표기 오류', '99.invalid', '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.'],
-      ['낡은 책방', undefined, '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.']
+      ['미래 책방', '99.0.0', `이 저장 파일은 메모고치 99.0.0에서 저장되었습니다. 현재 버전은 ${appVersion}입니다. 메모고치를 업데이트한 뒤 다시 열어 주세요.`],
+      ['버전 표기 오류', '99.invalid', '저장 파일의 메모 기록을 읽을 수 없습니다. 메모고치가 최신 버전인지 확인해 주세요.'],
+      ['낡은 책방', undefined, '저장 파일의 메모 기록을 읽을 수 없습니다. 메모고치가 최신 버전인지 확인해 주세요.']
     ]) {
       await page.evaluate(async ({name, stamp}) => {
         const root = await navigator.storage.getDirectory();

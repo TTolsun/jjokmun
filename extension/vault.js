@@ -67,7 +67,7 @@ export function useFolder(directory, { reopen = false, remember = true, copyCurr
     if (existing) {
       if (existing.mode === 'plain') {
         try { validateBackup(existing.payload.state, { local: true }); }
-        catch { throw new Error(unreadableVaultMessage(existing, '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.')); }
+        catch { throw new Error(unreadableVaultMessage(existing, '저장 파일의 메모 기록을 읽을 수 없습니다. 메모고치가 최신 버전인지 확인해 주세요.')); }
       }
     } else {
       const legacy = previous ? null : await legacySnapshot();

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-jjokmun is an offline Chrome Manifest V3 extension for memos, replies, and a small pixel-art pet garden. There is no build step, bundler, linter, or formatter: Chrome loads `extension/` directly as browser ES modules. Load it via `chrome://extensions` → Developer mode → Load unpacked → `extension/`. After edits, close jjokmun tabs, reload the extension card, then click the toolbar icon.
+메모고치 (memogochi) is an offline Chrome Manifest V3 extension for memos, replies, and a small pixel-art pet garden. There is no build step, bundler, linter, or formatter: Chrome loads `extension/` directly as browser ES modules. Load it via `chrome://extensions` → Developer mode → Load unpacked → `extension/`. After edits, close 메모고치 tabs, reload the extension card, then click the toolbar icon.
 
 User-facing strings are Korean. Commit subjects are short Korean summaries.
 

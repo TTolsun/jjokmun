@@ -25,7 +25,7 @@ export async function removeMigratedProfile(snapshot) {
     let blocked = false;
     open.onblocked = () => {
       blocked = true;
-      reject(new Error('이전 버전의 쪽문 탭을 닫고 같은 폴더를 다시 선택해 주세요.'));
+      reject(new Error('이전 버전의 메모고치 탭을 닫고 같은 폴더를 다시 선택해 주세요.'));
     };
     open.onupgradeneeded = () => {
       const tx = open.transaction;
