@@ -400,7 +400,8 @@ export function bindPetDevice(act, editorReturn) {
   });
   document.addEventListener('keydown', event => {
     if (!active || !expanded || event.defaultPrevented || event.repeat || event.isComposing
-      || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('dialog[open]')) return;
+      || event.ctrlKey || event.metaKey || event.altKey || document.querySelector('dialog[open]')
+      || event.target.closest?.('#pet-collection-guide[open]')) return;
     const character = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (character === 'Escape') {
       event.preventDefault();

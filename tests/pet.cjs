@@ -297,7 +297,6 @@ async function checkPet(session) {
     await peer.clock.setFixedTime(startedAt);
     await page.locator('#pet').waitFor();
     await collapsed.waitFor();
-    await liftPet(page);
     await openCollection.click();
     await collection.getByText(/알을 데려오면/).waitFor();
     await page.keyboard.press('Escape');
@@ -431,6 +430,7 @@ async function checkPet(session) {
     await page.locator('#pet-state[data-page="meters"] progress#pet-hunger').waitFor();
     await petButton(page, 'a');
     await page.locator('#pet-path').getByText('불뭉이 → 불달이 → 봉홧불이').waitFor();
+    await layPet(page);
     await openCollection.click();
     await collection.locator('[data-discovered-form="fire-runner-scout"]').getByText('돌보는 중').waitFor();
     await collection.getByText('불뭉이 → 불달이 → 봉홧불이').waitFor();
@@ -442,7 +442,8 @@ async function checkPet(session) {
     await page.setViewportSize({width: 320, height: 520});
     await filters.getByRole('button', {name: '불 강아지'}).click();
     assert.equal(await collection.evaluate(book => book.scrollWidth <= book.clientWidth), true);
-    await page.getByRole('button', {name: '성장 도감 닫기'}).click();
+    await openCollection.click();
+    assert.equal(await collection.isVisible(), false);
     await page.setViewportSize({width: 1280, height: 840});
     await action('sleep');
     const wake = (await readPet(page)).sleepUntil;
@@ -497,7 +498,6 @@ async function checkPet(session) {
     await page.locator('#pet-summary-sprite[src$="/cuddler.png"]').evaluate(img => img.decode());
     assert.deepEqual((await readPet(page)).discovered, old.discovered);
     assert.match(await page.locator('#pet-collection-count').innerText(), /3 \/ 44/);
-    await liftPet(page);
     await openCollection.click();
     await collection.locator('[data-discovered-form="cuddler"]').getByText('돌보는 중').waitFor();
     await page.keyboard.press('Escape');
@@ -532,7 +532,9 @@ async function checkFamilyCollection(session) {
       await page.locator('#pet-lcd-name').getByText('알', {exact: true}).waitFor();
       await page.locator('#pet-sprite[src$="/egg.png"]').waitFor();
       assert.match(await page.locator('#pet-collection-count').textContent(), /1 \/ 40/);
+      await layPet(page);
       await page.locator('#pet-collection-open').click();
+      await collection.locator('[data-discovered-form="egg"]').waitFor();
       assert.equal(await collection.locator('img[src*="' + family + '-"]').count(), 0);
       assert.equal(await collection.locator('[data-discovered-form]').count(), 1);
       assert.doesNotMatch(await collection.textContent(), /불 강아지|물 고양이|풀 햄스터/);
@@ -589,8 +591,25 @@ async function checkPetDeviceGeometry(session) {
       const offset = miniature.x + miniature.width / 2 - garden.x - garden.width / 2;
       assert.ok(Math.abs(offset) <= 1, 'the miniature is centered in the garden');
       assert.deepEqual([miniature.width, miniature.height], [150, 187.5]);
+      const guide = page.locator('#pet-collection-guide');
+      const guideOffset = () => guide.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const mini = document.getElementById('pet-expand').getBoundingClientRect();
+        return [box.top - mini.bottom, (box.left + box.right - mini.left - mini.right) / 2];
+      });
+      assert.deepEqual(await guideOffset(), [12, 0]);
+      await page.locator('#pet-collection-open').focus();
+      await page.keyboard.press('Enter');
+      await page.locator('#pet-collection').waitFor();
+      assert.deepEqual(await guideOffset(), [12, 0]);
       await liftPet(page);
       await mode('idle');
+      assert.ok(await guide.evaluate(node => node.open));
+      assert.deepEqual(await guideOffset(), [12, 0]);
+      await page.evaluate(() => scrollBy(0, 80));
+      assert.deepEqual(await guideOffset(), [12, 0]);
+      await page.locator('#pet').evaluate(node => node.scrollIntoView({block: 'center'}));
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.locator('#pet-sprite').evaluate(image => image.decode());
       const positions = await page.evaluate(() => {
         function face(id, atBottom) {
@@ -629,6 +648,7 @@ async function checkPetDeviceGeometry(session) {
       await mode('clock');
       await compare(width, 'clock');
       await layPet(page);
+      await page.locator('#pet-collection-open').click();
       await liftPet(page);
       await page.locator('[data-pet-menu="status"]').click();
       await mode('status');
@@ -667,19 +687,19 @@ async function checkPetDeviceGeometry(session) {
     }
     await layPet(page);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    const sizes = await page.evaluate(() => {
+    const frame = await page.evaluate(() => {
       const trigger = document.getElementById('pet-expand');
       const popover = document.getElementById('pet-popover');
+      const mini = trigger.getBoundingClientRect();
       trigger.click();
       const [lift] = popover.getAnimations();
       lift.pause();
       lift.currentTime = 0;
       const start = document.getElementById('pet-device').getBoundingClientRect();
       lift.finish();
-      return [start.width, start.height];
+      return ['left', 'top', 'width', 'height'].map(key => start[key] - mini[key]);
     });
-    assert.ok(Math.abs(sizes[0] - 150) < 1 && Math.abs(sizes[1] - 187.5) < 1,
-      'the first animation frame has the miniature shell dimensions');
+    assert.ok(frame.every(delta => Math.abs(delta) < 1), 'the lift starts at the exact miniature shell bounds');
     await page.waitForFunction(() => !document.getElementById('pet-popover').getAnimations().length);
     const landing = await page.evaluate(() => {
       const shell = document.getElementById('pet-device');

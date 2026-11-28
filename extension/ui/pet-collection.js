@@ -45,7 +45,7 @@ function entry(form, current, discovered) {
 }
 
 export function bindPetCollection() {
-  const dialog = element('pet-collection-dialog');
+  const guide = element('pet-collection-guide');
   const filters = element('pet-collection-families');
   const book = element('pet-collection');
   const progress = element('pet-discovery-progress');
@@ -99,11 +99,17 @@ export function bindPetCollection() {
     filters.append(button);
   }
 
-  element('pet-collection-open').addEventListener('click', () => {
+  guide.addEventListener('toggle', () => {
+    if (!guide.open) return;
     selected = groupOf(current);
     renderGroup();
-    dialog.showModal();
     book.scrollTop = 0;
+  });
+  guide.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !guide.open) return;
+    event.preventDefault();
+    guide.open = false;
+    element('pet-collection-open').focus();
   });
 
   function update(nextDiscovered, activeForm) {
@@ -122,14 +128,14 @@ export function bindPetCollection() {
     progress.value = discovered.length;
     filters.hidden = groups.size < 2;
     for (const button of filters.children) button.hidden = !groups.has(button.dataset.group);
-    if (dialog.open) {
+    if (guide.open) {
       if (followingCurrent || !groups.has(selected)) selected = groupOf(current);
       renderGroup();
     }
   }
 
   function reset() {
-    dialog.close();
+    guide.open = false;
     lastKey = current = selected = undefined;
     discovered = [];
     book.replaceChildren();

@@ -152,6 +152,15 @@
         <span class="pet-bezel" aria-hidden="true"><span class="pet-mini-lcd"><img id="pet-summary-sprite" src="art/egg.png" alt=""></span></span>
         <span class="pet-mini-controls" aria-hidden="true"><i>A</i><i>B</i><i>C</i></span>
       </button>
+      <details id="pet-collection-guide">
+        <summary id="pet-collection-open">성장 도감<span id="pet-collection-count"></span></summary>
+        <div class="collection-progress">
+          <span id="pet-discovery-total"></span>
+          <progress id="pet-discovery-progress" aria-label="전체 발견 수"></progress>
+        </div>
+        <div id="pet-collection-families" role="group" aria-label="계열 선택"></div>
+        <div id="pet-collection" tabindex="0" role="region" aria-label="성장 단계별 모습"></div>
+      </details>
       <div id="pet-popover" popover="manual" role="region" aria-label="확대된 정원 기기" hidden>
         <div id="pet-device" class="pet-device" data-mode="idle">
           <div class="pet-device-mark" aria-hidden="true"><span class="pet-device-emblem"></span></div>
@@ -255,23 +264,8 @@
           <p id="pet-condition" hidden></p>
           <p id="pet-status" role="status"></p>
           <blockquote id="pet-memo-excerpt" hidden></blockquote>
-          <button type="button" id="pet-collection-open" aria-haspopup="dialog" aria-controls="pet-collection-dialog">
-            성장 도감<span id="pet-collection-count"></span>
-          </button>
         </div>
       </div>
-      <dialog id="pet-collection-dialog" aria-labelledby="pet-collection-title">
-        <header class="collection-header">
-          <h2 id="pet-collection-title">성장 도감</h2>
-          <form method="dialog"><button class="close" aria-label="성장 도감 닫기" autofocus>×</button></form>
-          <div class="collection-progress">
-            <span id="pet-discovery-total"></span>
-            <progress id="pet-discovery-progress" aria-label="전체 발견 수"></progress>
-          </div>
-        </header>
-        <div id="pet-collection-families" role="group" aria-label="계열 선택"></div>
-        <div id="pet-collection" tabindex="0" role="region" aria-label="성장 단계별 모습"></div>
-      </dialog>
     </section>
 
   </main>
