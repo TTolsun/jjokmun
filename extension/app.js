@@ -111,6 +111,7 @@ function clearSensitive(showLock) {
   element('found-note').hidden = true;
   element('found-note-hint').hidden = true;
   element('pet-expand').classList.remove('has-note');
+  element('pet-expand').setAttribute('aria-label', '정원 기기 확대');
   element('detail-date').removeAttribute('datetime');
   element('detail-dialog').hidden = true;
   element('edit-form').hidden = true;
@@ -380,11 +381,15 @@ element('found-note-open').addEventListener('click', event => {
 element('found-note-fold').addEventListener('click', async event => {
   const button = event.currentTarget;
   const expected = viewGeneration;
+  // Put back only the note on screen, even if the day rolled over or another tab changed it.
+  const shown = displayedDate;
+  const memoId = foundNote(shown)?.memo.id;
+  if (!memoId) return;
   button.disabled = true;
   try {
-    await change((draft, date) => {
-      const entry = selectDaily(draft, date);
-      if (entry.folded) return false;
+    await change(draft => {
+      const entry = draft.daily.find(record => record.date === shown && record.memoId === memoId);
+      if (!entry || entry.folded) return false;
       entry.folded = true;
     });
     if (expected === viewGeneration) {
