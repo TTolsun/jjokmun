@@ -1,4 +1,3 @@
-const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkGuestVisit(session) {
@@ -43,13 +42,11 @@ async function checkGuestVisit(session) {
     await second.reload();
     await second.locator('#guest-reaction').getByText('“' + story + '”', { exact: true }).waitFor();
     await second.locator('#open-archive').click();
-    await openSection(second, 'memo-tools');
     await second.getByRole('button', { name: '답장 삭제' }).click();
     await second.locator('#reply-dialog-confirm').click();
     await second.locator('#floor-link').click();
     await second.getByRole('button', { name: '뒷이야기 건네기' }).waitFor();
     await second.locator('#open-archive').click();
-    await openSection(second, 'memo-tools');
     await second.locator('#delete-memo').click();
     await second.locator('#delete-confirm').click();
     await first.getByRole('button', { name: '글 건네기', exact: true }).waitFor();

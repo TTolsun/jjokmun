@@ -1,4 +1,3 @@
-const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 // The owner's pick sits on the shop floor next to the books that customers buy.
@@ -95,7 +94,6 @@ async function checkBookshop(session) {
       await page.locator('#archive-toggle').click();
       await page.locator('#archive-list button').first().click();
       await page.locator('#detail-title:focus').waitFor();
-      await openSection(page, 'memo-tools');
       await page.locator('#delete-memo').click();
       await page.locator('#delete-confirm').click();
       await waitText(page, 'memo-count', String(count - 1));

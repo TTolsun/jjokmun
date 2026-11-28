@@ -239,7 +239,6 @@ async function checkRendering(session) {
     await assertDiagrams(page, [['자료함', '책갈피']]);
 
     await openSource(page, markdownPath);
-    await openSection(page, 'memo-tools');
     await page.locator('#edit-memo').click();
     const editor = page.locator('#edit-input');
     assert.equal(await editor.inputValue(), markdown);

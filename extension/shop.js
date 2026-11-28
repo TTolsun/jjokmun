@@ -107,14 +107,6 @@ export function bondRoster(state) {
       || (a.memo.id < b.memo.id ? -1 : a.memo.id > b.memo.id ? 1 : 0));
 }
 
-// Explain the next reachable step in terms of what the writer does, not points.
-export function bondHint(bond, { requestedToday = false, repliedToday = false } = {}) {
-  if (!bond.nextTitle) return '가장 깊은 사이가 되었어요.';
-  if (repliedToday) return bond.nextTitle + '까지 정 ' + bond.remaining + ' 남았어요. 다른 날 다시 들러 주세요.';
-  if (requestedToday) return '단골이 오늘 다시 찾는 책이에요. 지금 답장하면 정 +' + BOND_POINTS.request + '.';
-  return bond.nextTitle + '까지 정 ' + bond.remaining + ' 남았어요. 메모를 쓴 날이 아닌 다른 날 답장하면 정 +' + BOND_POINTS.revisit + '.';
-}
-
 export function newShop() {
   return { days: 0, coins: 0, hearts: 0, level: 1, seat: 'window', plan: 'reading', openedAt: 0, decor: 0 };
 }
