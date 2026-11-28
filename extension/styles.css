@@ -153,7 +153,11 @@ mark { color: var(--canvas); background: var(--olive); padding: 0 1px; border-ra
   grid-template-columns: minmax(0, 1fr);
 }
 .journal-disclosure > summary { width: fit-content; padding: 7px 2px; cursor: pointer; color: var(--olive); font-weight: 600; }
-#memo-tools .detail-actions { flex-wrap: wrap; }
+#memo-tools .detail-actions { flex-wrap: wrap; gap: 6px; }
+#memo-tools .detail-actions button { padding: 6px 10px; border-color: var(--line); background: var(--surface); color: var(--ink); }
+#memo-tools .detail-actions button:not(:disabled):hover { background: var(--raised); }
+#memo-tools .detail-actions button:disabled { opacity: .5; }
+#memo-tools #delete-memo { margin-left: auto; color: var(--clay); }
 #memo-tools { margin-bottom: 18px; }
 #reply-form { border-top: 1px solid var(--line); padding-top: 14px; }
 #memo-search .search-field { margin-top: 2px; }
