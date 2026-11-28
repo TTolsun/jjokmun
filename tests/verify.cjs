@@ -148,7 +148,7 @@ async function checkReplyActions(session, a) {
     await a.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await a.locator('#reply-edit-input').fill('   ');
     await a.locator('#reply-dialog-confirm').click();
-    assert.match(await a.locator('#reply-dialog-status').innerText(), /한 줄/);
+    assert.match(await a.locator('#reply-dialog-status').innerText(), /답장 내용을 적어/);
     await a.locator('#reply-edit-input').fill(updated);
     await a.locator('#reply-edit-input').press('Enter');
     await a.locator('#reply-dialog').waitFor({state: 'hidden'});

@@ -185,7 +185,7 @@
           <form id="reply-form" autocomplete="off">
             <label class="field-label" for="reply-input">답장 남기기</label>
             <div class="inline-form">
-              <input type="text" id="reply-input" placeholder="이 메모를 지금 읽고 든 생각" maxlength="2000" required>
+              <textarea id="reply-input" rows="1" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
               <button type="submit" id="reply-save">답장 저장</button>
             </div>
           </form>
@@ -273,8 +273,8 @@
     <div class="section-heading"><h2 id="reply-dialog-title"></h2></div>
     <form id="reply-dialog-form" autocomplete="off">
       <div id="reply-edit-field">
-        <label class="field-label" for="reply-edit-input">답장 내용</label>
-        <input id="reply-edit-input" type="text" maxlength="2000" required>
+        <label class="field-label" for="reply-edit-input">답장 내용 (Enter로 저장, Shift+Enter로 줄바꿈)</label>
+        <textarea id="reply-edit-input" rows="6" required></textarea>
       </div>
       <div id="reply-delete-preview" hidden>
         <blockquote id="reply-delete-text"></blockquote>

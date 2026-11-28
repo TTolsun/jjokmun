@@ -306,19 +306,67 @@ async function checkRendering(session) {
     });
     assert.deepEqual(detected, ['markdown', 'markdown', 'mermaid', 'markdown', 'mermaid']);
     // Single-line fields turn pasted line breaks into spaces instead of gluing words.
-    await page.locator('#reply-compose > summary').click();
-    await page.locator('#reply-input').evaluate(input => {
-      input.focus();
+    await page.locator('#guest-input').evaluate(input => {
       input.value = '앞 ';
       input.setSelectionRange(2, 2);
       const data = new DataTransfer();
       data.setData('text/plain', '첫 줄\r\n둘째 줄\n');
       input.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));
     });
-    assert.equal(await page.locator('#reply-input').inputValue(), '앞 첫 줄 둘째 줄');
-    await page.locator('#detail-status').getByText('이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.').waitFor();
-    await page.locator('#reply-input').fill('');
+    assert.equal(await page.locator('#guest-input').inputValue(), '앞 첫 줄 둘째 줄');
+    assert.equal(await page.locator('#guest-status').textContent(), '이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.');
+    await page.locator('#guest-input').evaluate(input => { input.value = ''; });
     console.log('PASS  multi-line memo field, diagram file extensions, whole-diagram Markdown and single-line paste');
+
+    // Replies take several lines and render Markdown and diagrams, each in its own preview.
+    await page.locator('#reply-compose > summary').click();
+    const replyInput = page.locator('#reply-input');
+    await replyInput.click();
+    await page.keyboard.type('**굵은** 답장');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('- 항목');
+    await page.keyboard.press('Enter');
+    const replyArticle = text => page.locator('#detail-replies article').filter({hasText: text});
+    await replyArticle('항목').locator('.reply-preview strong').getByText('굵은', {exact: true}).waitFor();
+    assert.deepEqual(await replyArticle('항목').locator('.reply-preview li').allTextContents(), ['항목']);
+    assert.equal(await replyArticle('항목').locator('.reply-original').isVisible(), false);
+    await replyArticle('항목').locator('.reply-source-toggle').click();
+    assert.equal(await replyArticle('항목').locator('.reply-original').textContent(), '**굵은** 답장\n- 항목');
+    await replyArticle('항목').locator('.reply-source-toggle').click();
+    await replyInput.fill(mermaidSequence);
+    await replyInput.press('Enter');
+    await assertDiagrams(page, [diagramLabels[1]], '#detail-replies');
+    await assertDiagrams(page, [diagramLabels[3]]);
+    await replyInput.fill('그냥 한 줄 답장');
+    await replyInput.press('Enter');
+    const plainReply = replyArticle('그냥 한 줄 답장');
+    await plainReply.locator('.reply-original:visible').waitFor();
+    assert.equal(await plainReply.locator('.reply-source-toggle').isVisible(), false);
+    assert.equal(await plainReply.locator('.reply-preview').textContent(), '');
+    const storedReplies = JSON.parse(await diskFile('jjokmun-vault.json')).payload.state.memos
+      .flatMap(memo => memo.replies.map(reply => reply.text));
+    assert.ok(storedReplies.includes('**굵은** 답장\n- 항목'));
+    assert.ok(storedReplies.includes(mermaidSequence));
+    // The edit dialog keeps line breaks typed with Shift+Enter and still saves on Enter.
+    await openSection(page, 'memo-tools');
+    await replyArticle('항목').locator('[data-action="edit"]').click();
+    const replyEditor = page.locator('#reply-edit-input');
+    assert.equal(await replyEditor.inputValue(), '**굵은** 답장\n- 항목');
+    await replyEditor.fill('수정한 답장');
+    await replyEditor.press('Shift+Enter');
+    await replyEditor.press('End');
+    await page.keyboard.type('둘째 줄');
+    await replyEditor.press('Enter');
+    await page.locator('#detail-status').getByText('답장을 수정했어요.', {exact: true}).waitFor();
+    assert.equal(await replyArticle('둘째 줄').locator('.reply-original:visible').textContent(), '수정한 답장\n둘째 줄');
+    const accepted = await page.evaluate(async () => {
+      const {validateBackup} = await import('./store.js');
+      const state = {version: 1, daily: [], props: [], memos: [{id: 'm', text: '메모', createdOn: '2031-05-11', updatedAt: 1,
+        replies: [{id: 'r', text: '첫 줄\n둘째 줄', createdOn: '2031-05-11', createdAt: 1}]}]};
+      return validateBackup(state).memos[0].replies[0].text;
+    });
+    assert.equal(accepted, '첫 줄\n둘째 줄');
+    console.log('PASS  multi-line replies with per-reply Markdown and diagram previews, edit dialog and backup validation');
 
     // Queue a Markdown render and immediately switch to a standalone diagram.
     await page.evaluate(markdownPath => {

@@ -14,6 +14,7 @@ import { bindPortraits } from './ui/bookshop.js';
 import { bindGuestVisit } from './ui/guest-visit.js';
 import { bindSalesFloor } from './ui/sales-floor.js';
 import { bindDocumentPreview } from './ui/document-preview.js';
+import { bindReplyPreviews } from './ui/reply-previews.js';
 import { activity, monthlyProgress, reviewYear, seasonOf, shopGrade, yearReview } from './season.js';
 
 const channel = new BroadcastChannel('memo-alley');
@@ -57,11 +58,13 @@ const folderFiles = bindFolderFiles({
   canOpenMemo: path => mode === 'plain' && Boolean(documentAt(path)),
   openMemo: openDocumentAt
 });
-const documentPreview = bindDocumentPreview({
+const previewSources = {
   folder: () => mode === 'plain' ? folderConnection()?.directory : undefined,
   hasDocument: path => Boolean(documentAt(path)),
   openDocument: openDocumentAt
-});
+};
+const documentPreview = bindDocumentPreview(previewSources);
+const replyPreviews = bindReplyPreviews(previewSources);
 
 function currentMemo() {
   return state.memos.find((memo) => memo.id === detailId);
@@ -88,6 +91,7 @@ function clearSensitive(showLock) {
   guestVisit.reset();
   folderFiles.reset();
   documentPreview.reset();
+  replyPreviews.reset();
   resetEdit();
   resetArchive();
   element('folder-start-status').textContent = '';
@@ -159,6 +163,7 @@ function switchView() {
   } else {
     pendingArchiveChoice = undefined;
     documentPreview.reset();
+    replyPreviews.reset();
     if (workspaceReady) salesFloor.update(state, displayedDate);
   }
   if (leavingJournal) {
@@ -693,7 +698,9 @@ function renderDetail() {
   const container = element('detail-replies');
   const focused = container.contains(document.activeElement) ? document.activeElement : undefined;
   container.replaceChildren();
+  replyPreviews.prune(new Set(replies.map(reply => reply.id)));
   if (!replies.length) return;
+  const rendering = document.body.classList.contains('journal-view');
   const label = document.createElement('h3');
   label.textContent = '답장';
   container.append(label);
@@ -707,8 +714,7 @@ function renderDetail() {
       tag.textContent = '검색어가 있는 답장';
       article.append(tag);
     }
-    const text = document.createElement('p');
-    text.textContent = reply.text;
+    const text = replyPreviews.bodyFor(reply, memo, rendering);
     const header = document.createElement('div');
     header.className = 'reply-heading';
     const actions = element('reply-actions-template').content.cloneNode(true);
@@ -817,7 +823,10 @@ function renderSelection() {
   document.querySelector('.notebook').hidden = !state.memos.length;
   element('detail-dialog').hidden = !hasMemo;
   element('note-empty').hidden = hasMemo;
-  if (!hasMemo) documentPreview.reset();
+  if (!hasMemo) {
+    documentPreview.reset();
+    replyPreviews.reset();
+  }
   if (hasMemo) {
     // The shelf holds one memo, so show what a new pick would replace.
     const displayId = state.shop?.displayMemoId;
