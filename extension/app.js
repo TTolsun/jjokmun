@@ -4,10 +4,10 @@ import { createTime, element, formatDate, longDate, memoExcerpt } from './ui/dom
 import { focusArchiveReturn, newestMemos, renderArchive, resetArchive, setArchiveOpen } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
-import { DocumentConflictError, DocumentWriteError, folderConnection, useFolder, reconnectFolder, relinkDocument } from './vault.js';
+import { DocumentConflictError, DocumentWriteError, folderConnection, copyVaultToFolder, useFolder, reconnectFolder, relinkDocument } from './vault.js';
 import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
-import { detectFormat, documentChanged } from './documents.js';
+import { checkMemoSize, detectFormat, documentChanged } from './documents.js';
 import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindPortraits } from './ui/bookshop.js';
@@ -136,8 +136,11 @@ function renderPayload(result, date, storageMode = mode) {
   element('lock-screen').hidden = true;
   element('startup-status').hidden = true;
   element('undo-import').disabled = !result.payload.undo;
-  element('enable-vault').hidden = mode !== 'plain';
-  element('disable-vault').hidden = mode !== 'encrypted';
+  const encrypted = mode === 'encrypted';
+  for (const notice of document.querySelectorAll('.legacy-writing')) notice.hidden = !encrypted;
+  for (const id of ['memo-form', 'floor-memo-form']) element(id).hidden = encrypted;
+  document.querySelector('label[for="memo-input"]').hidden = encrypted;
+  element('copy-vault').hidden = !encrypted;
   element('lock-vault').hidden = mode !== 'encrypted';
   element('refresh-documents').hidden = mode !== 'plain';
   setStatus('vault-state', mode === 'encrypted'
@@ -247,6 +250,7 @@ async function change(mutator) {
 function render(date, months, grade) {
   displayedDate = date;
   guestVisit.render(state, date);
+  if (mode === 'encrypted' && !state.shop?.guestMemoId) element('guest-form').hidden = true;
   element('today-date').textContent = formatDate(date, longDate);
   const entry = state.daily.find((record) => record.date === date);
   const memo = !entry?.folded && state.memos.find((note) => note.id === entry?.memoId);
@@ -461,6 +465,8 @@ function textSaveError(error) {
 }
 
 function newMemo(text, date) {
+  if (mode === 'encrypted') throw new DocumentWriteError('새 메모를 쓰려면 먼저 일반 폴더로 복사해 주세요.');
+  checkMemoSize(text);
   const now = Date.now();
   return { id: crypto.randomUUID(), text, documentFormat: detectFormat(text), createdOn: date, createdAt: now, updatedAt: now, replies: [] };
 }
@@ -586,6 +592,7 @@ bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (tex
         return false;
       }
       if (memo.text === text || (base.documentPath && text === base.text.replace(/\r\n?/g, '\n'))) return false;
+      if (!base.documentPath) checkMemoSize(text);
       memo.text = text;
       memo.updatedAt = Math.min(8640000000000000, Math.max(Date.now(), memo.updatedAt + 1));
     });
@@ -1130,6 +1137,58 @@ async function chooseFolder(button, reopen) {
 element('choose-first-folder').addEventListener('click', event => chooseFolder(event.currentTarget, Boolean(lastDirectory)));
 element('choose-new-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('choose-locked-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
+const copyDialog = element('vault-copy-dialog');
+let copyTarget;
+
+async function chooseCopyTarget(event) {
+  const status = event.currentTarget.closest('#settings-dialog') ? 'settings-status'
+    : event.currentTarget.closest('#floor') ? 'floor-memo-status' : 'home-status';
+  const expected = viewGeneration;
+  try {
+    const target = await window.showDirectoryPicker({ mode: 'readwrite', id: 'jjokmun-copy' });
+    if (expected !== viewGeneration || mode !== 'encrypted') return;
+    copyTarget = target;
+    setStatus('vault-copy-description', '「' + folderConnection().directory.name + '」의 기록을 「' + target.name
+      + '」에 평문으로 복사합니다. 연결된 문서는 두 폴더에서 같은 상대 경로로 찾을 수 있습니다.');
+    setStatus('vault-copy-status', '');
+    copyDialog.showModal();
+  } catch (error) {
+    if (error.name !== 'AbortError' && expected === viewGeneration) setStatus(status, error.message);
+  }
+}
+for (const button of document.querySelectorAll('#copy-vault, .legacy-writing button')) button.addEventListener('click', chooseCopyTarget);
+element('vault-copy-cancel').addEventListener('click', () => copyDialog.close());
+copyDialog.addEventListener('close', () => {
+  copyTarget = undefined;
+  element('vault-copy-description').textContent = '';
+  element('vault-copy-status').textContent = '';
+});
+copyDialog.addEventListener('cancel', event => {
+  if (element('vault-copy-confirm').disabled) event.preventDefault();
+});
+element('vault-copy-confirm').addEventListener('click', async event => {
+  const target = copyTarget;
+  if (!target) return;
+  const expected = viewGeneration;
+  const button = event.currentTarget;
+  button.disabled = element('vault-copy-cancel').disabled = true;
+  setStatus('vault-copy-status', '문서를 복사하고 메모와 답장을 다시 읽어 확인하고 있습니다.');
+  try {
+    await copyVaultToFolder(target);
+    if (expected !== viewGeneration) return;
+    const remembered = await useFolder(target, { reopen: true, copyCurrent: false });
+    clearSensitive(false);
+    await refresh();
+    setStatus('home-status', '「' + target.name + '」에 복사한 메모와 답장을 확인했습니다.'
+      + (remembered ? '' : ' 다음 실행 때 이 폴더를 다시 선택해 주세요.'));
+    showView('#journal');
+  } catch (error) {
+    if (expected === viewGeneration) setStatus('vault-copy-status', '복사를 마치지 못했습니다. ' + error.message);
+  } finally {
+    button.disabled = element('vault-copy-cancel').disabled = false;
+  }
+});
+
 element('choose-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('storage-relocate').addEventListener('click', event => chooseFolder(event.currentTarget, true));
 element('storage-reconnect').addEventListener('click', async () => {
@@ -1150,7 +1209,6 @@ const clearBackupDialogs = bindBackupDialogs({
   today,
   setStatus,
   announce,
-  refresh,
   renderResult: renderPayload
 });
 
@@ -1185,7 +1243,8 @@ element('unlock-form').addEventListener('submit', async (event) => {
     await unlockVault(password);
     if (expected !== viewGeneration) return;
     await refresh();
-    if (workspaceReady) element('memo-input').focus();
+    if (workspaceReady) document.querySelector(document.body.classList.contains('journal-view')
+      ? '.writing .legacy-writing button' : '#floor .legacy-writing button').focus();
   } catch (error) {
     if (expected === viewGeneration) {
       setStatus('unlock-status', error.message || '저장소를 열지 못했습니다.');

@@ -1,3 +1,4 @@
+const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const assert = require('node:assert/strict');
 const {openSection, selectFolder} = require('./browser.cjs');
 
@@ -383,12 +384,12 @@ async function checkRendering(session) {
     assert.equal(await preview.getByRole('heading', {name: '수정한 기록'}).count(), 0);
 
     const password = 'test-only rendering vault password';
-    await page.evaluate(async password => {
-      const {enableVault, lockVault} = await import('./vault.js');
-      await enableVault(password);
+    await seedEncryptedVault(page, password);
+    await page.evaluate(async () => {
+      const {lockVault} = await import('./vault.js');
       await lockVault();
       window.dispatchEvent(new Event('focus'));
-    }, password);
+    });
     await page.locator('#lock-screen').waitFor();
     assert.equal(await preview.textContent(), '');
     assert.equal(await raw.textContent(), '');

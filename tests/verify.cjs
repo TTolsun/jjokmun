@@ -1,3 +1,4 @@
+const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -192,7 +193,7 @@ async function createSource(session) {
   try {
     await existing.locator(':is(#detail-original, #detail-preview):visible').getByText(folderMemo, {exact:true}).waitFor();
     assert.deepEqual(await rawRecord(existing), plain);
-    await existing.evaluate(async pass => (await import('./vault.js')).enableVault(pass), vaultPass);
+    await seedEncryptedVault(existing, vaultPass);
     const encrypted = await rawRecord(existing);
     await existing.reload();
     await assertLocked(existing);
@@ -255,7 +256,6 @@ async function createSource(session) {
 
 async function checkVault(session, a) {
   const b = await session.tab(monday);
-  const before = await rawRecord(a);
   await settings(a);
   await openSection(a, 'about-tools');
   const developer = a.getByRole('region', {name: '개발자 정보'});
@@ -263,13 +263,9 @@ async function checkVault(session, a) {
   const email = developer.getByRole('link', {name: 'baboess@gmail.com'});
   assert.equal(await email.getAttribute('href'), 'mailto:baboess@gmail.com');
   await openSection(a, 'storage-tools');
-  await a.locator('#enable-vault').click();
-  await forceNextWriteToFail(a);
-  await password(a,vaultPass);
-  await a.waitForFunction(()=>!document.querySelector('#backup-password-submit').disabled);
-  assert.deepEqual(await rawRecord(a),before);
-  if (!await a.locator('#backup-password-dialog').isVisible()) await a.locator('#enable-vault').click();
-  await password(a,vaultPass);
+  assert.equal(await a.locator('#enable-vault').count(), 0);
+  await seedEncryptedVault(a, vaultPass);
+  await b.evaluate(() => window.dispatchEvent(new Event('focus')));
   await assertLocked(b);
   const encrypted = await rawRecord(a);
   assert.equal(encrypted.mode,'encrypted');
@@ -277,10 +273,9 @@ async function checkVault(session, a) {
   await unlock(b);
   await openSection(b, 'memo-search');
   await b.locator('#archive-search').fill('미저장 비밀 문장');
-  await b.locator('#memo-input').fill('미저장 비밀 문장');
+  await b.locator('#reply-input').fill('미저장 비밀 문장');
   await b.locator('#floor-link').click();
-  await b.locator('#guest-input').fill('미저장 비밀 문장');
-  await b.locator('#floor-memo-input').fill('미저장 비밀 문장');
+  assert.equal(await b.locator('#floor-memo-form').isVisible(), false);
   await settings(b);
   await upload(b, Buffer.from(JSON.stringify(await readState(b))));
   await b.locator('#import-preview-dialog').waitFor();
@@ -328,7 +323,7 @@ async function checkVault(session, a) {
   await a.locator('#archive-list button').first().click();
   await a.locator('.linked-reply p').getByText(reply, {exact:true}).waitFor();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
-  console.log('PASS  encryption transition rollback, encrypted live record, two-tab lock and draft scrubbing, wrong password and bookstore recovery');
+  console.log('PASS  legacy encrypted record, two-tab lock and draft scrubbing, wrong password and bookstore recovery');
 }
 
 async function checkRecovery(session, bytes, initial) {
@@ -337,10 +332,6 @@ async function checkRecovery(session, bytes, initial) {
   await a.locator('#today-date').waitFor();
   await settings(a);
   await openSection(a, 'storage-tools');
-  await a.locator('#enable-vault').click();
-  await password(a,vaultPass);
-  await assertLocked(b);
-  await unlock(b);
   const original = await readState(a);
   for (const corrupt of [false,true]) {
     const file = JSON.parse(bytes);
@@ -361,7 +352,7 @@ async function checkRecovery(session, bytes, initial) {
     if (await a.locator('#backup-password-dialog').isVisible()) await a.locator('#backup-password-cancel').click();
     assert.deepEqual(await readState(a),original);
   }
-  await upload(a,Buffer.alloc(8*1024*1024+1,32));
+  await upload(a,Buffer.alloc(48*1024*1024+1,32));
   await a.waitForFunction(() => /크기|용량|MiB|MB/i.test(document.querySelector('#settings-status').textContent));
   assert.deepEqual(await readState(a),original);
   await upload(a,bytes);
@@ -391,7 +382,6 @@ async function checkRecovery(session, bytes, initial) {
   await upload(a,bytes); await password(a,backupPass); await commitPreview(a);
   assert.deepEqual((await readState(a)).memos,restored.memos);
   assert.deepEqual(await a.evaluate(async ()=>(await (await import('./vault.js')).readPayload()).payload.undo),previousUndo);
-  assert.ok(!JSON.stringify(await rawRecord(a)).includes(note));
   await write(b,localNote);
   // A later change to a previously imported note must survive selective undo.
   await b.locator('#archive-list button').filter({hasText:legacyText}).click();
@@ -401,7 +391,6 @@ async function checkRecovery(session, bytes, initial) {
   await b.locator('#edit-save').click();
   await b.waitForFunction(()=>document.querySelector('#detail-original').textContent==='가져오기 뒤 수정한 원문');
   await a.reload();
-  await unlock(a);
   await settings(a);
   await openSection(a, 'backup-tools');
   await a.locator('#undo-import').click();
@@ -424,14 +413,12 @@ async function checkRecovery(session, bytes, initial) {
   await commitPreview(a);
   assert.ok((await readState(a)).memos.some(m=>m.text===note));
   await openSection(a, 'storage-tools');
-  await a.locator('#disable-vault').click();
-  await password(a,vaultPass);
-  await a.waitForFunction(()=>!document.querySelector('#enable-vault').hidden);
-  assert.equal((await rawRecord(a)).mode,'plain');
+  assert.equal((await rawRecord(a)).mode, 'plain');
   console.log('PASS  fresh encrypted restore, wrong/damaged/oversized files, failed commit, old JSON, stale preview, idempotence and conflict-preserving undo');
 }
 
 async function run() {
+  await require('./vault-copy.cjs').checkVaultCopy();
   await require('./undo.cjs').checkPlainJournal();
   await require('./undo.cjs').checkLegacyFieldOrder();
   await require('./regulars.cjs').checkBondRules();

@@ -1,11 +1,12 @@
+import { copySnapshot } from './vault-copy.js';
 import { readVaultFile, writeVaultFile, unreadableVaultMessage, FolderAccessError } from './folder.js';
 import { rememberFolder } from './last-folder.js';
 import { legacySnapshot, removeMigratedProfile } from './legacy-profile.js';
 import { backupSnapshot, emptyState, validateBackup } from './store.js';
-import { deriveKey, newSalt, requireNewPassword, seal, unseal } from './crypto.js';
+import { deriveKey, seal, unseal } from './crypto.js';
 import {
   invalidateDocumentInventory, openDocuments, persistentDocuments, prepareDocuments,
-  relinkInPayload, rememberDocumentRevision, resumeDocuments, storeDocumentHandles, suspendDocuments
+  relinkInPayload, rememberDocumentRevision, storeDocumentHandles
 } from './documents.js';
 
 export { DocumentConflictError, DocumentWriteError } from './documents.js';
@@ -75,12 +76,8 @@ export function useFolder(directory, { reopen = false, remember = true, copyCurr
         await openDocuments(previous.directory, current.payload);
         const state = validateBackup(backupSnapshot(current.payload.state), { local: true });
         current = { ...current, payload: { state, undo: current.payload.undo } };
-      } else if (previous && current.mode === 'encrypted' && session?.location === previous.id && session.epoch === current.epoch) {
-        const payload = await unseal(current, session.key, 'vault');
-        if (payload.documents) {
-          delete payload.documents;
-          current = { ...current, ...await seal(payload, session.key, current.salt, 'vault') };
-        }
+      } else if (previous && current.mode === 'encrypted') {
+        throw new Error('일반 폴더로 복사를 선택한 뒤 대상 폴더를 지정해 주세요.');
       }
       assertGeneration(expected);
       const written = await writeVaultFile(directory, current, true);
@@ -222,31 +219,6 @@ export async function transact(change) {
   return (await readPayload(change, { createFiles: false })).payload.state;
 }
 
-export async function enableVault(password) {
-  requireNewPassword(password);
-  const expected = generation;
-  const salt = newSalt();
-  const key = await deriveKey(password, salt);
-  const { replacement, location } = await access(async (record, put, directory) => {
-    assertGeneration(expected);
-    if (record.mode !== 'plain') throw new LockedError();
-    const documents = await openDocuments(directory, record.payload);
-    await suspendDocuments(record.payload);
-    invalidateDocumentInventory(directory);
-    const replacement = {
-      format: 2, revision: record.revision + 1, epoch: record.epoch + 1, mode: 'encrypted',
-      ...await seal(record.payload, key, salt, 'vault')
-    };
-    await storeDocumentHandles(documents);
-    assertGeneration(expected);
-    put(replacement);
-    return { replacement, location: record[locationKey] };
-  });
-  assertGeneration(expected);
-  session = { epoch: replacement.epoch, location, key };
-  generation += 1;
-}
-
 export async function unlockVault(password) {
   if (!password || password.length > 256) throw new Error('저장소 비밀번호를 입력해 주세요.');
   const expected = generation;
@@ -260,26 +232,14 @@ export async function unlockVault(password) {
   generation += 1;
 }
 
-export async function disableVault(password) {
+export function copyVaultToFolder(target) {
   const expected = generation;
-  const first = await access();
-  if (first.mode !== 'encrypted' || session?.epoch !== first.epoch) throw new LockedError();
-  if (!password || password.length > 256) throw new Error('저장소 비밀번호를 입력해 주세요.');
-  const key = await deriveKey(password, first.salt);
-  for (let retry = 0; retry < MAX_WRITE_ATTEMPTS; retry += 1) {
-    const record = await access();
+  return access(async (record, _put, source) => {
+    if (record.mode !== 'encrypted' || session?.epoch !== record.epoch || session.location !== record[locationKey]) throw new LockedError();
+    const payload = await unseal(record, session.key, 'vault');
+    await copySnapshot(source, target, record, payload, () => assertGeneration(expected));
     assertGeneration(expected);
-    assertEpoch(record, first);
-    const payload = await unseal(record, key, 'vault');
-    await resumeDocuments(payload);
-    const replacement = { format: 2, revision: record.revision + 1, epoch: record.epoch + 1, mode: 'plain', payload: persistentDocuments(payload) };
-    if (await saveCompared(record, replacement, expected)) {
-      assertGeneration(expected);
-      dropVaultKey();
-      return;
-    }
-  }
-  throw new Error('다른 탭에서 저장 중입니다. 다시 시도해 주세요.');
+  });
 }
 
 export async function lockVault() {

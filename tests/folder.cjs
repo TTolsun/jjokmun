@@ -1,3 +1,4 @@
+const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const { openSection } = require('./browser.cjs');
 const {selectFolder} = require('./browser.cjs');
 const assert = require('node:assert/strict');
@@ -120,6 +121,7 @@ async function checkFolder(session) {
     await page.locator('#storage-reconnect').click();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
+    await seedEncryptedVault(page, 'sample folder password');
     const stored = await page.evaluate(async () => {
       const vault = await import('./vault.js');
       const folder = await vault.folderConnection();
@@ -127,7 +129,6 @@ async function checkFolder(session) {
       const read = async () => JSON.parse(await (await handle.getFile()).text());
       const titles = (await vault.transact()).memos.map(m => m.text);
       const profileState = (await indexedDB.databases()).find(db => db.name === 'memo-alley');
-      await vault.enableVault('sample folder password');
       const encrypted = await read();
       await vault.lockVault();
       await vault.unlockVault('sample folder password');
