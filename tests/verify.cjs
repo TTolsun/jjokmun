@@ -306,11 +306,17 @@ async function checkVault(session, a) {
   await petAction(owner, 'play');
   await petButton(owner, 'b');
   await owner.locator('#pet-game[data-phase="aim"]').waitFor();
+  await owner.locator('#pet-collection-open').click();
+  await owner.locator('#pet-collection [data-discovered-form="fire-pup"]').waitFor();
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
   assert.equal(await pet.isVisible(), false);
   await owner.locator('#pet-popover').waitFor({state:'hidden'});
+  assert.equal(await owner.locator('#pet-collection-dialog').evaluate(dialog => dialog.open), false);
+  assert.equal(await owner.locator('#pet-collection [data-discovered-form]').count(), 0);
+  assert.equal(await owner.locator('#pet-collection-families button:is(:not([hidden]), [aria-pressed])').count(), 0);
+  assert.equal(await owner.locator('#pet-discovery-progress:is([max], [value])').count(), 0);
   assert.equal(await owner.locator('#pet-game').getAttribute('data-phase'), null);
   await unlock(owner);
   await owner.locator('#pet-expand[aria-expanded="false"]').waitFor();

@@ -289,13 +289,19 @@ async function checkPet(session) {
     await page.clock.setFixedTime(startedAt + elapsed);
     await page.reload();
   };
-  const discovered = page.locator('#pet-collection li:not(.undiscovered)');
+  const collection = page.locator('#pet-collection');
+  const openCollection = page.locator('#pet-collection-open');
   const memo = '창가에서 불 강아지를 만난 날';
   try {
     await page.clock.setFixedTime(startedAt);
     await peer.clock.setFixedTime(startedAt);
     await page.locator('#pet').waitFor();
     await collapsed.waitFor();
+    await liftPet(page);
+    await openCollection.click();
+    await collection.getByText(/알을 데려오면/).waitFor();
+    await page.keyboard.press('Escape');
+    assert.equal(await openCollection.evaluate(button => button === document.activeElement), true);
     await action('adopt');
     await page.locator('#pet-status').getByText(/알을 데려왔어요/).waitFor();
     await idle.waitFor();
@@ -404,7 +410,6 @@ async function checkPet(session) {
     await later(finalGrowth);
     await showForm('fire-runner-scout');
     assert.ok((await readPet(peer)).discovered.includes('fire-runner-scout'));
-    assert.equal(await discovered.count(), 4);
     assert.match(await page.locator('#pet-collection-count').innerText(), /4 \/ 40/);
 
     await liftPet(page);
@@ -412,9 +417,18 @@ async function checkPet(session) {
     await page.locator('#pet-state[data-page="meters"] progress#pet-hunger').waitFor();
     await petButton(page, 'a');
     await page.locator('#pet-path').getByText('불뭉이 → 불달이 → 봉홧불이').waitFor();
-    await page.locator('#pet-collection-panel > summary').click();
-    await page.locator('[data-discovered-form="fire-runner-scout"]').getByText('봉홧불이', {exact: true}).waitFor();
-    await page.locator('#pet-collection-panel > summary').click();
+    await openCollection.click();
+    await collection.locator('[data-discovered-form="fire-runner-scout"]').getByText('돌보는 중').waitFor();
+    await collection.getByText('불뭉이 → 불달이 → 봉홧불이').waitFor();
+    assert.equal(await collection.locator('li').count(), 3);
+    const filters = page.getByRole('group', {name: '계열 선택'});
+    await filters.getByRole('button', {name: '알', exact: true}).click();
+    assert.equal(await collection.locator('li[data-discovered-form="egg"]').count(), 1);
+    await page.setViewportSize({width: 320, height: 520});
+    await filters.getByRole('button', {name: '불 강아지'}).click();
+    assert.equal(await collection.evaluate(book => book.scrollWidth <= book.clientWidth), true);
+    await page.getByRole('button', {name: '성장 도감 닫기'}).click();
+    await page.setViewportSize({width: 1280, height: 840});
     await action('sleep');
     const wake = (await readPet(page)).sleepUntil;
     assert.ok(wake > startedAt + finalGrowth);
@@ -468,6 +482,10 @@ async function checkPet(session) {
     await page.locator('#pet-summary-sprite[src$="/cuddler.png"]').evaluate(img => img.decode());
     assert.deepEqual((await readPet(page)).discovered, old.discovered);
     assert.match(await page.locator('#pet-collection-count').innerText(), /3 \/ 44/);
+    await liftPet(page);
+    await openCollection.click();
+    await collection.locator('[data-discovered-form="cuddler"]').getByText('돌보는 중').waitFor();
+    await page.keyboard.press('Escape');
     await action('newEgg');
     await confirmNewEgg(page);
     await page.locator('#pet-habitat[data-form="egg"]').waitFor({state:'attached'});
@@ -499,20 +517,19 @@ async function checkFamilyCollection(session) {
       await page.locator('#pet-lcd-name').getByText('알', {exact: true}).waitFor();
       await page.locator('#pet-sprite[src$="/egg.png"]').waitFor();
       assert.match(await page.locator('#pet-collection-count').textContent(), /1 \/ 40/);
+      await page.locator('#pet-collection-open').click();
       assert.equal(await collection.locator('img[src*="' + family + '-"]').count(), 0);
       assert.equal(await collection.locator('[data-discovered-form]').count(), 1);
       assert.doesNotMatch(await collection.textContent(), /불 강아지|물 고양이|풀 햄스터/);
       await page.clock.setFixedTime(now + HATCH_MS);
-      await page.reload();
       await page.locator('#pet-habitat[data-form="' + child + '"]').waitFor({state:'attached'});
       await page.locator('#pet-summary-sprite[src$="/' + child + '.png"]').evaluate(img => img.decode());
-      await liftPet(page);
-      await page.locator('#pet-collection-panel > summary').click();
-      await collection.locator('[data-discovered-form="' + child + '"]').waitFor({state:'attached'});
+      await collection.locator('[data-discovered-form="' + child + '"]').getByText('돌보는 중').waitFor();
       assert.match(await page.locator('#pet-collection-count').textContent(), /2 \/ 40/);
       for (const [other] of families) {
         if (family !== other) assert.equal(await collection.locator('img[src*="' + other + '-"]').count(), 0);
       }
+      await page.keyboard.press('Escape');
 
       await petAction(page, 'play');
       await finishBallGame(page);
