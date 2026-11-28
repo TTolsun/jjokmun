@@ -403,6 +403,9 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
   input.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
     if (composing || event.isComposing || event.keyCode === 229) {
+      // An Enter that ends an IME syllable (Korean, on Windows Chrome) arrives only as this
+      // composing keydown, so a textarea line break must not be cancelled here.
+      if (input.localName === 'textarea' && (event.shiftKey || !('enterSubmits' in input.dataset))) return;
       event.preventDefault();
     } else if ('enterSubmits' in input.dataset && !event.shiftKey) {
       // Memo fields are textareas that still save on Enter; Shift+Enter adds a line.
