@@ -54,9 +54,7 @@ export function bindReplyPreviews({ folder, hasDocument, openDocument }) {
     views.delete(view.id);
   }
 
-  // Returns the element to place under the reply's heading. Rendering is requested only
-  // when `render` is true, which the journal view sets.
-  function bodyFor(reply, memo, render) {
+  function bodyFor(reply, memo) {
     const path = memo.documentPath;
     let view = views.get(reply.id);
     if (view && (view.text !== reply.text || view.path !== path)) {
@@ -67,7 +65,7 @@ export function bindReplyPreviews({ folder, hasDocument, openDocument }) {
       view = create(reply, path);
       views.set(reply.id, view);
     }
-    if (render && !view.requested) {
+    if (!view.requested) {
       view.requested = true;
       observer.observe(view.body);
     }

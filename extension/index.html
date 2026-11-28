@@ -13,210 +13,241 @@
       <img src="icon-32.png" width="30" height="30" alt="">
       <span>jjokmun</span>
     </div>
-    <nav aria-label="작업 화면 이동">
-      <a href="#floor" id="floor-link">책방</a>
-      <button type="button" id="open-archive">메모장</button>
+    <nav aria-label="쪽문 설정">
       <button type="button" id="open-settings">설정</button>
     </nav>
   </header>
 
   <main class="workspace" hidden>
-    <section id="floor" aria-labelledby="floor-title">
-      <div class="floor-heading"><div><p class="floor-date" id="business-day"></p><h1 id="floor-title" tabindex="-1">골목 책방</h1></div><strong id="business-phase"></strong></div>
-      <form id="floor-memo-form" class="floor-memo" autocomplete="off">
-        <label class="field-label" for="floor-memo-input">한 줄을 쓰면 새 책이 되어 신간 매대에 꽂혀요</label>
-        <div class="inline-form">
-          <textarea id="floor-memo-input" rows="1" data-enter-submits placeholder="오늘 떠오른 생각을 적어 보세요 (Shift+Enter로 줄바꿈)" required></textarea>
-          <button id="floor-memo-save" type="submit">책 꽂기</button>
-        </div>
-      </form>
-      <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
-      <p class="status" id="floor-memo-status" role="status"></p>
-      <div class="floor-layout">
-        <div>
-          <div id="sales-floor">
-            <canvas id="business-room" width="256" height="152" role="img" aria-label="손님들이 서가에서 책을 고르고 계산대로 걸어가는 책방"></canvas>
-            <canvas id="business-people" width="256" height="152" aria-hidden="true"></canvas>
-            <div id="furniture-handles" role="group" aria-label="움직일 가구" aria-describedby="floor-help"></div>
-          </div>
-          <p id="floor-event"></p>
-          <div class="owners-pick" hidden><span>주인의 추천글</span><p id="business-pick"></p></div>
-          <section class="guest-visit" aria-labelledby="writing-title">
-            <p class="floor-kicker">오늘 들른 손님</p>
-            <div class="guest-byline"><canvas id="guest-portrait" width="24" height="32" aria-hidden="true"></canvas><span>스케치북을 든 연두</span></div>
-            <h2 id="writing-title" tabindex="-1">첫 장을 펴는 용기</h2>
-            <p id="guest-speech"></p>
-            <blockquote id="guest-page" hidden></blockquote>
-            <p id="guest-reaction" hidden></p>
-            <form id="guest-form" autocomplete="off">
-              <label class="field-label" for="guest-input" id="guest-label">연두에게 건넬 한 줄</label>
-              <div class="inline-form"><input type="text" id="guest-input" maxlength="2000" required><button type="submit" id="guest-submit">글 건네기</button></div>
-            </form>
-            <button type="button" id="guest-choose" hidden>써 둔 메모에서 고르기</button>
-            <p class="status" role="status" id="guest-status"></p>
-          </section>
-          <section class="roster" aria-labelledby="roster-title">
-            <div class="section-heading"><h3 id="roster-title">단골 명부</h3><span id="roster-count" class="count"></span></div>
-            <p id="roster-tally"></p>
-            <ol id="roster-list"></ol>
-          </section>
-        </div>
-        <section class="ledger" aria-labelledby="ledger-title">
-          <h2 id="ledger-title">오늘의 책방</h2>
-          <dl class="ledger-values"><div><dt>가게 안 손님</dt><dd id="floor-guests"></dd></div><div><dt>오늘 팔린 내 책</dt><dd id="floor-sold"></dd></div></dl>
-          <div class="sold-books">
-            <h3>팔린 책</h3>
-            <p id="sold-empty"></p>
-            <ol id="sold-list"></ol>
-          </div>
-          <section class="daily" aria-labelledby="daily-title">
-            <div class="section-heading"><h3 id="daily-title">다시 찾는 책</h3></div>
-            <p id="daily-empty">며칠 지난 책은 손님이 다시 찾아와요.</p>
-            <div id="daily-board" hidden>
-              <button type="button" id="daily-memo">
-                <span id="daily-request"></span>
-                <span id="daily-excerpt"></span>
-                <span class="daily-read" aria-hidden="true">다시 읽고 답장</span>
-              </button>
-              <button type="button" id="defer-memo">오늘은 접어두기</button>
-            </div>
-          </section>
-          <section class="season" aria-labelledby="season-title">
-            <div class="section-heading"><h3 id="season-title">이달의 목표</h3><span id="season-name" class="count"></span></div>
-            <ul id="goal-list"></ul>
-            <p id="shop-grade"></p>
-            <p id="goal-status" class="status" role="status"></p>
-          </section>
-          <section id="year-review" class="year-review" aria-labelledby="review-title" hidden>
-            <div class="section-heading"><h3 id="review-title"></h3></div>
-            <dl id="review-stats"></dl>
-          </section>
-          <p id="floor-help">가구는 끌어서 옮길 수 있어요. 키보드로는 가구에 초점을 맞추고 방향키를 누르세요.</p>
-          <button id="retry-floor" type="button" hidden>영업 기록 다시 저장</button>
-          <p id="business-status" role="status"></p>
-        </section>
-      </div>
-    </section>
-    <section class="writing" aria-labelledby="journal-title">
-      <div class="writing-copy">
-        <p id="today-date" class="today-date"></p>
-        <h1 id="journal-title">메모장</h1>
-        <label class="field-label" for="memo-input">오늘 남겨둘 생각은?</label>
-        <form id="memo-form" autocomplete="off">
-          <textarea id="memo-input" rows="1" data-enter-submits placeholder="새 메모를 적어 보세요 (Shift+Enter로 줄바꿈)" required></textarea>
-          <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
-        </form>
-        <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
-        <p class="status" id="home-status" role="status"></p>
-      </div>
-    </section>
-    <button id="archive-toggle" type="button" aria-expanded="false" aria-controls="memo-archive">전체 메모</button>
-    <aside id="memo-archive" class="archive panel" aria-labelledby="archive-title">
-      <div class="section-heading">
-        <h2 id="archive-title">전체 메모</h2>
-        <span id="memo-count" class="count" aria-label="메모 수">0</span>
-      </div>
-      <button id="refresh-documents" class="document-action" type="button" hidden>폴더 문서 새로고침</button>
-      <p id="document-refresh-status" class="status" role="status"></p>
-      <details id="memo-search" class="journal-disclosure">
-        <summary>메모 검색</summary>
-        <label class="search-field">
-          <span class="search-icon" aria-hidden="true"></span>
-          <input id="archive-search" type="search" aria-label="원문, 답장, 파일 경로 검색" placeholder="원문, 답장, 파일 경로 검색">
-        </label>
-      </details>
-      <div id="archive-list" class="archive-list"></div>
-      <button id="archive-more" type="button" hidden>메모 더 보기</button>
-      <details id="folder-files" hidden>
-        <summary>폴더 파일</summary>
-        <div class="section-heading"><input id="file-search" type="search" aria-label="파일 경로 검색" placeholder="파일 경로 검색"><button id="scan-files" type="button">새로고침</button></div>
-        <p id="file-status" role="status"></p>
-        <ul id="file-list"></ul>
-        <button id="more-files" type="button" hidden>더 보기</button>
-      </details>
-      <p class="status" id="archive-status" role="status"></p>
-    </aside>
-
-    <section class="notebook panel" aria-label="메모 읽기">
-      <div class="note-empty" id="note-empty">
-        <span class="paper-icon" aria-hidden="true"><i></i></span>
-        <h2 id="empty-title">아직 남긴 메모가 없어요</h2>
-        <p id="empty-text">위에 한 줄을 저장하면 원문과 답장을 이곳에서 읽을 수 있어요.</p>
-      </div>
-
-      <section id="detail-dialog" class="note-detail" aria-labelledby="detail-title" hidden>
-        <div class="section-heading detail-heading">
-          <h2 id="detail-title" tabindex="-1">메모</h2>
-          <button type="button" id="detail-close" class="close" aria-label="메모 선택 해제">×</button>
-        </div>
-        <div class="note-byline"><time id="detail-date"></time></div>
-        <p id="detail-path" class="detail-path" hidden></p>
-        <p id="document-missing" class="status" hidden>폴더에서 이 파일을 찾거나 읽을 수 없습니다. 답장과 책방 기록은 남아 있어요.</p>
-        <form id="relink-document" hidden>
-          <label for="document-path-choice" class="field-label">옮긴 파일 다시 연결</label>
-          <div class="inline-form">
-            <select id="document-path-choice" required></select>
-            <button id="relink-document-submit" class="document-action" type="submit">연결</button>
-          </div>
-        </form>
-        <button id="toggle-document-source" class="document-action" type="button" aria-controls="detail-original detail-preview" aria-pressed="false" hidden>원문 보기</button>
-        <p class="original" id="detail-original"></p>
-        <div id="detail-preview" class="document-preview" hidden></div>
-        <div class="shelf-action">
-          <button type="button" id="display-memo">매대에 놓기</button>
-          <p id="shelf-previous" hidden></p>
-        </div>
-        <div id="memo-tools">
-          <div class="detail-actions">
-            <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
-            <button type="button" id="edit-memo">원문 수정</button>
-            <button type="button" id="delete-memo">메모 삭제</button>
-            <button type="button" id="give-memo" hidden>이 글을 연두에게 건네기</button>
-          </div>
-          <form id="edit-form" hidden>
-            <label class="field-label" for="edit-input">원문 수정</label>
-            <textarea id="edit-input" rows="7"></textarea>
-            <div class="inline-form edit-actions">
-              <button id="edit-save" type="submit">수정 저장</button>
-              <button id="edit-cancel" type="button">취소</button>
-            </div>
-            <section id="edit-conflict" class="edit-conflict" aria-labelledby="edit-conflict-title" hidden>
-              <h3 id="edit-conflict-title">편집을 시작한 뒤 원본이 바뀌었어요</h3>
-              <div class="edit-versions">
-                <div>
-                  <h4>작성 중인 내용</h4>
-                  <pre id="edit-conflict-draft" tabindex="0"></pre>
-                </div>
-                <div>
-                  <h4>현재 파일 내용</h4>
-                  <pre id="edit-conflict-disk" tabindex="0"></pre>
-                </div>
-              </div>
-              <div class="inline-form edit-actions">
-                <button id="keep-edit-draft" class="document-action" type="button">작성본을 새 메모로 저장</button>
-                <button id="use-disk-edit" class="document-action" type="button">파일 내용으로 편집 다시 시작</button>
-              </div>
-            </section>
+    <section id="journal" aria-labelledby="journal-title">
+      <div class="writing">
+        <div class="writing-copy">
+          <p id="today-date" class="today-date"></p>
+          <h1 id="journal-title">메모장</h1>
+          <label class="visually-hidden" for="memo-input">새 메모</label>
+          <form id="memo-form" autocomplete="off">
+            <textarea id="memo-input" rows="1" data-enter-submits placeholder="새 메모를 적어 보세요 (Shift+Enter로 줄바꿈)" required></textarea>
+            <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
           </form>
+          <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
+          <p class="status" id="home-status" role="status"></p>
         </div>
-        <div id="detail-replies" class="replies"></div>
-        <template id="reply-actions-template">
-          <div class="detail-actions">
-            <button type="button" class="copy-button copy-reply" data-action="copy" aria-label="답장 복사"><span class="copy-icon" aria-hidden="true"></span></button>
-            <button type="button" data-action="edit" aria-label="답장 수정">수정</button>
-            <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
+      </div>
+      <button id="archive-toggle" type="button" aria-expanded="true" aria-controls="memo-archive">최근 메모</button>
+      <section id="memo-archive" class="archive panel" aria-labelledby="archive-title">
+        <div class="section-heading">
+          <h2 id="archive-title">최근 메모</h2>
+          <span id="memo-count" class="count" aria-label="메모 수">0</span>
+        </div>
+        <button id="refresh-documents" class="document-action" type="button" hidden>폴더 문서 새로고침</button>
+        <p id="document-refresh-status" class="status" role="status"></p>
+        <details id="memo-search" class="journal-disclosure">
+          <summary>메모 검색</summary>
+          <label class="search-field">
+            <span class="search-icon" aria-hidden="true"></span>
+            <input id="archive-search" type="search" aria-label="원문, 답장, 파일 경로 검색" placeholder="원문, 답장, 파일 경로 검색">
+          </label>
+        </details>
+        <div id="archive-list" class="archive-list"></div>
+        <button id="archive-more" type="button" hidden>메모 더 보기</button>
+        <p class="status" id="archive-status" role="status"></p>
+
+        <section id="detail-dialog" class="note-detail" aria-labelledby="detail-title" hidden>
+          <div class="section-heading detail-heading">
+            <h2 id="detail-title" tabindex="-1">메모</h2>
+            <button type="button" id="detail-close" class="close" aria-label="메모 선택 해제">×</button>
           </div>
-        </template>
-        <form id="reply-form" autocomplete="off">
-          <label class="field-label" for="reply-input">답장 쓰기</label>
-          <div class="inline-form">
-            <textarea id="reply-input" rows="1" maxlength="65536" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
-            <button type="submit" id="reply-save">답장 저장</button>
+          <div class="note-byline"><time id="detail-date"></time></div>
+          <p id="detail-path" class="detail-path" hidden></p>
+          <p id="document-missing" class="status" hidden>폴더에서 이 파일을 찾거나 읽을 수 없습니다. 답장과 펫 기록은 남아 있어요.</p>
+          <form id="relink-document" hidden>
+            <label for="document-path-choice" class="field-label">옮긴 파일 다시 연결</label>
+            <div class="inline-form">
+              <select id="document-path-choice" required></select>
+              <button id="relink-document-submit" class="document-action" type="submit">연결</button>
+            </div>
+          </form>
+          <button id="toggle-document-source" class="document-action" type="button" aria-controls="detail-original detail-preview" aria-pressed="false" hidden>원문 보기</button>
+          <p class="original" id="detail-original"></p>
+          <div id="detail-preview" class="document-preview" hidden></div>
+          <div id="memo-tools">
+            <div class="detail-actions">
+              <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
+              <button type="button" id="pet-read-memo" hidden>펫에게 읽어 주기</button>
+              <button type="button" id="edit-memo">원문 수정</button>
+              <button type="button" id="delete-memo">메모 삭제</button>
+            </div>
+            <form id="edit-form" hidden>
+              <label class="field-label" for="edit-input">원문 수정</label>
+              <textarea id="edit-input" rows="7"></textarea>
+              <div class="inline-form edit-actions">
+                <button id="edit-save" type="submit">수정 저장</button>
+                <button id="edit-cancel" type="button">취소</button>
+              </div>
+              <section id="edit-conflict" class="edit-conflict" aria-labelledby="edit-conflict-title" hidden>
+                <h3 id="edit-conflict-title">편집을 시작한 뒤 원본이 바뀌었어요</h3>
+                <div class="edit-versions">
+                  <div>
+                    <h4>작성 중인 내용</h4>
+                    <pre id="edit-conflict-draft" tabindex="0"></pre>
+                  </div>
+                  <div>
+                    <h4>현재 파일 내용</h4>
+                    <pre id="edit-conflict-disk" tabindex="0"></pre>
+                  </div>
+                </div>
+                <div class="inline-form edit-actions">
+                  <button id="keep-edit-draft" class="document-action" type="button">작성본을 새 메모로 저장</button>
+                  <button id="use-disk-edit" class="document-action" type="button">파일 내용으로 편집 다시 시작</button>
+                </div>
+              </section>
+            </form>
           </div>
-        </form>
-        <p class="status" id="detail-status" role="status"></p>
-        <p class="status" id="copy-status" role="status"></p>
+          <div id="detail-replies" class="replies"></div>
+          <template id="reply-actions-template">
+            <div class="detail-actions">
+              <button type="button" class="copy-button copy-reply" data-action="copy" aria-label="답장 복사"><span class="copy-icon" aria-hidden="true"></span></button>
+              <button type="button" data-action="edit" aria-label="답장 수정">수정</button>
+              <button type="button" data-action="delete" aria-label="답장 삭제">삭제</button>
+            </div>
+          </template>
+          <form id="reply-form" autocomplete="off">
+            <label class="field-label" for="reply-input">답장 쓰기</label>
+            <div class="inline-form">
+              <textarea id="reply-input" rows="1" maxlength="65536" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
+              <button type="submit" id="reply-save">답장 저장</button>
+            </div>
+          </form>
+          <p class="status" id="detail-status" role="status"></p>
+          <p class="status" id="copy-status" role="status"></p>
+        </section>
+        <details id="folder-files" hidden>
+          <summary>폴더 파일</summary>
+          <div class="section-heading"><input id="file-search" type="search" aria-label="파일 경로 검색" placeholder="파일 경로 검색"><button id="scan-files" type="button">새로고침</button></div>
+          <p id="file-status" role="status"></p>
+          <ul id="file-list"></ul>
+          <button id="more-files" type="button" hidden>더 보기</button>
+        </details>
       </section>
+    </section>
+    <section id="pet" aria-labelledby="pet-title">
+      <h2 id="pet-title" class="visually-hidden" tabindex="-1">정원</h2>
+      <button type="button" id="pet-expand" class="pet-device pet-device-mini" aria-label="정원 기기 확대"
+        aria-controls="pet-popover" aria-expanded="false">
+        <span class="pet-device-mark" aria-hidden="true"><span class="pet-device-emblem"></span></span>
+        <span class="pet-bezel" aria-hidden="true"><span class="pet-mini-lcd"><img id="pet-summary-sprite" src="art/egg.png" alt=""></span></span>
+        <span class="pet-mini-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
+      <div id="pet-popover" popover="manual" role="region" aria-label="확대된 정원 기기" hidden>
+        <div id="pet-device" class="pet-device" data-mode="idle">
+          <div class="pet-device-mark" aria-hidden="true"><span class="pet-device-emblem"></span></div>
+          <div class="pet-bezel">
+            <div class="pet-lcd">
+              <div class="pet-lcd-header">
+                <span id="pet-screen-label">정원</span>
+                <span id="pet-lcd-name"></span>
+                <span id="pet-attention" hidden><span aria-hidden="true">!</span> 돌봄이 필요해요</span>
+              </div>
+              <div id="pet-habitat" class="pet-habitat">
+                <div class="pet-stage">
+                  <span id="pet-poop" hidden aria-hidden="true">💩</span>
+                  <button type="button" id="pet-sprite-button" aria-label="펫 쓰다듬기" disabled>
+                    <img id="pet-sprite" src="art/egg.png" alt="">
+                  </button>
+                  <span id="pet-effect" aria-hidden="true"></span>
+                  <span id="pet-need-symbol" aria-hidden="true" hidden></span>
+                  <span id="pet-game-ball" aria-hidden="true" hidden></span>
+                </div>
+                <div id="pet-clock" class="pet-screen-panel" hidden>
+                  <p id="pet-time"></p>
+                  <time id="pet-clock-time"></time>
+                  <p id="pet-clock-date"></p>
+                </div>
+                <div id="pet-state" class="pet-screen-panel pet-state" data-page="meters" hidden>
+                  <div id="pet-state-overview">
+                    <p id="pet-stage-label" hidden></p>
+                    <h2 id="pet-name">낯선 알</h2>
+                    <p id="pet-path" hidden></p>
+                    <p id="pet-growth-hint" hidden></p>
+                  </div>
+                  <dl id="pet-meters" class="pet-meters" hidden>
+                    <div><dt id="pet-hunger-label">허기</dt><dd><progress id="pet-hunger" max="100" aria-labelledby="pet-hunger-label"></progress><span></span></dd></div>
+                    <div><dt id="pet-happiness-label">기분</dt><dd><progress id="pet-happiness" max="100" aria-labelledby="pet-happiness-label"></progress><span></span></dd></div>
+                    <div><dt id="pet-energy-label">기력</dt><dd><progress id="pet-energy" max="100" aria-labelledby="pet-energy-label"></progress><span></span></dd></div>
+                    <div><dt id="pet-health-label">건강</dt><dd><progress id="pet-health" max="100" aria-labelledby="pet-health-label"></progress><span></span></dd></div>
+                    <div id="pet-growth-meter"><dt id="pet-growth-label">성장</dt><dd><progress id="pet-growth" max="100" aria-labelledby="pet-growth-label"></progress><span></span></dd></div>
+                  </dl>
+                </div>
+                <div id="pet-menu" class="pet-screen-panel pet-menu" hidden role="group" aria-labelledby="pet-menu-title">
+                  <h2 id="pet-menu-title"></h2>
+                  <div class="pet-menu-actions">
+                    <button type="button" data-pet-action="adopt">알 데려오기</button>
+                    <button type="button" data-pet-action="feed">밥 주기</button>
+                    <button type="button" data-pet-action="snack">간식 주기</button>
+                    <button type="button" data-pet-action="play">공놀이</button>
+                    <button type="button" data-pet-action="explore">정원 탐색</button>
+                    <button type="button" data-pet-action="pet">쓰다듬기</button>
+                    <button type="button" data-pet-action="clean">청소하기</button>
+                    <button type="button" data-pet-action="sleep">불 끄고 재우기</button>
+                    <button type="button" data-pet-action="wake">불 켜고 깨우기</button>
+                    <button type="button" data-pet-action="heal">치료하기</button>
+                    <button type="button" data-pet-action="newEgg">새 알 데려오기</button>
+                    <button type="button" data-pet-action="back">뒤로</button>
+                  </div>
+                  <p id="pet-menu-help"></p>
+                </div>
+                <div id="pet-confirm" class="pet-screen-panel pet-menu" hidden role="group" aria-labelledby="pet-confirm-title">
+                  <h2 id="pet-confirm-title">새 알을 데려올까요?</h2>
+                  <p>지금 펫과 작별하더라도 발견한 모습은 성장 도감에 남아요.</p>
+                  <div class="pet-menu-actions">
+                    <button type="button" data-pet-keep="true">계속 돌보기</button>
+                    <button type="button" data-pet-confirm="true">새 알 데려오기</button>
+                  </div>
+                </div>
+                <div id="pet-game" class="pet-screen-panel pet-game" hidden aria-labelledby="pet-game-title">
+                  <h2 id="pet-game-title" class="visually-hidden">공놀이</h2>
+                  <p id="pet-game-message" aria-live="polite"></p>
+                  <div id="pet-game-lanes" class="pet-game-lanes" role="group" aria-label="공 던질 방향">
+                    <button type="button" data-ball-direction="left">왼쪽</button>
+                    <button type="button" data-ball-direction="center">가운데</button>
+                    <button type="button" data-ball-direction="right">오른쪽</button>
+                  </div>
+                  <p id="pet-game-score"></p>
+                </div>
+              </div>
+              <div id="pet-icon-strip" role="group" aria-label="돌봄 메뉴">
+                <div class="pet-icons-top">
+                  <button type="button" data-pet-menu="egg"><span aria-hidden="true">🥚</span><span>알</span></button>
+                  <button type="button" data-pet-menu="food"><span aria-hidden="true">🍚</span><span>먹이</span></button>
+                  <button type="button" data-pet-menu="activity"><span aria-hidden="true">🎾</span><span>놀이</span></button>
+                  <button type="button" data-pet-menu="status"><span aria-hidden="true">▤</span><span>상태</span></button>
+                </div>
+                <div class="pet-icons-bottom">
+                  <button type="button" data-pet-menu="clean"><span aria-hidden="true">🫧</span><span>청소</span></button>
+                  <button type="button" data-pet-menu="lamp"><span aria-hidden="true">💡</span><span>조명</span></button>
+                  <button type="button" data-pet-menu="heal"><span aria-hidden="true">✚</span><span>치료</span></button>
+                  <button type="button" data-pet-menu="restart"><span aria-hidden="true">⟳</span><span>새 알</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="pet-controls" role="group" aria-label="정원 조작">
+            <button type="button" id="pet-a" aria-keyshortcuts="A ArrowRight"><b>A</b><span>선택</span></button>
+            <button type="button" id="pet-b" aria-keyshortcuts="B"><b>B</b><span>결정</span></button>
+            <button type="button" id="pet-c" aria-keyshortcuts="C Escape"><b>C</b><span>닫기</span></button>
+          </div>
+        </div>
+        <div class="pet-popover-notes">
+          <p id="pet-condition" hidden></p>
+          <p id="pet-habit" hidden></p>
+          <p id="pet-status" role="status"></p>
+          <blockquote id="pet-memo-excerpt" hidden></blockquote>
+          <details id="pet-collection-panel" class="pet-collection journal-disclosure">
+            <summary><span id="pet-collection-title">성장 도감</span><span id="pet-collection-count"></span></summary>
+            <div id="pet-collection"></div>
+          </details>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -239,10 +270,10 @@
   <main id="storage-start" class="lock-screen panel" hidden aria-labelledby="start-title">
     <img src="icon-32.png" width="36" height="36" alt="">
     <h1 id="start-title">메모를 어디에 보관할까요?</h1>
-    <p>내 기기의 폴더에 메모와 책방을 함께 저장해요. 전에 쓰던 폴더를 고르면 이어서 쓸 수 있어요.</p>
+    <p>내 기기의 폴더에 메모와 펫 기록을 함께 저장해요. 전에 쓰던 폴더를 고르면 이어서 쓸 수 있어요.</p>
     <button id="reopen-last-folder" type="button" hidden>저장 폴더 다시 연결</button>
     <button id="choose-first-folder" type="button">메모 저장 폴더 선택</button>
-    <button id="choose-new-folder" type="button" hidden>새 책방 시작</button>
+    <button id="choose-new-folder" type="button" hidden>새 저장 폴더 선택</button>
     <p id="folder-start-status" class="status" role="status"></p>
   </main>
   <div id="storage-recovery" hidden>
@@ -302,28 +333,25 @@
       <h2 id="settings-title">설정</h2>
       <button type="button" class="close" id="settings-close" aria-label="설정 닫기" autofocus>×</button>
     </div>
-    <form id="shop-name-form" autocomplete="off">
-      <label for="shop-name" class="field-label">책방 이름</label>
-      <div class="inline-form"><input id="shop-name" maxlength="40" required><button type="submit">이름 저장</button></div>
-    </form>
-    <details id="storage-tools" class="journal-disclosure">
-      <summary>저장 폴더</summary>
+    <section id="storage-tools" class="settings-section" aria-labelledby="storage-title">
+      <h3 id="storage-title">저장 폴더와 암호화</h3>
       <section>
-        <h3>메모 저장 폴더</h3>
+        <h4>메모 저장 폴더</h4>
         <p id="storage-location"></p>
         <button id="choose-folder" type="button">저장 폴더 선택</button>
-        <p>선택한 폴더에 메모를 저장합니다. 하위 폴더의 파일은 전체 메모 아래에서 열 수 있습니다.</p>
+          <p>선택한 폴더에 메모를 저장합니다. 하위 폴더의 파일은 최근 메모 아래에서 열 수 있습니다.</p>
       </section>
-      <section class="vault-settings">
-        <h3>이 기기의 저장소</h3>
+      <section>
+        <h4>이 기기의 저장소</h4>
         <p id="vault-state"></p>
         <div class="backup-actions">
           <button type="button" id="copy-vault" hidden>일반 폴더로 복사</button>
+          <button type="button" id="lock-vault" hidden>모든 탭 잠그기</button>
         </div>
       </section>
-    </details>
-    <details id="backup-tools" class="journal-disclosure">
-      <summary>백업과 복원</summary>
+    </section>
+    <section id="backup-tools" class="settings-section" aria-labelledby="backup-title">
+      <h3 id="backup-title">백업과 복원</h3>
       <p>새 백업에는 비밀번호가 필요합니다. 이전에 내보낸 평문 JSON도 가져올 수 있습니다.</p>
       <div class="backup-actions">
         <button type="button" id="export-backup">암호화 백업 내보내기</button>
@@ -332,18 +360,14 @@
         <button type="button" id="undo-import" disabled>최근 가져오기 되돌리기</button>
       </div>
       <p class="status" id="undo-result" role="status"></p>
-    </details>
-    <details id="about-tools" class="journal-disclosure">
-      <summary>개발자 정보</summary>
-      <section class="developer-info" aria-labelledby="developer-title">
-        <h3 id="developer-title">개발자 정보</h3>
-        <dl>
-          <dt>이름</dt><dd>KH</dd>
-          <dt>이메일</dt><dd><a href="mailto:baboess@gmail.com">baboess@gmail.com</a></dd>
-        </dl>
-      </section>
-    </details>
-    <button type="button" id="lock-vault" hidden>모든 탭 잠그기</button>
+    </section>
+    <section id="about-tools" class="settings-section developer-info" aria-labelledby="developer-title">
+      <h3 id="developer-title">개발자 정보</h3>
+      <dl>
+        <dt>이름</dt><dd>KH</dd>
+        <dt>이메일</dt><dd><a href="mailto:baboess@gmail.com">baboess@gmail.com</a></dd>
+      </dl>
+    </section>
     <p class="status" id="settings-status" role="status"></p>
   </dialog>
 

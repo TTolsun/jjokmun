@@ -255,7 +255,7 @@ async function checkRendering(session) {
     const memoInput = page.locator('#memo-input');
     await memoInput.fill('   \n');
     await memoInput.press('Enter');
-    await page.locator('#home-status').getByText('한 줄을 적어 주세요.').waitFor();
+    await page.locator('#home-status').getByText('내용을 적어 주세요.').waitFor();
     await memoInput.fill('');
     await page.keyboard.type('    첫 줄');
     await page.keyboard.press('Shift+Enter');
@@ -310,26 +310,7 @@ async function checkRendering(session) {
         .map(detectFormat);
     });
     assert.deepEqual(detected, ['markdown', 'markdown', 'mermaid', 'markdown', 'mermaid']);
-    // Single-line fields turn pasted line breaks into spaces instead of gluing words.
-    await page.locator('#guest-input').evaluate(input => {
-      input.value = '앞 ';
-      input.setSelectionRange(2, 2);
-      const data = new DataTransfer();
-      data.setData('text/plain', '첫 줄\r\n둘째 줄\n');
-      input.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));
-    });
-    assert.equal(await page.locator('#guest-input').inputValue(), '앞 첫 줄 둘째 줄');
-    assert.equal(await page.locator('#guest-status').textContent(), '이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.');
-    await page.locator('#guest-input').evaluate(input => {
-      input.value = '앞교체뒤';
-      input.setSelectionRange(1, 3);
-      const data = new DataTransfer();
-      data.setData('text/plain', '\r\n가운데\n');
-      input.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));
-    });
-    assert.equal(await page.locator('#guest-input').inputValue(), '앞 가운데 뒤');
-    await page.locator('#guest-input').evaluate(input => { input.value = ''; });
-    console.log('PASS  multi-line memo field, diagram file extensions, whole-diagram Markdown and single-line paste');
+    console.log('PASS  multi-line memo field, diagram file extensions and whole-diagram Markdown');
 
     // Replies take several lines and render Markdown and diagrams, each in its own preview.
     const replyInput = page.locator('#reply-input');

@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const {launch, openSection} = require('./browser.cjs');
+const {launch} = require('./browser.cjs');
+const {petAction, layPet} = require('./pet-controls.cjs');
 const {seedEncryptedVault} = require('./legacy-vault.cjs');
 
 const date = '2033-03-02';
@@ -16,15 +17,15 @@ async function snapshot(page) {
     const {transact} = await import('./vault.js');
     const {digest} = await import('./documents.js');
     const state = await transact();
-    return Promise.all(state.memos.map(async memo => ({
+    const memos = await Promise.all(state.memos.map(async memo => ({
       id: memo.id, text: await digest(new TextEncoder().encode(memo.text)), length: memo.text.length, replies: memo.replies
     })));
+    return {memos, pet: state.pet};
   });
 }
 
 async function chooseCopy(page) {
   await page.locator('#open-settings').click();
-  await openSection(page, 'storage-tools');
   await page.evaluate(name => {
     window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle(name, {create:true});
   }, target);
@@ -44,6 +45,9 @@ async function checkVaultCopy() {
     await page.locator('#reply-save').click();
     await page.locator('#detail-replies').getByText('첫 메모의 답장').waitFor();
     const originalPath = await page.locator('#detail-path').innerText();
+    await petAction(page, 'adopt');
+    await page.locator('#pet-lcd-name').getByText('알', {exact:true}).waitFor();
+    await layPet(page);
     await seedEncryptedVault(page, password);
     await page.evaluate(async path => {
       const {folderConnection, transact} = await import('./vault.js');
@@ -101,7 +105,7 @@ async function checkVaultCopy() {
     await page.locator('#unlock-submit').click();
     await chooseCopy(page);
     await page.locator('#vault-copy-confirm').click();
-    await page.locator('#home-status').getByText(/복사한 메모와 답장을 확인/).waitFor();
+    await page.locator('#home-status').getByText(/복사한 메모, 답장, 펫 기록을 확인/).waitFor();
     assert.equal(await encryptedBytes(), initialBytes);
     const copies = await page.evaluate(async ({source, target, path}) => {
       const root = await navigator.storage.getDirectory();
@@ -126,7 +130,6 @@ async function checkVaultCopy() {
     assert.deepEqual(await snapshot(page), expected);
     await page.locator('#memo-input').fill('');
     await page.locator('#open-settings').click();
-    await openSection(page, 'backup-tools');
     await page.locator('#export-backup').click();
     await page.locator('#backup-password').fill(backupPass);
     await page.locator('#backup-password-confirm').fill(backupPass);
@@ -136,7 +139,6 @@ async function checkVaultCopy() {
     fresh = await launch('');
     const restored = await fresh.tab(date, '복원');
     await restored.locator('#open-settings').click();
-    await openSection(restored, 'backup-tools');
     await restored.locator('#import-backup').setInputFiles({name:'backup.json', mimeType:'application/json', buffer:backup});
     await restored.locator('#backup-password').fill(backupPass);
     await restored.locator('#backup-password-submit').click();
