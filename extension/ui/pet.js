@@ -6,17 +6,22 @@ import { FAMILY_NAMES, familyHabit, familyPrecursor, familyReaction } from './pe
 
 const METERS = ['hunger', 'happiness', 'energy', 'health', 'growth'];
 const MAX_TIMEOUT_DELAY = 2_147_483_647;
+const CARE_STATUS = {
+  feed: '밥을 줬어요.', snack: '간식을 줬어요.', play: '공놀이를 마쳤어요.',
+  explore: '정원 탐색을 마쳤어요.', pet: '쓰다듬었어요.', clean: '청소했어요.',
+  sleep: '재웠어요.', wake: '깨웠어요.', heal: '치료했어요.'
+};
 const EFFECTS = { feed: '♪', snack: '♪', play: '✦', explore: '✧', clean: '✧', sleep: 'z z', wake: '☀', heal: '✚', pet: '♥', memo: '♥' };
 const BABY_POSES = { feed: 'feed', snack: 'feed', play: 'play', explore: 'explore', pet: 'pet', memo: 'pet' };
 const HABITS = {
-  play: { action: 'play', description: '공을 발앞에 밀어 두고 같이 뛰놀기를 기다려요.' },
-  explore: { action: 'explore', description: '잎사귀 뒤에 뭐가 있는지 고개를 빼꼼 내밀어요.' },
-  affection: { action: 'pet', description: '곁으로 다가와 머리를 살짝 기대요.' }
+  play: { action: 'play' },
+  explore: { action: 'explore' },
+  affection: { action: 'pet' }
 };
 const FIRE_PUP_HABITS = {
-  play: { action: 'play', reaction: 'pup-tap', description: '공이 구르면 냅다 뛰다가 코앞에서 딱 멈춰요.' },
-  explore: { action: 'explore', reaction: 'sniff', description: '아래로 처진 귀를 풀잎에 대고 낯선 냄새를 맡아요.' },
-  affection: { action: 'pet', reaction: 'nestle', description: '손에 머리를 기대면 가슴의 불씨 무늬가 반짝여요.' }
+  play: { action: 'play', reaction: 'pup-tap' },
+  explore: { action: 'explore', reaction: 'sniff' },
+  affection: { action: 'pet', reaction: 'nestle' }
 };
 const ACTIVE_HABITS = {
   play: '이번 성장기에는 공놀이를 가장 자주 했어요.',
@@ -24,18 +29,18 @@ const ACTIVE_HABITS = {
   affection: '이번 성장기에는 쓰다듬으며 가장 자주 교감했어요.'
 };
 const FIRE_MOTIONS = {
-  'fire-runner': ['play', 'look-back', '앞발부터 내딛고서야 뒤를 힐끗 봐요.'],
-  'fire-scout': ['explore', 'nose-first', '코부터 흙에 대요. 긴 귀는 한 박자 늦게 따라 내려와요.'],
-  'fire-cuddler': ['pet', 'nestle', '갈기 아래에서 앞발 하나만 내밀고 곁에 앉아요.'],
-  'fire-runner-runner': ['play', 'dash', '꼬리 끝이 두 갈래로 펼쳐지고 발밑 불씨가 튀어요.'],
-  'fire-runner-scout': ['explore', 'beacon', '긴 다리로 서서 꼬리 끝 불빛을 위로 들어 길을 살펴요.'],
-  'fire-runner-cuddler': ['pet', 'nestle', '긴 목에 불갈기를 둘러 감고 곁으로 와요.'],
-  'fire-scout-runner': ['play', 'flutter', '양쪽 귀를 활짝 펴고 앞발부터 통통 뛰어요.'],
-  'fire-scout-scout': ['explore', 'sniff', '귀 끝을 소용돌이처럼 말고 땅 가까이에서 냄새를 따라가요.'],
-  'fire-scout-cuddler': ['pet', 'nestle', '넓은 귀를 앞쪽으로 늘어뜨려 두 앞발을 감싸요.'],
-  'fire-cuddler-runner': ['play', 'flutter', '해처럼 뻗은 갈기가 쿵쿵 뛸 때마다 들썩여요.'],
-  'fire-cuddler-scout': ['explore', 'beacon', '이마 위에 솟은 털불이 고개보다 먼저 길을 비춰요.'],
-  'fire-cuddler-cuddler': ['pet', 'nestle', '둥글게 퍼진 갈기 속에 앞발을 파묻어요.']
+  'fire-runner': ['play', 'look-back'],
+  'fire-scout': ['explore', 'nose-first'],
+  'fire-cuddler': ['pet', 'nestle'],
+  'fire-runner-runner': ['play', 'dash'],
+  'fire-runner-scout': ['explore', 'beacon'],
+  'fire-runner-cuddler': ['pet', 'nestle'],
+  'fire-scout-runner': ['play', 'flutter'],
+  'fire-scout-scout': ['explore', 'sniff'],
+  'fire-scout-cuddler': ['pet', 'nestle'],
+  'fire-cuddler-runner': ['play', 'flutter'],
+  'fire-cuddler-scout': ['explore', 'beacon'],
+  'fire-cuddler-cuddler': ['pet', 'nestle']
 };
 const PLAY_MOTIONS = {
   'fire-pup': 'pup-tap', 'fire-runner': 'look-back', 'fire-scout': 'nose-first', 'fire-cuddler': 'paw-rest',
@@ -47,19 +52,19 @@ const PLAY_MOTIONS = {
 const HABIT_ACTIONS = { play: 'play', explore: 'explore', affection: 'pet' };
 const FIRE_PRECURSORS = {
   'fire-runner': {
-    play: ['dash', '공을 앞지르려 길게 내딛자 꼬리의 불꽃이 두 갈래로 일렁여요.'],
-    explore: ['beacon', '달리다 멈춰 꼬리 끝 불을 높이고, 공이 지나간 쪽의 풀숲을 살펴요.'],
-    affection: ['nestle', '긴 목을 손에 기대자 갈기의 불빛이 목둘레를 따라 번져요.']
+    play: 'dash',
+    explore: 'beacon',
+    affection: 'nestle'
   },
   'fire-scout': {
-    play: ['flutter', '냄새를 맡다가 공 소리에 긴 귀를 양옆으로 펴고 앞발부터 뛰어들어요.'],
-    explore: ['sniff', '긴 귀 끝이 살짝 말려요. 코와 귀를 바닥 가까이 대고 냄새를 쫓아요.'],
-    affection: ['nestle', '머리를 숙여 손에 기대며 두 귀를 앞쪽으로 늘어뜨려요.']
+    play: 'flutter',
+    explore: 'sniff',
+    affection: 'nestle'
   },
   'fire-cuddler': {
-    play: ['flutter', '공을 보고 벌떡 뛰자 부드럽던 갈기가 햇살처럼 여러 방향으로 뻗어요.'],
-    explore: ['beacon', '그늘을 들여다볼 때 이마 위 갈기가 불꽃처럼 솟아 먼저 안쪽을 비춰요.'],
-    affection: ['nestle', '곁에 앉아 앞발을 포개자 갈기가 둥글게 퍼져 발을 덮어요.']
+    play: 'flutter',
+    explore: 'beacon',
+    affection: 'nestle'
   }
 };
 const NEEDS = {
@@ -75,7 +80,7 @@ function formName(form) {
 
 function precursor(form, habit) {
   const next = FIRE_PRECURSORS[form]?.[habit];
-  if (next) return { action: HABIT_ACTIONS[habit], reaction: next[0], description: next[1], preview: true };
+  if (next) return { action: HABIT_ACTIONS[habit], reaction: next, preview: true };
   return familyPrecursor(form, habit);
 }
 
@@ -129,8 +134,8 @@ export function bindPet(change, saveError, editorReturn) {
     if (next) return next;
     const fire = FIRE_MOTIONS[pet?.form];
     if (fire) {
-      const [action, reaction, description] = fire;
-      return { action, reaction, description };
+      const [action, reaction] = fire;
+      return { action, reaction };
     }
     const details = PET_FORM_DETAILS[pet?.form];
     const leading = details?.stage === 1 ? dominantPetHabit(pet) : undefined;
@@ -172,9 +177,6 @@ export function bindPet(change, saveError, editorReturn) {
     condition.textContent = pet?.sleeping ? '잠들었어요.' : conditions || '';
     condition.hidden = !condition.textContent;
     habit = pet?.sleeping || pet?.needs.includes('heal') ? undefined : habitOf(pet);
-    const hint = element('pet-habit');
-    hint.textContent = habit && (habit.preview || motion === habit.action) ? habit.description : '';
-    hint.hidden = !hint.textContent;
     habitat.dataset.form = form;
     habitat.dataset.stage = stage;
     habitat.classList.toggle('pet-night', Boolean(pet?.night));
@@ -301,20 +303,17 @@ export function bindPet(change, saveError, editorReturn) {
       if (result.changed && previousForm && current?.form !== previousForm && action !== 'newEgg') {
         showEvolution(previousForm, result.event);
       } else {
-        status.textContent = result.event || '펫 상태가 바뀌었어요. 지금 할 수 있는 행동을 골라 주세요.';
         if (result.changed) {
-          const [habitAction, motion, description] = FIRE_MOTIONS[current?.form] || [];
+          status.textContent = CARE_STATUS[action] ?? result.event;
+          const [habitAction, motion] = FIRE_MOTIONS[current?.form] || [];
           const next = action === 'explore' || action === 'pet'
             ? precursor(current?.form, action === 'pet' ? 'affection' : action) : undefined;
           const reaction = familyReaction(current?.form, action) || (action === 'play'
             ? PLAY_MOTIONS[current?.form] || (motion && 'dash') : action === habitAction ? motion : undefined);
-          if (next) {
-            status.textContent += ' ' + next.description;
-          } else if ((action === 'explore' || action === 'pet') && action === habitAction) {
-            status.textContent += ' ' + description;
-          }
           const cueAfterPlay = action === 'play' && PET_FORM_DETAILS[current?.form]?.stage === 2;
           showEffect(action, next?.reaction || reaction, Boolean(next), cueAfterPlay);
+        } else {
+          status.textContent = result.event || '펫 상태가 바뀌었어요. 지금 할 수 있는 행동을 골라 주세요.';
         }
       }
     } catch (error) {
@@ -354,7 +353,6 @@ export function bindPet(change, saveError, editorReturn) {
     element('pet-name').textContent = '';
     element('pet-lcd-name').textContent = '';
     element('pet-condition').textContent = '';
-    element('pet-habit').textContent = '';
     for (const id of ['pet-stage-label', 'pet-path', 'pet-growth-hint']) {
       const label = element(id);
       label.textContent = '';

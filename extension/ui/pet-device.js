@@ -92,6 +92,7 @@ export function bindPetDevice(act, editorReturn) {
       return;
     }
     expanded = false;
+    game = gameOwner = undefined;
     idle();
     popover.hidePopover();
     popover.hidden = true;
@@ -107,7 +108,7 @@ export function bindPetDevice(act, editorReturn) {
   function renderGame() {
     const panel = element('pet-game');
     const ball = element('pet-game-ball');
-    if (!game) {
+    if (!game || mode !== 'game') {
       delete panel.dataset.phase;
       delete panel.dataset.target;
       delete panel.dataset.direction;
@@ -148,6 +149,7 @@ export function bindPetDevice(act, editorReturn) {
     shell.dataset.mode = mode;
     shell.setAttribute('aria-busy', String(working));
     buttonB.querySelector('span').textContent = mode === 'idle' ? '시계' : '결정';
+    element('pet-c').querySelector('span').textContent = game && game.phase !== 'complete' ? '끝내고 닫기' : '닫기';
     const spriteButton = element('pet-sprite-button');
     spriteButton.tabIndex = mode === 'game' ? -1 : 0;
     spriteButton.setAttribute('aria-hidden', String(mode === 'game'));
@@ -168,6 +170,7 @@ export function bindPetDevice(act, editorReturn) {
     }
     for (const button of actions) {
       const action = button.dataset.petAction;
+      if (action === 'play') button.textContent = game && game.phase !== 'complete' ? '공놀이 계속' : '공놀이';
       button.hidden = !options.includes(action);
       button.setAttribute('aria-disabled', String(working || !available(action)));
       button.setAttribute('aria-pressed', String(action === selectedAction));
@@ -194,12 +197,13 @@ export function bindPetDevice(act, editorReturn) {
 
   function openMenu(key) {
     if (!active || !expanded || working || !keysFor(pet).includes(key)) return;
-    game = gameOwner = undefined;
+    if (game?.phase === 'complete') game = gameOwner = undefined;
     menuKey = key;
     selectedAction = undefined;
     statusPage = 0;
     mode = key === 'status' ? 'status' : 'menu';
     render();
+    element('pet-menu').scrollTop = 0;
   }
 
   function selectMenu() {
@@ -210,7 +214,7 @@ export function bindPetDevice(act, editorReturn) {
 
   function idle() {
     mode = 'idle';
-    menuKey = selectedAction = game = gameOwner = undefined;
+    menuKey = selectedAction = undefined;
   }
 
   function choose(action) {
@@ -227,8 +231,10 @@ export function bindPetDevice(act, editorReturn) {
       return;
     }
     if (action === 'play') {
-      game = createBallGame();
-      gameOwner = { form: pet.form, startedAt: pet.startedAt };
+      if (!game) {
+        game = createBallGame();
+        gameOwner = { form: pet.form, startedAt: pet.startedAt };
+      }
       mode = 'game';
       render();
       return;
@@ -241,6 +247,7 @@ export function bindPetDevice(act, editorReturn) {
   function sendBall(button) {
     if (game.phase === 'complete') {
       if (working || button === 'a') return;
+      game = gameOwner = undefined;
       idle();
       render();
       return;
@@ -336,7 +343,10 @@ export function bindPetDevice(act, editorReturn) {
     active = true;
     pet = value;
     working = pending;
-    if (game && game.phase !== 'complete' && (!pet || gameOwner.form !== pet.form || gameOwner.startedAt !== pet.startedAt)) idle();
+    if (game && (!pet || gameOwner.form !== pet.form || gameOwner.startedAt !== pet.startedAt)) {
+      game = gameOwner = undefined;
+      idle();
+    }
     if (menuKey && !keysFor(pet).includes(menuKey) && mode !== 'game') idle();
     render();
   }
@@ -345,6 +355,7 @@ export function bindPetDevice(act, editorReturn) {
     active = false;
     pet = undefined;
     working = false;
+    game = gameOwner = undefined;
     close(false);
     idle();
     render();

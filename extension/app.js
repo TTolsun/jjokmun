@@ -25,10 +25,11 @@ let detailId;
 let detailExpanded = false;
 let linkedReply;
 let returnFocus;
-let confirmedReplyCount;
-let confirmedDocument;
+let deletionTarget;
 let editBase;
 let editSession;
+const replyDrafts = new Map();
+const editDrafts = new Map();
 let pendingRefresh = Promise.resolve();
 let pendingArchiveChoice;
 let workspaceReady = false;
@@ -95,6 +96,8 @@ function clearSensitive(showLock) {
   folderFiles.reset();
   documentPreview.reset();
   replyPreviews.reset();
+  replyDrafts.clear();
+  editDrafts.clear();
   resetEdit();
   resetArchive();
   element('folder-start-status').textContent = '';
@@ -104,7 +107,7 @@ function clearSensitive(showLock) {
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'archive-list',
     'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
-    'delete-message', 'vault-state', 'unlock-status', 'detail-path', 'document-path-choice', 'document-refresh-status',
+    'delete-target', 'delete-message', 'vault-state', 'unlock-status', 'detail-path', 'document-path-choice', 'document-refresh-status',
     'found-note-title', 'found-note-date', 'found-note-excerpt', 'found-note-hint']) {
     element(id).replaceChildren();
   }
@@ -120,7 +123,7 @@ function clearSensitive(showLock) {
   clearBackupDialogs();
   state = emptyState();
   renderedRevision = -1;
-  detailId = linkedReply = returnFocus = confirmedReplyCount = confirmedDocument = displayedDate = readPetMemoId = undefined;
+  detailId = linkedReply = returnFocus = deletionTarget = displayedDate = readPetMemoId = undefined;
   detailExpanded = false;
   if (showLock && !lockPending) element('unlock-password').focus();
 }
@@ -226,6 +229,12 @@ function render(date) {
   renderFoundNote(date);
   element('today-date').textContent = formatDate(date, longDate);
   const sorted = newestMemos(state.memos);
+  if (editDrafts.size || replyDrafts.size) {
+    const ids = new Set(sorted.map(memo => memo.id));
+    for (const drafts of [editDrafts, replyDrafts]) {
+      for (const id of drafts.keys()) if (!ids.has(id)) drafts.delete(id);
+    }
+  }
   if (detailId && !currentMemo()) {
     element('delete-dialog').close();
     closeDetail(element('detail-dialog').contains(document.activeElement));
@@ -276,6 +285,8 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
       if (message && expected === viewGeneration && (!inDetail || detailId === revision)) {
         if (input.value === original) input.value = '';
         setStatus(statusId, message);
+      } else if (message && expected === viewGeneration && inputId === 'reply-input' && replyDrafts.get(revision) === original) {
+        replyDrafts.delete(revision);
       }
     } catch (error) {
       if (expected === viewGeneration) {
@@ -474,7 +485,7 @@ bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (tex
   try {
     await change((draft) => {
       const memo = findMemo(draft, id);
-      if (base.documentPath && !sameDocument(base, memo)) {
+      if (!sameDocument(base, memo)) {
         conflicted = true;
         return false;
       }
@@ -488,16 +499,26 @@ bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (tex
     await refresh();
     conflicted = true;
   }
-  if (expected !== viewGeneration || editBase !== base) return;
+  if (expected !== viewGeneration) return;
+  if (editBase !== base) {
+    const draft = editDrafts.get(id);
+    if (draft?.base === base) {
+      if (conflicted) draft.conflict = true;
+      else if (draft.text === text) editDrafts.delete(id);
+      else draft.base = state.memos.find(memo => memo.id === id);
+    }
+    return;
+  }
   if (conflicted) {
     element('edit-conflict').hidden = false;
     element('edit-save').hidden = true;
     renderEditConflict(currentMemo());
-    element('keep-edit-draft').focus();
-    setStatus('detail-status', '파일과 작성본을 비교한 뒤 계속해 주세요.');
+    element(mode === 'encrypted' ? 'use-disk-edit' : 'keep-edit-draft').focus();
+    setStatus('detail-status', '원본과 작성본을 비교한 뒤 계속해 주세요.');
     return;
   }
-  hideEdit();
+  if (element('edit-input').value === text) hideEdit();
+  else editBase = currentMemo();
   return '메모를 수정했어요.';
 }, input => editBase?.documentPath || input.value.trim() ? input.value : '');
 
@@ -508,10 +529,11 @@ function sameDocument(previous, current) {
 
 function renderEditConflict(memo) {
   if (element('edit-conflict').hidden) return;
-  const available = memo?.documentPath && !memo.documentMissing;
+  const available = memo && !memo.documentMissing;
   element('edit-conflict-draft').textContent = element('edit-input').value;
   element('edit-conflict-disk').textContent = available ? memo.text : '파일을 찾거나 읽을 수 없습니다.';
   element('use-disk-edit').disabled = !available;
+  element('keep-edit-draft').hidden = mode === 'encrypted';
 }
 
 function renderRelink(memo) {
@@ -637,7 +659,10 @@ function refreshArchive() {
   if (workspaceReady) renderArchive(newestMemos(state.memos), detailExpanded ? detailId : undefined, openArchiveDetail);
 }
 
-element('archive-search').addEventListener('input', refreshArchive);
+element('archive-search').addEventListener('input', () => {
+  refreshArchive();
+  renderSelection();
+});
 element('refresh-documents').addEventListener('click', async (event) => {
   const button = event.currentTarget;
   const expected = viewGeneration;
@@ -653,15 +678,37 @@ element('refresh-documents').addEventListener('click', async (event) => {
   }
 });
 
+function rememberDetailDrafts() {
+  if (!currentMemo()) return;
+  const reply = element('reply-input').value;
+  if (reply) replyDrafts.set(detailId, reply);
+  if (editBase) {
+    editDrafts.set(detailId, { base: editBase, text: element('edit-input').value, conflict: !element('edit-conflict').hidden });
+  }
+}
+
+function selectionFilteredOut() {
+  return element('archive-search').value.trim() && !element('archive-list').querySelector('[aria-current="true"]');
+}
+
 function openDetail(id, replyId, source) {
   pendingArchiveChoice = undefined;
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
+    rememberDetailDrafts();
     setStatus('home-status', '');
     replyDialog.reset();
-    element('reply-input').value = '';
+    element('reply-input').value = replyDrafts.get(id) ?? '';
+    replyDrafts.delete(id);
     element('document-path-choice').value = '';
     resetEdit();
+    const draft = editDrafts.get(id);
+    if (draft) {
+      startEdit(draft.base, draft.text);
+      element('edit-conflict').hidden = !draft.conflict;
+      element('edit-save').hidden = draft.conflict;
+      editDrafts.delete(id);
+    }
     setStatus('detail-status', '');
     setStatus('copy-status', '');
   }
@@ -669,8 +716,11 @@ function openDetail(id, replyId, source) {
   detailExpanded = true;
   linkedReply = replyId;
   returnFocus = source;
-  renderSelection();
   refreshArchive();
+  if (selectionFilteredOut()) {
+    element('archive-search').value = '';
+    element('archive-search').dispatchEvent(new Event('input'));
+  } else renderSelection();
   if (source) {
     const title = element('detail-title');
     title.focus({ preventScroll: true });
@@ -700,7 +750,7 @@ function openArchiveDetail(id, replyId, source) {
 }
 
 function renderSelection() {
-  const hasMemo = detailExpanded && Boolean(currentMemo());
+  const hasMemo = detailExpanded && Boolean(currentMemo()) && !selectionFilteredOut();
   element('detail-dialog').hidden = !hasMemo;
   if (hasMemo) renderDetail();
   else {
@@ -710,6 +760,7 @@ function renderSelection() {
 }
 
 function closeDetail(restoreFocus = true) {
+  rememberDetailDrafts();
   pendingArchiveChoice = undefined;
   replyDialog.reset();
   if (restoreFocus && returnFocus?.dataset.memoId) {
@@ -738,12 +789,12 @@ element('edit-memo').addEventListener('click', () => {
   element('edit-input').focus();
 });
 
-function startEdit(memo) {
+function startEdit(memo, text = memo.text) {
   resetEdit();
   editBase = memo;
   editSession = Symbol();
   const input = element('edit-input');
-  input.value = memo.text;
+  input.value = text;
   input.required = !memo.documentPath;
   if (memo.documentPath || memo.text.length > 2000) input.removeAttribute('maxlength');
   else input.maxLength = 2000;
@@ -769,7 +820,7 @@ element('edit-cancel').addEventListener('click', hideEdit);
 element('edit-input').addEventListener('input', () => renderEditConflict(currentMemo()));
 element('use-disk-edit').addEventListener('click', () => {
   const memo = currentMemo();
-  if (!memo?.documentPath || memo.documentMissing) return;
+  if (!memo || memo.documentMissing) return;
   startEdit(memo);
   element('edit-input').focus();
 });
@@ -789,6 +840,7 @@ element('keep-edit-draft').addEventListener('click', async event => {
       newId = memo.id;
     });
     if (expected === viewGeneration && editBase === base && element('edit-input').value === text) {
+      resetEdit();
       openDetail(newId);
       element('detail-title').focus();
       setStatus('detail-status', '작성본을 새 메모로 저장했어요.');
@@ -804,15 +856,15 @@ element('keep-edit-draft').addEventListener('click', async event => {
 
 function describeDeletion(memo, changed = false) {
   const count = memo.replies.length;
-  confirmedReplyCount = count;
-  confirmedDocument = memo.documentPath ? memo : undefined;
+  deletionTarget = memo;
+  element('delete-target').textContent = memo.documentPath || memoExcerpt(memo, 80).trim().split(/\r?\n/)[0] || '빈 메모';
   const message = count
     ? `메모에 남긴 답장 ${count}개가 함께 삭제됩니다.`
     : '이 메모에는 답장이 없습니다. 삭제한 메모는 되돌릴 수 없습니다.';
   const summary = memo.documentPath ? message + (memo.documentMissing
     ? ' 사라진 파일에 연결된 메모 기록을 지웁니다.'
     : ' 전체 메모에서 지우고 폴더의 원본 파일은 보관합니다.') : message;
-  const changedMessage = memo.documentPath ? '메모가 바뀌었습니다.' : '답장 수가 바뀌었습니다.';
+  const changedMessage = '메모나 답장이 바뀌었습니다.';
   element('delete-message').textContent = changed ? `${changedMessage} ${summary} 삭제하려면 다시 확인해 주세요.` : summary;
 }
 
@@ -822,9 +874,8 @@ element('delete-memo').addEventListener('click', () => {
 });
 
 element('delete-confirm').addEventListener('click', async () => {
-  const id = detailId;
-  const expectedCount = confirmedReplyCount;
-  const base = confirmedDocument;
+  const base = deletionTarget;
+  const id = base.id;
   const button = element('delete-confirm');
   let updatedMemo;
   button.disabled = true;
@@ -832,10 +883,10 @@ element('delete-confirm').addEventListener('click', async () => {
     await change((draft) => {
       const memo = draft.memos.find((record) => record.id === id);
       if (!memo) return;
-      if (memo.replies.length !== expectedCount || (base && (
+      if (memo.replies.length !== base.replies.length ||
         memo.documentMissing !== base.documentMissing || memo.text !== base.text ||
         memo.updatedAt !== base.updatedAt || memo.documentPath !== base.documentPath
-      ))) {
+      ) {
         updatedMemo = memo;
         return false;
       }

@@ -237,6 +237,26 @@ async function checkJournalLayout(session) {
     await page.locator('#archive-search:focus').waitFor();
     await click('#memo-input');
     await page.locator('#memo-input:focus').waitFor();
+    const sample = '산책 😊가나다라분홍빛 꽃을 봤다. ' + '천천히 걸었다. '.repeat(12);
+    await page.locator('#memo-input').fill(sample);
+    await click('#memo-save');
+    await page.locator('#detail-original').getByText(sample.trim()).waitFor({state:'attached'});
+    const current = await page.locator('#detail-path').innerText();
+    await click('#edit-memo');
+    await page.locator('#edit-input').fill('아직 저장하지 않은 원문');
+    await page.locator('#reply-input').fill('아직 저장하지 않은 답장');
+    await archive.locator('[data-memo-id="layout-23"]').click();
+    await page.keyboard.press('Control+k');
+    await page.locator('#archive-search').fill('분홍빛');
+    assert.equal(await page.locator('#delete-memo').isVisible(), false);
+    assert.ok((await page.locator('.archive-text').innerText()).includes('😊가나다라분홍빛'));
+    await click('.archive-entry');
+    assert.equal(await page.locator('#edit-input').inputValue(), '아직 저장하지 않은 원문');
+    assert.equal(await page.locator('#reply-input').inputValue(), '아직 저장하지 않은 답장');
+    await click('#edit-cancel');
+    await click('#delete-memo');
+    assert.equal(await page.locator('#delete-target').innerText(), current);
+    await click('#delete-cancel');
     console.log('PASS  inline notes and replies, narrow-screen scrolling, and cursor and focus restoration after lifting');
   } finally { await page.close(); }
 }
