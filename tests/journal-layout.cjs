@@ -102,9 +102,12 @@ async function checkJournalLayout(session) {
       if (width >= 861) {
         assert.ok(pet.x + pet.width <= journal.x, 'the smaller pet is to the left of the journal');
         assert.ok(pet.width < journal.width, 'the journal is wider than the pet');
-        const columnStart = await page.locator('.workspace').evaluate(node =>
-          node.getBoundingClientRect().left + parseFloat(getComputedStyle(node).paddingLeft));
-        assert.ok(pet.x < columnStart, 'the pet moves left within the centered layout');
+        const rail = await page.locator('.workspace').evaluate(node => {
+          const style = getComputedStyle(node, '::before');
+          return [node.getBoundingClientRect().left + parseFloat(style.left), parseFloat(style.width)];
+        });
+        assert.deepEqual(rail, [0, 224], 'the desktop garden does not grow into the outer margin');
+        assert.equal(pet.width, rail[1]);
       } else {
         assert.ok(journal.y + journal.height <= pet.y, 'the journal precedes the pet on narrow screens');
         assert.ok(writing.y < 300, 'the memo composer starts near the top');

@@ -47,19 +47,20 @@
       </div>
       <button id="archive-toggle" type="button" aria-expanded="true" aria-controls="memo-archive">최근 메모</button>
       <section id="memo-archive" class="archive panel" aria-labelledby="archive-title">
-        <div class="section-heading">
-          <h2 id="archive-title">최근 메모</h2>
-          <span id="memo-count" class="count" aria-label="메모 수">0</span>
+        <div class="archive-toolbar">
+          <div class="section-heading">
+            <h2 id="archive-title">최근 메모</h2>
+            <span id="memo-count" class="count" aria-label="메모 수">0</span>
+          </div>
+          <button id="refresh-documents" class="document-action" type="button" hidden>폴더 문서 새로고침</button>
+          <details id="memo-search" class="journal-disclosure">
+            <summary><span class="search-icon" aria-hidden="true"></span>메모 검색</summary>
+            <label class="search-field">
+              <input id="archive-search" type="search" aria-label="원문, 답장, 파일 경로 검색" placeholder="원문, 답장, 파일 경로 검색">
+            </label>
+          </details>
         </div>
-        <button id="refresh-documents" class="document-action" type="button" hidden>폴더 문서 새로고침</button>
         <p id="document-refresh-status" class="status" role="status"></p>
-        <details id="memo-search" class="journal-disclosure">
-          <summary>메모 검색</summary>
-          <label class="search-field">
-            <span class="search-icon" aria-hidden="true"></span>
-            <input id="archive-search" type="search" aria-label="원문, 답장, 파일 경로 검색" placeholder="원문, 답장, 파일 경로 검색">
-          </label>
-        </details>
         <div id="archive-list" class="archive-list"></div>
         <button id="archive-more" type="button" hidden>메모 더 보기</button>
         <p class="status" id="archive-status" role="status"></p>
@@ -149,7 +150,7 @@
         aria-controls="pet-popover" aria-expanded="false">
         <span class="pet-device-mark" aria-hidden="true"><span class="pet-device-emblem"></span></span>
         <span class="pet-bezel" aria-hidden="true"><span class="pet-mini-lcd"><img id="pet-summary-sprite" src="art/egg.png" alt=""></span></span>
-        <span class="pet-mini-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="pet-mini-controls" aria-hidden="true"><i>A</i><i>B</i><i>C</i></span>
       </button>
       <div id="pet-popover" popover="manual" role="region" aria-label="확대된 정원 기기" hidden>
         <div id="pet-device" class="pet-device" data-mode="idle">
