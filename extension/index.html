@@ -162,16 +162,11 @@
         <button id="toggle-document-source" class="document-action" type="button" aria-controls="detail-original detail-preview" aria-pressed="false" hidden>원문 보기</button>
         <p class="original" id="detail-original"></p>
         <div id="detail-preview" class="document-preview" hidden></div>
-        <div class="shelf-action">
-          <button type="button" id="display-memo">매대에 놓기</button>
-          <p id="shelf-previous" hidden></p>
-        </div>
         <div id="memo-tools">
           <div class="detail-actions">
             <button type="button" id="copy-memo" aria-label="메모 원문 복사">원문 복사</button>
             <button type="button" id="edit-memo">원문 수정</button>
             <button type="button" id="delete-memo">메모 삭제</button>
-            <button type="button" id="give-memo" hidden>이 글을 연두에게 건네기</button>
           </div>
           <form id="edit-form" hidden>
             <label class="field-label" for="edit-input">원문 수정</label>
@@ -216,6 +211,14 @@
         </form>
         <p class="status" id="detail-status" role="status"></p>
         <p class="status" id="copy-status" role="status"></p>
+        <section class="shop-actions" aria-labelledby="shop-actions-title">
+          <h3 id="shop-actions-title">책방에서</h3>
+          <div class="shelf-action">
+            <button type="button" id="display-memo">매대에 놓기</button>
+            <button type="button" id="give-memo" hidden>이 글을 연두에게 건네기</button>
+            <p id="shelf-previous" hidden></p>
+          </div>
+        </section>
       </section>
     </section>
 
