@@ -48,7 +48,7 @@ async function launch(profile, extensionPath = extension) {
     });
     const tab = async (date, folder = 'test-vault', view = 'journal') => {
       const page = await context.newPage();
-      await page.goto(home + (date ? '?date=' + date : '') + (view ? '#' + view : ''));
+      await page.goto(home + (date ? '?date=' + date : '') + (view === 'journal' ? '#journal' : ''));
       if (folder) {
         await page.locator('#storage-start:visible, .workspace:visible, #lock-screen:visible').waitFor();
         if (await page.locator('#choose-first-folder').isVisible()) await selectFolder(page, folder);

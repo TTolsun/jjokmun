@@ -34,7 +34,7 @@ function searchControl() {
 
 const archiveToggle = element('archive-toggle');
 
-export function setArchiveOpen(open) {
+function setArchiveOpen(open) {
   archiveToggle.setAttribute('aria-expanded', String(open));
 }
 
@@ -49,7 +49,7 @@ export function focusArchiveReturn(id) {
 
 export function resetArchive() {
   visibleLimit = PAGE_SIZE;
-  setArchiveOpen(false);
+  setArchiveOpen(true);
   const more = element('archive-more');
   more.onclick = null;
   more.hidden = true;
@@ -58,6 +58,7 @@ export function resetArchive() {
 export function renderArchive(memos, selectedId, openDetail) {
   const list = element('archive-list');
   const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.memoId : undefined;
+  const scrollTop = list.scrollTop;
   const query = searchText(element('archive-search').value.trim());
   element('memo-count').textContent = memos.length;
   element('memo-count').hidden = Boolean(query);
@@ -85,6 +86,8 @@ export function renderArchive(memos, selectedId, openDetail) {
     row.type = 'button';
     row.className = 'archive-entry';
     row.dataset.memoId = memo.id;
+    row.setAttribute('aria-controls', 'detail-dialog');
+    row.setAttribute('aria-expanded', String(memo.id === selectedId));
     if (memo.id === selectedId) row.setAttribute('aria-current', 'true');
     const text = document.createElement('span');
     text.className = 'archive-text';
@@ -116,35 +119,33 @@ export function renderArchive(memos, selectedId, openDetail) {
     list.append(row);
     if (memo.id === focusedId) focusTarget = row;
   }
-  if (focusedId) (focusTarget || searchControl()).focus();
+  list.scrollTop = scrollTop;
+  if (focusedId) (focusTarget || searchControl()).focus({ preventScroll: true });
   element('archive-status').textContent = list.childElementCount ? '' : query ? '검색 결과가 없습니다.' : '아직 남긴 메모가 없습니다.';
 }
 
 function openJournal() {
-  if (location.hash !== '#journal') {
-    history.replaceState(null, '', '#journal');
-    window.dispatchEvent(new Event('hashchange'));
-  }
+  if (location.hash !== '#journal') history.replaceState(null, '', '#journal');
+  element('journal').scrollIntoView();
 }
-element('open-archive').addEventListener('click', () => {
-  openJournal();
-  element('memo-input').focus();
-});
 archiveToggle.addEventListener('click', () => {
   setArchiveOpen(archiveToggle.getAttribute('aria-expanded') === 'false');
 });
 window.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     event.preventDefault();
-    if (!document.body.classList.contains('journal-view')) openJournal();
     if (element('memo-archive').closest('[hidden]')) return;
+    openJournal();
     setArchiveOpen(true);
     element('memo-search').open = true;
     element('archive-search').focus();
     element('archive-search').select();
   }
 });
-element('archive-search').addEventListener('input', () => { visibleLimit = PAGE_SIZE; });
+element('archive-search').addEventListener('input', () => {
+  visibleLimit = PAGE_SIZE;
+  element('archive-list').scrollTop = 0;
+});
 element('memo-search').addEventListener('toggle', () => {
   const search = element('archive-search');
   if (!element('memo-search').open && search.value) {

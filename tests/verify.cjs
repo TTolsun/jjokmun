@@ -1,5 +1,6 @@
 const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const { openSection } = require('./browser.cjs');
+const {petAction, petButton, liftPet} = require('./pet-controls.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -52,7 +53,6 @@ async function password(p, value) {
 }
 async function exportFile(p) {
   await settings(p);
-  await openSection(p, 'backup-tools');
   await p.locator('#export-backup').click();
   const download = p.waitForEvent('download');
   await password(p, backupPass);
@@ -63,7 +63,6 @@ async function exportFile(p) {
 }
 async function upload(p, bytes) {
   await settings(p);
-  await openSection(p, 'backup-tools');
   await p.locator('#import-backup').setInputFiles({name:'test-backup.json', mimeType:'application/json', buffer:bytes});
 }
 async function commitPreview(p) {
@@ -87,7 +86,7 @@ async function forceNextWriteToFail(p) {
 }
 async function assertLocked(p) {
   await p.locator('#lock-screen').waitFor();
-  for (const selector of ['#copy-memo', '.copy-reply', '#reply-input', '#memo-input', '#floor-memo-input', '#daily-memo', '#archive-search']) {
+  for (const selector of ['#copy-memo', '.copy-reply', '#reply-input', '#memo-input', '#archive-search']) {
     assert.equal(await p.locator(selector).first().isVisible(), false, selector);
   }
   const contents = await p.evaluate(() => document.body.textContent + [...document.querySelectorAll('input, textarea')].map(i => i.value).join(' '));
@@ -139,6 +138,7 @@ async function checkReplyActions(session, a) {
   const row = `article[data-reply-id="${target.id}"]`;
   const b = await session.tab(monday);
   try {
+    await b.locator('[data-memo-id="' + memo.id + '"]').click();
     await b.locator(row).getByRole('button', {name: '답장 수정'}).click();
     await b.locator('#reply-edit-input').fill('다른 탭의 초안');
     await a.locator(row).getByRole('button', {name: '답장 수정'}).click();
@@ -170,6 +170,7 @@ async function checkReplyActions(session, a) {
     await a.locator(row).waitFor({state: 'detached'});
     await b.getByText('검색 결과가 없습니다.').waitFor();
     await a.reload();
+    await a.locator('[data-memo-id="' + memo.id + '"]').click();
     await a.locator('#detail-replies').getByText(reply,{exact:true}).waitFor();
     const after = await readState(a);
     assert.deepEqual(after.memos.find(item => item.id === memo.id).replies, [memo.replies[0]]);
@@ -191,6 +192,7 @@ async function createSource(session) {
   await seedLegacy(session.worker);
   const existing = await session.tab(monday, folder);
   try {
+    await existing.locator('#archive-list button').filter({hasText:folderMemo}).click();
     await existing.locator(':is(#detail-original, #detail-preview):visible').getByText(folderMemo, {exact:true}).waitFor();
     assert.deepEqual(await rawRecord(existing), plain);
     await seedEncryptedVault(existing, vaultPass);
@@ -242,6 +244,9 @@ async function createSource(session) {
   await copyText(a,'#copy-memo',note);
   await copyText(a,'.copy-reply',reply,true);
   await a.setViewportSize({width:1280,height:840});
+  await a.evaluate(() => { Math.random = () => 0; });
+  await petAction(a, 'adopt');
+  await a.locator('#pet-status').getByText(/알을 데려왔어요/).waitFor();
   const bytes = await exportFile(a);
   const again = await exportFile(a);
   const one = JSON.parse(bytes), two = JSON.parse(again);
@@ -256,13 +261,12 @@ async function createSource(session) {
 
 async function checkVault(session, a) {
   const b = await session.tab(monday);
+  await a.locator('#memo-input').fill('미저장 비밀 문장');
   await settings(a);
-  await openSection(a, 'about-tools');
   const developer = a.getByRole('region', {name: '개발자 정보'});
   assert.ok(await developer.getByText('KH', {exact: true}).isVisible());
   const email = developer.getByRole('link', {name: 'baboess@gmail.com'});
   assert.equal(await email.getAttribute('href'), 'mailto:baboess@gmail.com');
-  await openSection(a, 'storage-tools');
   assert.equal(await a.locator('#enable-vault').count(), 0);
   await seedEncryptedVault(a, vaultPass);
   await b.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -271,38 +275,51 @@ async function checkVault(session, a) {
   assert.equal(encrypted.mode,'encrypted');
   for (const value of [note,reply,legacyText,vaultPass]) assert.ok(!JSON.stringify(encrypted).includes(value));
   await unlock(b);
+  await b.locator('#archive-list button').filter({hasText:note}).click();
+  await b.locator('#reply-input').fill('미저장 비밀 문장');
   await openSection(b, 'memo-search');
   await b.locator('#archive-search').fill('미저장 비밀 문장');
-  await b.locator('#reply-input').fill('미저장 비밀 문장');
-  await b.locator('#floor-link').click();
-  assert.equal(await b.locator('#floor-memo-form').isVisible(), false);
+  assert.equal(await b.locator('#memo-form').isVisible(), false);
   await settings(b);
   await upload(b, Buffer.from(JSON.stringify(await readState(b))));
   await b.locator('#import-preview-dialog').waitFor();
   const editor = await session.tab(monday);
   await unlock(editor);
+  await editor.locator('#archive-list button').filter({hasText:note}).click();
   await editor.getByRole('button', {name: '답장 수정'}).click();
   await editor.locator('#reply-edit-input').fill('미저장 비밀 문장');
   const owner = await session.tab(monday);
   await unlock(owner);
-  await owner.locator('#display-memo').click();
-  await owner.locator('#detail-status').getByText('책방 매대에 추천글을 올렸어요.').waitFor();
-  await settings(owner);
-  await owner.locator('#shop-name').fill('저녁의 서점');
-  await owner.locator('#shop-name-form button').click();
-  await owner.locator('#settings-close').click();
-  await owner.locator('#floor-link').click();
-  await owner.locator('#floor-title').getByText('저녁의 서점').waitFor();
-  await owner.waitForFunction(() => document.querySelector('#business-pick').textContent !== '');
+  const pet = owner.locator('#pet');
+  const egg = (await readState(owner)).pet;
+  await owner.clock.setFixedTime(egg.startedAt + 120_000);
+  await owner.reload();
+  await unlock(owner);
+  await pet.locator('#pet-summary-sprite[src$="/fire-pup.png"]').waitFor();
+  await liftPet(owner);
+  await owner.locator('#archive-list button').filter({hasText:note}).click();
+  await owner.locator(':is(#detail-original, #detail-preview):visible').getByText(note, {exact:true}).waitFor();
+  await owner.locator('#pet-read-memo').click();
+  await pet.locator('#pet-memo-excerpt').getByText(note, {exact:true}).waitFor();
+  const petState = (await readState(owner)).pet;
+  assert.ok(petState);
+  await petAction(owner, 'play');
+  await petButton(owner, 'b');
+  await owner.locator('#pet-game[data-phase="aim"]').waitFor();
   await settings(a);
   await a.locator('#lock-vault').click();
   await Promise.all([assertLocked(a), assertLocked(b), assertLocked(editor), assertLocked(owner)]);
-  assert.equal(await owner.locator('#floor').isVisible(), false);
-  assert.equal(await owner.locator('#business-pick').textContent(), '');
-  assert.equal(await owner.locator('#floor-title').textContent(), '');
-  assert.equal(await owner.locator('#sold-list').textContent(), '');
+  assert.equal(await pet.isVisible(), false);
+  await owner.locator('#pet-popover').waitFor({state:'hidden'});
+  assert.equal(await owner.locator('#pet-game').getAttribute('data-phase'), null);
   await unlock(owner);
-  assert.equal((await readState(owner)).shop.name, '저녁의 서점');
+  await owner.locator('#pet-expand[aria-expanded="false"]').waitFor();
+  await owner.locator('#pet-popover').waitFor({state:'hidden'});
+  assert.equal(await owner.locator('#pet-game').isVisible(), false);
+  assert.deepEqual((await readState(owner)).pet, petState);
+  await petAction(owner, 'play');
+  await owner.locator('#pet-game[data-phase="ready"]').waitFor();
+  await petButton(owner, 'c');
   await owner.close();
   assert.equal(await editor.locator('#reply-dialog').isVisible(), false);
   assert.equal(await editor.locator('#reply-edit-input').inputValue(), '');
@@ -323,7 +340,7 @@ async function checkVault(session, a) {
   await a.locator('#archive-list button').first().click();
   await a.locator('.linked-reply p').getByText(reply, {exact:true}).waitFor();
   assert.equal(await a.locator('.linked-reply p').innerText(),reply);
-  console.log('PASS  legacy encrypted record, two-tab lock and draft scrubbing, wrong password and bookstore recovery');
+  console.log('PASS  legacy encrypted record, multi-tab lock and draft scrubbing, wrong password and pet recovery');
 }
 
 async function checkRecovery(session, bytes, initial) {
@@ -331,7 +348,6 @@ async function checkRecovery(session, bytes, initial) {
   const b = await session.tab(wednesday);
   await a.locator('#today-date').waitFor();
   await settings(a);
-  await openSection(a, 'storage-tools');
   const original = await readState(a);
   for (const corrupt of [false,true]) {
     const file = JSON.parse(bytes);
@@ -369,6 +385,7 @@ async function checkRecovery(session, bytes, initial) {
   await commitPreview(a);
   const restored=await readState(a);
   assert.deepEqual(restored.memos,initial.memos);
+  assert.deepEqual(restored.pet,initial.pet);
   assert.deepEqual(restored.props,initial.props);
   for (const entry of initial.daily) assert.ok(restored.daily.some(d=>d.date===entry.date && d.memoId===entry.memoId));
   await doneSettings(a);
@@ -392,7 +409,6 @@ async function checkRecovery(session, bytes, initial) {
   await b.waitForFunction(()=>document.querySelector('#detail-original').textContent==='가져오기 뒤 수정한 원문');
   await a.reload();
   await settings(a);
-  await openSection(a, 'backup-tools');
   await a.locator('#undo-import').click();
   await a.locator('#undo-confirm').click();
   await a.locator('#undo-dialog').waitFor({state:'hidden'});
@@ -401,6 +417,7 @@ async function checkRecovery(session, bytes, initial) {
   const after = await readState(a);
   assert.deepEqual(after.memos.map(m=>m.text).sort(),[localNote,'가져오기 뒤 수정한 원문'].sort());
   assert.equal(after.props.length,0);
+  assert.equal(after.pet, undefined);
   assert.ok(after.daily.every(entry=>!entry.memoId || after.memos.some(m=>m.id===entry.memoId)));
 
   // Legacy plaintext JSON, preview invalidation by an independent write.
@@ -412,7 +429,6 @@ async function checkRecovery(session, bytes, initial) {
   assert.equal((await readState(a)).memos.length,3);
   await commitPreview(a);
   assert.ok((await readState(a)).memos.some(m=>m.text===note));
-  await openSection(a, 'storage-tools');
   assert.equal((await rawRecord(a)).mode, 'plain');
   console.log('PASS  fresh encrypted restore, wrong/damaged/oversized files, failed commit, old JSON, stale preview, idempotence and conflict-preserving undo');
 }
@@ -421,8 +437,11 @@ async function run() {
   await require('./vault-copy.cjs').checkVaultCopy();
   await require('./undo.cjs').checkPlainJournal();
   await require('./undo.cjs').checkLegacyFieldOrder();
-  await require('./regulars.cjs').checkBondRules();
-  await require('./season.cjs').checkSeasonRules();
+  await require('./pet.cjs').checkPetClock();
+  await require('./pet.cjs').checkGrowthPaths();
+  await require('./pet.cjs').checkGrowthStability();
+  await require('./pet.cjs').checkAdoptionBackups();
+  await require('./pet.cjs').checkLegacyPetBackups();
   const manifest=JSON.parse(await fs.readFile(path.join(extension,'manifest.json'),'utf8'));
   assert.equal(manifest.chrome_url_overrides,undefined);
   assert.equal(manifest.host_permissions,undefined);
@@ -448,15 +467,15 @@ async function run() {
     console.log('PASS  no external HTTP(S) requests in normal application workflows');
     await checkPolicy(session);
     await session.context.close();
-    session = await launch(path.join(directory, 'sales-floor-profile'));
-    await require('./sales-floor.cjs').checkSalesFloor(session);
+    session = await launch(path.join(directory, 'journal-layout-profile'));
     await require('./journal-layout.cjs').checkJournalLayout(session);
     assert.deepEqual(session.external, []);
     await session.context.close();
-    session = await launch(path.join(directory, 'bookshop-profile'));
-    await require('./bookshop.cjs').checkBookshop(session);
-    await require('./guest-visit.cjs').checkGuestVisit(session);
-    assert.deepEqual(session.external,[]);
+    session = await launch(path.join(directory, 'pet-profile'));
+    await require('./pet.cjs').checkPet(session);
+    await require('./pet.cjs').checkFamilyCollection(session);
+    await require('./pet.cjs').checkPetDeviceGeometry(session);
+    assert.deepEqual(session.external, []);
     await session.context.close();
     session = await launch(path.join(directory, 'folder-profile'));
     await require('./folder.cjs').checkFolder(session);
@@ -469,14 +488,6 @@ async function run() {
     session = await launch(path.join(directory, 'rendering-profile'));
     await require('./rendering.cjs').checkRendering(session);
     assert.deepEqual(session.external, []);
-    await session.context.close();
-    session = await launch(path.join(directory, 'regulars-profile'));
-    await require('./regulars.cjs').checkRegulars(session);
-    assert.deepEqual(session.external,[]);
-    await session.context.close();
-    session = await launch(path.join(directory, 'season-profile'));
-    await require('./season.cjs').checkSeason(session);
-    assert.deepEqual(session.external,[]);
   } finally {
     if (session) await session.context.close();
     const resolved=await fs.realpath(directory);

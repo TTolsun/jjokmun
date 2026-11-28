@@ -1,6 +1,7 @@
 import { MAX_VAULT_BYTES } from './crypto.js';
 import { validateShop } from './shop.js';
 import { validateBusiness } from './business.js';
+import { petEvolution, validatePet } from './pet.js';
 
 const VERSION = 1;
 export const PROP_KINDS = ['chair', 'plant', 'books'];
@@ -65,7 +66,10 @@ const formats = new Set(['markdown', 'text', 'plantuml', 'mermaid']);
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 
 export function backupSnapshot(state) {
-  return validateBackup(state, { local: true });
+  const snapshot = validateBackup(state, { local: true });
+  const evolution = petEvolution(snapshot.pet);
+  if (evolution) snapshot.pet = evolution.pet;
+  return snapshot;
 }
 
 export function validateBackup(value, { local = false } = {}) {
@@ -125,6 +129,7 @@ export function validateBackup(value, { local = false } = {}) {
     return { kind: prop.kind, memoId: prop.memoId, replyId: prop.replyId };
   });
   const clean = { version: VERSION, memos, daily, props };
+  if (value.pet !== undefined) clean.pet = validatePet(value.pet);
   if (value.business !== undefined) clean.business = validateBusiness(value.business);
   if (value.shop !== undefined) {
     clean.shop = validateShop(value.shop);

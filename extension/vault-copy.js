@@ -1,4 +1,4 @@
-import { backupSnapshot } from './store.js';
+import { validateBackup } from './store.js';
 import { digest, documentFormat, extensions, openDocuments, persistentDocuments } from './documents.js';
 import { COPY_FORMAT, readVaultFile, writeVaultFile } from './folder.js';
 
@@ -59,8 +59,8 @@ async function copyDocument(directory, path, bytes, hash) {
 async function verify(directory, record, expected) {
   await openDocuments(directory, record.payload, true);
   if (record.payload.state.memos.some(memo => memo.documentMissing)
-    || JSON.stringify(backupSnapshot(record.payload.state)) !== JSON.stringify(expected)) {
-    throw new Error('대상 폴더에서 다시 읽은 메모나 답장이 원본과 다릅니다. 기존 암호화 저장소에서 다시 시도해 주세요.');
+    || JSON.stringify(validateBackup(record.payload.state, { local: true })) !== JSON.stringify(expected)) {
+    throw new Error('대상 폴더에서 다시 읽은 메모, 답장 또는 펫 기록이 원본과 다릅니다. 기존 암호화 저장소에서 다시 시도해 주세요.');
   }
 }
 
@@ -71,7 +71,8 @@ export async function copySnapshot(source, target, encrypted, payload, checkSess
   if (await source.resolve(target) !== null || await target.resolve(source) !== null) {
     throw new Error('원본 폴더와 겹치지 않는 별도 폴더를 선택해 주세요.');
   }
-  const state = backupSnapshot(payload.state);
+  // A copy verifies the saved records even if the pet is due to evolve while documents are written.
+  const state = validateBackup(payload.state, { local: true });
   const paths = copyPaths(state.memos, payload.documents);
   const documents = Object.create(null);
   for (const memo of state.memos) {
