@@ -1,4 +1,4 @@
-import { readVaultFile, writeVaultFile, FolderAccessError } from './folder.js';
+import { readVaultFile, writeVaultFile, unreadableVaultMessage, FolderAccessError } from './folder.js';
 import { rememberFolder } from './last-folder.js';
 import { legacySnapshot, removeMigratedProfile } from './legacy-profile.js';
 import { backupSnapshot, emptyState, validateBackup } from './store.js';
@@ -64,7 +64,10 @@ export function useFolder(directory, { reopen = false, remember = true, copyCurr
     const sameFolder = connection && await connection.directory.isSameEntry(directory);
     const existing = await readVaultFile(directory, !reopen && !sameFolder);
     if (existing) {
-      if (existing.mode === 'plain') validateBackup(existing.payload.state, { local: true });
+      if (existing.mode === 'plain') {
+        try { validateBackup(existing.payload.state, { local: true }); }
+        catch { throw new Error(unreadableVaultMessage(existing, '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.')); }
+      }
     } else {
       const legacy = previous ? null : await legacySnapshot();
       let current = previous ? await fileRecord(previous) : normalize(legacy?.state);
@@ -80,9 +83,9 @@ export function useFolder(directory, { reopen = false, remember = true, copyCurr
         }
       }
       assertGeneration(expected);
-      await writeVaultFile(directory, current, true);
+      const written = await writeVaultFile(directory, current, true);
       if (legacy) {
-        if (legacy.state && JSON.stringify(await readVaultFile(directory)) !== JSON.stringify(current)) {
+        if (legacy.state && JSON.stringify(await readVaultFile(directory)) !== written) {
           throw new Error('저장 파일을 확인하지 못했습니다. 이전 프로필의 기록을 유지합니다.');
         }
         assertGeneration(expected);
