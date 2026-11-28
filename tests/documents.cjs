@@ -1,3 +1,4 @@
+const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const assert = require('node:assert/strict');
 const {openSection, selectFolder} = require('./browser.cjs');
 
@@ -224,7 +225,7 @@ async function checkDocuments(session) {
     console.log('PASS  UTF-16 LE and BE document edits preserve BOM and CRLF');
 
     const passphrase = 'test-only document vault password';
-    await page.evaluate(async passphrase => (await import('./vault.js')).enableVault(passphrase), passphrase);
+    await seedEncryptedVault(page, passphrase);
     await page.reload();
     await page.locator('#lock-screen').waitFor();
     assert.ok(!(await page.locator('body').textContent()).includes(markdown));
@@ -243,9 +244,8 @@ async function checkDocuments(session) {
     assert.ok(!unlocked.includes('암호화 중 외부에서 쓴 원문'));
     assert.ok(!unlocked.includes('암호화 중 새로 만든 파일'));
     const beforeEncryptedWrite = await disk(page, 'list', '');
-    await page.locator('#memo-input').fill('암호화 저장소에서 쓴 메모');
-    await page.locator('#memo-save').click();
-    await page.locator(':is(#detail-original, #detail-preview):visible').getByText('암호화 저장소에서 쓴 메모', {exact: true}).waitFor();
+    assert.equal(await page.locator('#memo-form').isVisible(), false);
+    assert.ok(await page.locator('.writing .legacy-writing button').isVisible());
     assert.deepEqual((await disk(page, 'list', '')).sort(), beforeEncryptedWrite.sort());
     await expectBytes(page, '서가/책.md', '암호화 중 외부에서 쓴 원문');
     console.log('PASS  encrypted snapshot ignores external changes and writes no new plaintext memo files');

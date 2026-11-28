@@ -26,9 +26,10 @@
           <h1 id="journal-title">메모장</h1>
           <label class="visually-hidden" for="memo-input">새 메모</label>
           <form id="memo-form" autocomplete="off">
-            <input id="memo-input" type="text" maxlength="2000" placeholder="새 메모를 한 줄로 적어 보세요" required>
+            <textarea id="memo-input" rows="1" data-enter-submits placeholder="새 메모를 적어 보세요 (Shift+Enter로 줄바꿈)" required></textarea>
             <button id="memo-save" type="submit">저장 <span aria-hidden="true">↵</span></button>
           </form>
+          <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
           <p class="status" id="home-status" role="status"></p>
         </div>
       </div>
@@ -113,7 +114,7 @@
           <form id="reply-form" autocomplete="off">
             <label class="field-label" for="reply-input">답장 쓰기</label>
             <div class="inline-form">
-              <input type="text" id="reply-input" placeholder="이 메모를 지금 읽고 든 생각" maxlength="2000" required>
+              <textarea id="reply-input" rows="1" maxlength="65536" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
               <button type="submit" id="reply-save">답장 저장</button>
             </div>
           </form>
@@ -293,8 +294,8 @@
     <div class="section-heading"><h2 id="reply-dialog-title"></h2></div>
     <form id="reply-dialog-form" autocomplete="off">
       <div id="reply-edit-field">
-        <label class="field-label" for="reply-edit-input">답장 내용</label>
-        <input id="reply-edit-input" type="text" maxlength="2000" required>
+        <label class="field-label" for="reply-edit-input">답장 내용 (Enter로 저장, Shift+Enter로 줄바꿈)</label>
+        <textarea id="reply-edit-input" rows="6" maxlength="65536" required></textarea>
       </div>
       <div id="reply-delete-preview" hidden>
         <blockquote id="reply-delete-text"></blockquote>
@@ -317,6 +318,16 @@
     </div>
   </dialog>
 
+  <dialog id="vault-copy-dialog" aria-labelledby="vault-copy-title">
+    <h2 id="vault-copy-title">일반 폴더로 복사</h2>
+    <p id="vault-copy-description"></p>
+    <p>대상 폴더에 접근할 수 있는 사람은 메모와 답장을 비밀번호 없이 읽을 수 있습니다. 원래 폴더의 문서와 암호화 저장 파일은 그대로 보관합니다.</p>
+    <p id="vault-copy-status" class="status" role="status"></p>
+    <div class="confirm-actions">
+      <button id="vault-copy-cancel" type="button" autofocus>취소</button>
+      <button id="vault-copy-confirm" type="button">복사하고 열기</button>
+    </div>
+  </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <div class="section-heading">
       <h2 id="settings-title">설정</h2>
@@ -328,15 +339,13 @@
         <h4>메모 저장 폴더</h4>
         <p id="storage-location"></p>
         <button id="choose-folder" type="button">저장 폴더 선택</button>
-        <p>선택한 폴더에 메모를 저장합니다. 하위 폴더의 파일은 전체 메모 아래에서 열 수 있습니다.</p>
+          <p>선택한 폴더에 메모를 저장합니다. 하위 폴더의 파일은 최근 메모 아래에서 열 수 있습니다.</p>
       </section>
       <section>
         <h4>이 기기의 저장소</h4>
         <p id="vault-state"></p>
-        <p>비밀번호를 잊으면 암호화한 메모를 다시 열 수 없습니다.</p>
         <div class="backup-actions">
-          <button type="button" id="enable-vault">저장소 암호화</button>
-          <button type="button" id="disable-vault" hidden>저장소 암호화 해제</button>
+          <button type="button" id="copy-vault" hidden>일반 폴더로 복사</button>
           <button type="button" id="lock-vault" hidden>모든 탭 잠그기</button>
         </div>
       </section>

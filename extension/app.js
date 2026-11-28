@@ -4,15 +4,16 @@ import { createTime, element, formatDate, longDate, memoExcerpt } from './ui/dom
 import { focusArchiveReturn, newestMemos, renderArchive, resetArchive } from './ui/archive.js';
 import { bindBackupDialogs } from './ui/backup-dialogs.js';
 import { bindReplyDialog } from './ui/reply-dialog.js';
-import { DocumentConflictError, DocumentWriteError, folderConnection, useFolder, reconnectFolder, relinkDocument } from './vault.js';
+import { DocumentConflictError, DocumentWriteError, folderConnection, copyVaultToFolder, useFolder, reconnectFolder, relinkDocument } from './vault.js';
 import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
-import { documentChanged } from './documents.js';
+import { checkMemoSize, detectFormat, documentChanged } from './documents.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { applyPetAction, petView } from './pet.js';
 import { bindPet } from './ui/pet.js';
 import { bindDocumentPreview } from './ui/document-preview.js';
 import { bindEditorReturn } from './ui/editor-return.js';
+import { bindReplyPreviews } from './ui/reply-previews.js';
 
 const channel = new BroadcastChannel('memo-alley');
 const requestedDate = new URLSearchParams(location.search).get('date');
@@ -61,11 +62,13 @@ const folderFiles = bindFolderFiles({
   canOpenMemo: path => mode === 'plain' && Boolean(documentAt(path)),
   openMemo: openDocumentAt
 });
-const documentPreview = bindDocumentPreview({
+const previewSources = {
   folder: () => mode === 'plain' ? folderConnection()?.directory : undefined,
   hasDocument: path => Boolean(documentAt(path)),
   openDocument: openDocumentAt
-});
+};
+const documentPreview = bindDocumentPreview(previewSources);
+const replyPreviews = bindReplyPreviews(previewSources);
 
 function currentMemo() {
   return state.memos.find((memo) => memo.id === detailId);
@@ -91,6 +94,7 @@ function clearSensitive(showLock) {
   pet.reset();
   folderFiles.reset();
   documentPreview.reset();
+  replyPreviews.reset();
   resetEdit();
   resetArchive();
   element('folder-start-status').textContent = '';
@@ -128,13 +132,16 @@ function renderPayload(result, date, storageMode = mode) {
   element('lock-screen').hidden = true;
   element('startup-status').hidden = true;
   element('undo-import').disabled = !result.payload.undo;
-  element('enable-vault').hidden = mode !== 'plain';
-  element('disable-vault').hidden = mode !== 'encrypted';
+  const encrypted = mode === 'encrypted';
+  for (const notice of document.querySelectorAll('.legacy-writing')) notice.hidden = !encrypted;
+  element('memo-form').hidden = encrypted;
+  document.querySelector('label[for="memo-input"]').hidden = encrypted;
+  element('copy-vault').hidden = !encrypted;
   element('lock-vault').hidden = mode !== 'encrypted';
   element('refresh-documents').hidden = mode !== 'plain';
   setStatus('vault-state', mode === 'encrypted'
     ? '쪽문 저장 파일에 메모를 암호화해 저장합니다. 폴더에 남은 .md와 .txt 파일은 계속 열 수 있습니다.'
-    : '새 메모는 저장 폴더에 .md 파일로 저장됩니다. 답장과 펫 기록은 쪽문 저장 파일에 남습니다.');
+    : '새 메모는 저장 폴더에 파일로 저장됩니다. 답장과 펫 기록은 쪽문 저장 파일에 남습니다.');
   render(date);
   if (resumed && ['#journal', '#pet'].includes(location.hash)) {
     element(location.hash.slice(1)).scrollIntoView();
@@ -223,8 +230,16 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; });
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && (composing || event.isComposing || event.keyCode === 229)) {
+    if (event.key !== 'Enter') return;
+    if (composing || event.isComposing || event.keyCode === 229) {
+      // An Enter that ends an IME syllable (Korean, on Windows Chrome) arrives only as this
+      // composing keydown, so a textarea line break must not be cancelled here.
+      if (input.localName === 'textarea' && (event.shiftKey || !('enterSubmits' in input.dataset))) return;
       event.preventDefault();
+    } else if ('enterSubmits' in input.dataset && !event.shiftKey) {
+      // Memo fields are textareas that still save on Enter; Shift+Enter adds a line.
+      event.preventDefault();
+      form.requestSubmit();
     }
   });
   form.addEventListener('submit', async (event) => {
@@ -232,8 +247,8 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
     if (composing || pending) return;
     const original = input.value;
     const text = readText(input);
-    if (!text && input.required) {
-      setStatus(statusId, '한 줄을 적어 주세요.');
+    if (input.required && !text.trim()) {
+      setStatus(statusId, '내용을 적어 주세요.');
       input.focus();
       return;
     }
@@ -244,7 +259,7 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
     button.disabled = true;
     try {
       const message = await onSubmit(text);
-      if (message && expected === viewGeneration && (!inDetail || (!inDetail.hidden && detailId === revision))) {
+      if (message && expected === viewGeneration && (!inDetail || detailId === revision)) {
         if (input.value === original) input.value = '';
         setStatus(statusId, message);
       }
@@ -268,8 +283,10 @@ function textSaveError(error) {
 }
 
 function newMemo(text, date) {
+  if (mode === 'encrypted') throw new DocumentWriteError('새 메모를 쓰려면 먼저 일반 폴더로 복사해 주세요.');
+  checkMemoSize(text);
   const now = Date.now();
-  return { id: crypto.randomUUID(), text, documentFormat: 'markdown', createdOn: date, createdAt: now, updatedAt: now, replies: [] };
+  return { id: crypto.randomUUID(), text, documentFormat: detectFormat(text), createdOn: date, createdAt: now, updatedAt: now, replies: [] };
 }
 
 bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text) => {
@@ -283,7 +300,7 @@ bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text)
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
   return '메모를 남겼어요.';
-});
+}, input => input.value);
 
 function renderPetMemo() {
   if (state.pet?.form === 'egg') readPetMemoId = undefined;
@@ -355,6 +372,7 @@ bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (tex
         return false;
       }
       if (memo.text === text || (base.documentPath && text === base.text.replace(/\r\n?/g, '\n'))) return false;
+      if (!base.documentPath) checkMemoSize(text);
       memo.text = text;
       memo.updatedAt = Math.min(8640000000000000, Math.max(Date.now(), memo.updatedAt + 1));
     });
@@ -449,6 +467,7 @@ function renderDetail() {
   const container = element('detail-replies');
   const focused = container.contains(document.activeElement) ? document.activeElement : undefined;
   container.replaceChildren();
+  replyPreviews.prune(new Set(replies.map(reply => reply.id)));
   if (!replies.length) return;
   const label = document.createElement('h3');
   label.textContent = '답장';
@@ -463,8 +482,7 @@ function renderDetail() {
       tag.textContent = '검색어가 있는 답장';
       article.append(tag);
     }
-    const text = document.createElement('p');
-    text.textContent = reply.text;
+    const text = replyPreviews.bodyFor(reply, memo);
     const header = document.createElement('div');
     header.className = 'reply-heading';
     const actions = element('reply-actions-template').content.cloneNode(true);
@@ -576,8 +594,11 @@ function openArchiveDetail(id, replyId, source) {
 function renderSelection() {
   const hasMemo = detailExpanded && Boolean(currentMemo());
   element('detail-dialog').hidden = !hasMemo;
-  if (!hasMemo) documentPreview.reset();
-  else renderDetail();
+  if (hasMemo) renderDetail();
+  else {
+    documentPreview.reset();
+    replyPreviews.reset();
+  }
 }
 
 function closeDetail(restoreFocus = true) {
@@ -809,6 +830,58 @@ async function chooseFolder(button, reopen) {
 element('choose-first-folder').addEventListener('click', event => chooseFolder(event.currentTarget, Boolean(lastDirectory)));
 element('choose-new-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('choose-locked-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
+const copyDialog = element('vault-copy-dialog');
+let copyTarget;
+
+async function chooseCopyTarget(event) {
+  const status = event.currentTarget.closest('#settings-dialog') ? 'settings-status' : 'home-status';
+  const expected = viewGeneration;
+  try {
+    const target = await window.showDirectoryPicker({ mode: 'readwrite', id: 'jjokmun-copy' });
+    if (expected !== viewGeneration || mode !== 'encrypted') return;
+    copyTarget = target;
+    setStatus('vault-copy-description', '「' + folderConnection().directory.name + '」의 기록을 「' + target.name
+      + '」에 평문으로 복사합니다. 연결된 문서는 두 폴더에서 같은 상대 경로로 찾을 수 있습니다.');
+    setStatus('vault-copy-status', '');
+    copyDialog.showModal();
+  } catch (error) {
+    if (error.name !== 'AbortError' && expected === viewGeneration) setStatus(status, error.message);
+  }
+}
+for (const button of document.querySelectorAll('#copy-vault, .legacy-writing button')) button.addEventListener('click', chooseCopyTarget);
+element('vault-copy-cancel').addEventListener('click', () => copyDialog.close());
+copyDialog.addEventListener('close', () => {
+  copyTarget = undefined;
+  element('vault-copy-description').textContent = '';
+  element('vault-copy-status').textContent = '';
+});
+copyDialog.addEventListener('cancel', event => {
+  if (element('vault-copy-confirm').disabled) event.preventDefault();
+});
+element('vault-copy-confirm').addEventListener('click', async event => {
+  const target = copyTarget;
+  if (!target) return;
+  const expected = viewGeneration;
+  const button = event.currentTarget;
+  button.disabled = element('vault-copy-cancel').disabled = true;
+  setStatus('vault-copy-status', '문서를 복사하고 메모, 답장, 펫 기록을 다시 읽어 확인하고 있습니다.');
+  try {
+    await copyVaultToFolder(target);
+    if (expected !== viewGeneration) return;
+    const remembered = await useFolder(target, { reopen: true, copyCurrent: false });
+    clearSensitive(false);
+    await refresh();
+    setStatus('home-status', '「' + target.name + '」에 복사한 메모, 답장, 펫 기록을 확인했습니다.'
+      + (remembered ? '' : ' 다음 실행 때 이 폴더를 다시 선택해 주세요.'));
+    element('journal').scrollIntoView();
+    element('memo-input').focus({ preventScroll: true });
+  } catch (error) {
+    if (expected === viewGeneration) setStatus('vault-copy-status', '복사를 마치지 못했습니다. ' + error.message);
+  } finally {
+    button.disabled = element('vault-copy-cancel').disabled = false;
+  }
+});
+
 element('choose-folder').addEventListener('click', event => chooseFolder(event.currentTarget, false));
 element('storage-relocate').addEventListener('click', event => chooseFolder(event.currentTarget, true));
 element('storage-reconnect').addEventListener('click', async () => {
@@ -828,7 +901,6 @@ const clearBackupDialogs = bindBackupDialogs({
   today,
   setStatus,
   announce,
-  refresh,
   renderResult: renderPayload
 });
 
@@ -863,7 +935,7 @@ element('unlock-form').addEventListener('submit', async (event) => {
     await unlockVault(password);
     if (expected !== viewGeneration) return;
     await refresh();
-    if (workspaceReady) element('memo-input').focus();
+    if (workspaceReady) document.querySelector('.writing .legacy-writing button').focus();
   } catch (error) {
     if (expected === viewGeneration) {
       setStatus('unlock-status', error.message || '저장소를 열지 못했습니다.');

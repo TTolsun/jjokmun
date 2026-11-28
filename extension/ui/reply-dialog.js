@@ -47,7 +47,17 @@ export function bindReplyDialog(change) {
     if (!confirm.disabled && target) closeAndFocus();
   });
   input.addEventListener('keydown', event => {
-    if (event.key === 'Enter' && (event.isComposing || event.keyCode === 229)) event.preventDefault();
+    if (event.key !== 'Enter') return;
+    // A composing Enter can be the only keydown for Shift+Enter after a Korean syllable,
+    // so let it insert the line break.
+    if (event.isComposing || event.keyCode === 229) {
+      if (!event.shiftKey) event.preventDefault();
+    }
+    // Enter saves as before; Shift+Enter starts a new line in the textarea.
+    else if (!event.shiftKey) {
+      event.preventDefault();
+      element('reply-dialog-form').requestSubmit();
+    }
   });
   element('reply-dialog-form').addEventListener('submit', async event => {
     event.preventDefault();
@@ -56,7 +66,7 @@ export function bindReplyDialog(change) {
     const editing = pending.action === 'edit';
     const text = input.value.trim();
     if (editing && !text) {
-      status.textContent = '답장을 한 줄로 적어 주세요.';
+      status.textContent = '답장 내용을 적어 주세요.';
       input.focus();
       return;
     }

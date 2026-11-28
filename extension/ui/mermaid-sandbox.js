@@ -18,8 +18,8 @@ window.addEventListener('message', async (event) => {
   try {
     const { svg } = await renderer.render('diagram-' + id, source, container);
     parent.postMessage({ id, svg: materializeSvgStyles(svg, container) }, event.origin);
-  } catch {
-    parent.postMessage({ id, error: true }, event.origin);
+  } catch (error) {
+    parent.postMessage({ id, error: String(error?.message ?? error).slice(0, 1000) }, event.origin);
   } finally {
     container.remove();
   }

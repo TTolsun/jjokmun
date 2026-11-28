@@ -199,7 +199,7 @@ async function checkJournalLayout(session) {
     await openSection(page, 'folder-files');
     await click('#open-settings');
     assert.equal(await page.locator('#settings-dialog :is(details, summary)').count(), 0);
-    for (const selector of ['#choose-folder', '#enable-vault', '#export-backup', '#choose-backup', '#undo-import', '#developer-title']) {
+    for (const selector of ['#choose-folder', '#export-backup', '#choose-backup', '#undo-import', '#developer-title']) {
       await page.locator(selector).waitFor();
     }
     for (const width of [320, 360, 640, 768, 1280]) {

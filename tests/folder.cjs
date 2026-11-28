@@ -1,3 +1,4 @@
+const { seedEncryptedVault } = require('./legacy-vault.cjs');
 const { openSection } = require('./browser.cjs');
 const {selectFolder} = require('./browser.cjs');
 const assert = require('node:assert/strict');
@@ -61,6 +62,26 @@ async function checkFolder(session) {
     });
     await page.locator('#choose-folder').click();
     await page.getByText('쪽문 저장 파일의 형식을 확인해 주세요.').waitFor();
+    // A file from a newer release that this release rejects names the version gap.
+    const appVersion = await page.evaluate(() => chrome.runtime.getManifest().version);
+    for (const [name, stamp, message] of [
+      ['미래 책방', '99.0.0', `이 저장 파일은 쪽문 99.0.0에서 저장되었습니다. 지금 쓰는 쪽문(${appVersion})을 업데이트한 뒤 다시 열어 주세요.`],
+      ['버전 표기 오류', '99.invalid', '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.'],
+      ['낡은 책방', undefined, '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.']
+    ]) {
+      await page.evaluate(async ({name, stamp}) => {
+        const root = await navigator.storage.getDirectory();
+        const directory = await root.getDirectoryHandle(name, {create:true});
+        const file = await directory.getFileHandle('jjokmun-vault.json', {create:true});
+        const stream = await file.createWritable();
+        await stream.write(JSON.stringify({format:2, revision:1, epoch:0, mode:'plain', appVersion:stamp, payload:{undo:null,
+          state:{version:1, memos:[{id:'future', text:'', createdOn:'2026-11-25', updatedAt:1, replies:[{id:'r', text:''}]}], daily:[], props:[]}}}));
+        await stream.close();
+        window.showDirectoryPicker = async () => directory;
+      }, {name, stamp});
+      await page.locator('#choose-folder').click();
+      await page.getByText(message, {exact:true}).waitFor();
+    }
     await page.reload();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
@@ -100,6 +121,7 @@ async function checkFolder(session) {
     await page.locator('#storage-reconnect').click();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
+    await seedEncryptedVault(page, 'sample folder password');
     const stored = await page.evaluate(async () => {
       const vault = await import('./vault.js');
       const folder = await vault.folderConnection();
@@ -107,7 +129,6 @@ async function checkFolder(session) {
       const read = async () => JSON.parse(await (await handle.getFile()).text());
       const titles = (await vault.transact()).memos.map(m => m.text);
       const profileState = (await indexedDB.databases()).find(db => db.name === 'memo-alley');
-      await vault.enableVault('sample folder password');
       const encrypted = await read();
       await vault.lockVault();
       await vault.unlockVault('sample folder password');
@@ -117,6 +138,7 @@ async function checkFolder(session) {
     assert.equal(stored.profileState, undefined);
     assert.equal(stored.encrypted.mode, 'encrypted');
     assert.equal(stored.encrypted.payload, undefined);
+    assert.equal(stored.encrypted.appVersion, await page.evaluate(() => chrome.runtime.getManifest().version));
     assert.equal(stored.decrypted, 6);
     const retry = await session.context.newPage();
     try {
