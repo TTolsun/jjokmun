@@ -19,7 +19,7 @@ export function bindReplyDialog(change) {
 
   function open(action, memoId, reply) {
     const editing = action === 'edit';
-    target = { action, memoId, replyId: reply.id, original: reply.text };
+    target = { action, memoId, replyId: reply.id, original: reply.text, editorSession: Symbol() };
     element('reply-dialog-title').textContent = editing ? '답장 수정' : '답장을 삭제할까요?';
     element('reply-edit-field').hidden = !editing;
     element('reply-delete-preview').hidden = editing;
@@ -89,5 +89,11 @@ export function bindReplyDialog(change) {
       input.readOnly = false;
     }
   });
-  return { open, reset };
+  function editorContext(memo) {
+    if (!dialog.open || target?.action !== 'edit' || memo?.id !== target.memoId
+      || !memo.replies.some(reply => reply.id === target.replyId)) return undefined;
+    return target.editorSession;
+  }
+
+  return { open, reset, editorContext };
 }

@@ -1,5 +1,6 @@
 import { selectDaily } from './store.js';
 import { validateBusiness } from './business.js';
+import { petEvolution, validatePet } from './pet.js';
 
 const core = (memo) => ({ text: memo.text, updatedAt: memo.updatedAt });
 const link = (memoId, replyId) => memoId + '/' + replyId;
@@ -134,11 +135,41 @@ export function mergeImport(state, backup, date) {
     undo.shop = structuredClone(state.shop);
     summary.shop = 1;
   }
-  return { summary, undo: changed || undo.shop || undo.business ? structuredClone(undo) : null };
+  if (backup.pet) {
+    if (!state.pet) {
+      const restored = petEvolution(backup.pet)?.pet ?? structuredClone(backup.pet);
+      const now = Date.now();
+      const clockOffset = Math.max(0, restored.startedAt - now, restored.tickAt - now, restored.sleepTickAt - now);
+      for (const key of ['startedAt', 'tickAt', 'sleepStartedAt', 'sleepTickAt', 'sleepUntil']) {
+        restored[key] = Math.max(0, restored[key] - clockOffset);
+      }
+      state.pet = restored;
+      undo.pet = { before: null, after: restored };
+      summary.pet = '복원';
+    } else {
+      const current = petEvolution(state.pet)?.pet ?? state.pet;
+      const incoming = petEvolution(backup.pet)?.pet ?? backup.pet;
+      const discovered = incoming.discovered.filter(form => !current.discovered.includes(form));
+      if (discovered.length) {
+        const restored = { ...current, discovered: [...current.discovered, ...discovered] };
+        undo.pet = { before: current, after: restored };
+        state.pet = restored;
+        summary.pet = '도감에 추가';
+      }
+    }
+  }
+  return { summary, undo: changed || undo.shop || undo.business || undo.pet ? structuredClone(undo) : null };
 }
 
 export function undoImport(state, undo, date) {
   const summary = { memos: 0, originals: 0, replies: 0, conflicts: 0, reasons: [] };
+  if (undo.pet && state.pet) {
+    if (JSON.stringify(validatePet(state.pet)) === JSON.stringify(validatePet(undo.pet.after))) {
+      if (undo.pet.before) state.pet = undo.pet.before;
+      else delete state.pet;
+      summary.pet = 1;
+    } else conflict(summary, '가져오기 뒤 돌본 펫의 기록은 유지했습니다.');
+  }
   if (undo.business) {
     if (state.business && JSON.stringify(validateBusiness(state.business)) === JSON.stringify(validateBusiness(undo.business.after))) {
       if (undo.business.before) state.business = undo.business.before;

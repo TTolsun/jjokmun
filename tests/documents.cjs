@@ -45,7 +45,8 @@ async function failNextWrite(page, filename) {
 
 async function openDocument(page, name) {
   await openSection(page, 'memo-search');
-  await page.locator('#archive-list button').filter({has: page.getByText(name, {exact: true})}).click();
+  const row = page.locator('#archive-list button').filter({has: page.getByText(name, {exact: true})});
+  if (await row.getAttribute('aria-expanded') !== 'true') await row.click();
   await page.waitForFunction(name => document.querySelector('#detail-path').textContent === name, name);
 }
 

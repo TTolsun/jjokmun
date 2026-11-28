@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "쪽문 · 나만의 메모장",
   "version": "1.8.1",
-  "description": "한 줄 메모가 책이 되는 작은 도트 책방입니다. 내 폴더의 Markdown 문서를 열고 Mermaid·PlantUML 다이어그램을 오프라인으로 읽고 편집하세요.",
+  "description": "작은 정원에서 펫을 돌보고 한 줄 메모와 답장을 남겨 보세요. 내 폴더의 Markdown 문서를 열고 Mermaid·PlantUML 다이어그램을 오프라인으로 읽고 편집하세요.",
   "icons": { "16": "icon-16.png", "32": "icon-32.png", "128": "icon-128.png" },
   "action": {
     "default_title": "쪽문 · 나만의 메모장 열기",

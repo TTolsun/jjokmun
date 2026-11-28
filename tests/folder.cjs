@@ -34,7 +34,6 @@ async function checkFolder(session) {
       window.showDirectoryPicker = async () => library;
     });
     await page.locator('#open-settings').click();
-    await openSection(page, 'storage-tools');
     await page.locator('#choose-folder').click();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
@@ -60,12 +59,12 @@ async function checkFolder(session) {
       await stream.close();
       window.showDirectoryPicker = async () => damaged;
     });
-    await openSection(page, 'storage-tools');
     await page.locator('#choose-folder').click();
     await page.getByText('쪽문 저장 파일의 형식을 확인해 주세요.').waitFor();
     await page.reload();
     await openSection(page, 'folder-files');
     await page.locator('#file-list button').nth(5).waitFor();
+    await page.locator('#archive-list button').filter({hasText:'옮길 메모'}).click();
     await page.locator(':is(#detail-original, #detail-preview):visible').getByText('옮길 메모').waitFor();
     const another = await session.tab(undefined, null);
     try {
@@ -160,6 +159,7 @@ async function checkFolder(session) {
     });
     assert.ok(!remainingFiles.includes('jjokmun-vault.json'));
     await selectFolder(page, 'test-vault');
+    await page.locator('#archive-list button').filter({hasText:'옮길 메모'}).click();
     await page.locator(':is(#detail-original, #detail-preview):visible').getByText('옮길 메모').waitFor();
     console.log('PASS  automatic folder restore, permission retry, encrypted startup and missing vault recovery');
     console.log('PASS  folder migration, nested text/source/binary files, reload, concurrent writes and encrypted disk record');

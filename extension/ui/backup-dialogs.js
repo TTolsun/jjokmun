@@ -70,12 +70,12 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
       value.textContent = summary[field] + '개';
       list.append(term, value);
     }
-    for (const [key, label] of [['shop', '책방 운영 기록'], ['business', '가구 배치와 단골 기록']]) {
+    for (const [key, label] of [['shop', '책방 운영 기록'], ['business', '가구 배치와 단골 기록'], ['pet', '펫 돌봄과 도감 기록']]) {
       if (!next.backup[key]) continue;
       const term = document.createElement('dt');
       term.textContent = label;
       const value = document.createElement('dd');
-      value.textContent = summary[key] ? '복원' : '현재 기록 유지';
+      value.textContent = key === 'pet' ? (summary.pet || '현재 기록 유지') : (summary[key] ? '복원' : '현재 기록 유지');
       list.append(term, value);
     }
     const reasons = document.createElement('ul');
@@ -279,8 +279,9 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, refr
       undoDialog.close();
       renderResult(result, date);
       announce('changed');
-      const message = '가져오기를 되돌렸어요. 제거한 메모 ' + summary.memos + '개, 복원한 원문 '
+      let message = '가져오기를 되돌렸어요. 제거한 메모 ' + summary.memos + '개, 복원한 원문 '
         + summary.originals + '개, 제거한 답장 ' + summary.replies + '개.';
+      if (summary.pet) message += ' 펫 기록도 가져오기 전으로 돌아갔어요.';
       setStatus('undo-result', summary.conflicts ? message + ' 충돌 ' + summary.conflicts + '건. ' + summary.reasons.join(' ') : message);
     } catch (error) {
       if (expected === activeView()) {
