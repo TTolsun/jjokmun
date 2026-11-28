@@ -1,4 +1,3 @@
-const { openSection } = require('./browser.cjs');
 const assert = require('node:assert/strict');
 
 async function checkSalesFloor(session) {
@@ -125,19 +124,17 @@ async function checkSalesFloor(session) {
     await sold.click();
     await page.locator(':is(#detail-original, #detail-preview):visible').getByText('골목 끝 나무 아래에서 쓴 첫 책').waitFor();
     assert.equal(await page.locator('#reply-input').evaluate(input => input === document.activeElement), true);
-    await page.locator('#reply-compose > summary').click();
     assert.equal(await page.locator('.owners-pick').isVisible(), false);
     await page.locator('#open-archive').click();
-    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input']);
+    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
     await page.locator('#memo-input').fill('주인이 권하는 여행기');
     await page.locator('#memo-save').click();
     await page.locator(':is(#detail-original, #detail-preview):visible').getByText('주인이 권하는 여행기').waitFor();
-    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input']);
-    assert.equal(await page.locator('#edit-memo').isVisible(), false);
+    assert.deepEqual(await page.locator('.workspace :is(input, textarea):visible').evaluateAll(inputs => inputs.map(input => input.id)), ['memo-input', 'reply-input']);
+    assert.ok(await page.locator('#edit-memo').isVisible());
     await page.keyboard.press('Control+k');
     assert.equal(await page.locator('#archive-search').evaluate(input => input === document.activeElement), true);
     await page.locator('#memo-search > summary').click();
-    await openSection(page, 'memo-tools');
     await page.locator('#display-memo').click();
     await page.locator('#detail-status').getByText('책방 매대에 추천글을 올렸어요.').waitFor();
     await page.locator('#floor-link').click();

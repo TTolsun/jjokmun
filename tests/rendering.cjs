@@ -239,7 +239,6 @@ async function checkRendering(session) {
     await assertDiagrams(page, [['자료함', '책갈피']]);
 
     await openSource(page, markdownPath);
-    await openSection(page, 'memo-tools');
     await page.locator('#edit-memo').click();
     const editor = page.locator('#edit-input');
     assert.equal(await editor.inputValue(), markdown);
@@ -278,7 +277,6 @@ async function checkRendering(session) {
     }
     // A Markdown memo whose whole text is a diagram renders as that diagram.
     await openSource(page, fileName);
-    await openSection(page, 'memo-tools');
     await page.locator('#edit-memo').click();
     await editor.fill(plantumlClass);
     await page.locator('#edit-save').click();
@@ -291,7 +289,6 @@ async function checkRendering(session) {
     });
     assert.deepEqual(detected, ['markdown', 'markdown', 'mermaid', 'markdown', 'mermaid']);
     // Single-line fields turn pasted line breaks into spaces instead of gluing words.
-    await page.locator('#reply-compose > summary').click();
     await page.locator('#reply-input').evaluate(input => {
       input.focus();
       input.value = '앞 ';

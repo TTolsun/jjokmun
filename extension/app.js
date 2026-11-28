@@ -8,7 +8,7 @@ import { DocumentConflictError, DocumentWriteError, folderConnection, useFolder,
 import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
 import { detectFormat, documentChanged } from './documents.js';
-import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondHint, bondOf, bondRoster, newShop, regularOf } from './shop.js';
+import { BOND_POINTS, BOND_TIERS, DEFAULT_NAME, bondOf, bondRoster, newShop, regularOf } from './shop.js';
 import { bindFolderFiles } from './ui/folder-files.js';
 import { bindPortraits } from './ui/bookshop.js';
 import { bindGuestVisit } from './ui/guest-visit.js';
@@ -99,15 +99,11 @@ function clearSensitive(showLock) {
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'daily-excerpt', 'archive-list',
     'detail-status', 'copy-status', 'home-status', 'floor-memo-status', 'archive-status', 'settings-status', 'shelf-previous',
     'delete-message', 'vault-state', 'unlock-status', 'daily-request', 'roster-count', 'roster-tally', 'roster-list',
-    'regular-name', 'regular-title', 'regular-hint', 'season-name', 'goal-list', 'shop-grade',
+    'season-name', 'goal-list', 'shop-grade',
     'goal-status', 'review-title', 'review-stats', 'detail-path', 'document-path-choice', 'document-refresh-status']) {
     element(id).replaceChildren();
   }
   element('detail-date').removeAttribute('datetime');
-  element('regular-progress').value = 0;
-  element('regular-progress').max = 1;
-  const portrait = element('regular-portrait');
-  portrait.getContext('2d').clearRect(0, 0, portrait.width, portrait.height);
   element('daily-board').hidden = true;
   element('year-review').hidden = true;
   seenGoals = undefined;
@@ -387,20 +383,6 @@ function renderRoster() {
   if (focused) list.querySelector(`[data-regular="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
 }
 
-function renderRegular(memo) {
-  const bond = bondOf(memo, state.daily);
-  element('regular-name').textContent = regularOf(memo.id).name;
-  element('regular-title').textContent = bond.title + ' · 정 ' + bond.points;
-  const progress = element('regular-progress');
-  progress.max = Math.max(1, bond.ceiling - bond.floor);
-  progress.value = bond.nextTitle ? bond.points - bond.floor : progress.max;
-  element('regular-hint').textContent = bondHint(bond, {
-    requestedToday: state.daily.some((entry) => !entry.folded && entry.date === displayedDate && entry.memoId === memo.id),
-    repliedToday: memo.replies.some((reply) => reply.createdOn === displayedDate)
-  });
-  portraits.portrait(element('regular-portrait'), memo.id);
-}
-
 function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = input => input.value.trim()) {
   const form = element(formId);
   const input = element(inputId);
@@ -511,7 +493,6 @@ function openFromFloor(id) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   showView('#journal');
   openDetail(id);
-  element('reply-compose').open = true;
   element('reply-input').focus();
 }
 
@@ -688,7 +669,6 @@ function renderDetail() {
   renderEditConflict(memo);
   element('detail-original').textContent = memo.text;
   if (document.body.classList.contains('journal-view')) documentPreview.update(memo);
-  renderRegular(memo);
   const replies = [...memo.replies].sort((a, b) => a.createdOn.localeCompare(b.createdOn) || a.createdAt - b.createdAt);
   const container = element('detail-replies');
   const focused = container.contains(document.activeElement) ? document.activeElement : undefined;
@@ -776,8 +756,6 @@ function openDetail(id, replyId, source) {
   if (!state.memos.some((memo) => memo.id === id)) return;
   if (detailId !== id) {
     setStatus('home-status', '');
-    element('reply-compose').open = false;
-    element('memo-tools').open = false;
     replyDialog.reset();
     element('reply-input').value = '';
     element('document-path-choice').value = '';
@@ -789,7 +767,6 @@ function openDetail(id, replyId, source) {
   linkedReply = replyId;
   returnFocus = source;
   if (pickingMemo && source?.dataset.memoId) {
-    element('memo-tools').open = true;
     pickingMemo = false;
   }
   renderSelection();
