@@ -346,6 +346,20 @@ async function checkPet(session) {
     await page.keyboard.press('b');
     await page.locator('#pet-game[data-phase="result"]').waitFor();
     const score = await page.locator('#pet-game-score').textContent();
+    await page.locator('[data-pet-menu="status"]').click();
+    await page.setViewportSize({width:320,height:640});
+    await page.locator('[data-pet-menu="activity"]').click();
+    const actions = page.locator('#pet-menu .pet-menu-actions button:visible');
+    assert.equal(await actions.count(), 4);
+    assert.equal(await actions.evaluateAll(buttons => {
+      const panel = document.querySelector('#pet-menu').getBoundingClientRect();
+      return buttons.every(button => {
+        const rect = button.getBoundingClientRect();
+        return rect.top >= panel.top && rect.bottom <= panel.bottom && rect.left >= panel.left && rect.right <= panel.right;
+      });
+    }), true);
+    await page.getByRole('button', {name:'공놀이 계속'}).click();
+    await page.setViewportSize({width:1280,height:840});
     await page.locator('#memo-input').click();
     await page.locator('#memo-input:focus').waitFor();
     await page.keyboard.type('abc');
@@ -401,7 +415,7 @@ async function checkPet(session) {
     assert.equal((await readPet(page)).play, 0);
     assert.ok((await readPet(peer)).discovered.includes('fire-runner'));
     for (let i = 0; i < 3; i++) await action('explore');
-    await page.locator('#pet-habit').getByText(/꼬리 끝 불을 높이고/).waitFor();
+    await page.locator('#pet-status').getByText('정원 탐색을 마쳤어요.', {exact: true}).waitFor();
     await page.locator('#pet-habitat[data-preview="true"]').waitFor();
     await page.locator('#pet-sprite[src$="fire-runner-habit-explore.png"]').evaluate(img => img.decode());
     assert.equal((await readPet(page)).explore, 6);
@@ -420,6 +434,7 @@ async function checkPet(session) {
     await openCollection.click();
     await collection.locator('[data-discovered-form="fire-runner-scout"]').getByText('돌보는 중').waitFor();
     await collection.getByText('불뭉이 → 불달이 → 봉홧불이').waitFor();
+    await collection.getByText('꼬리 끝의 불을 높이 들어 길을 살펴요.', {exact: true}).waitFor();
     assert.equal(await collection.locator('li').count(), 3);
     const filters = page.getByRole('group', {name: '계열 선택'});
     await filters.getByRole('button', {name: '알', exact: true}).click();
@@ -434,7 +449,7 @@ async function checkPet(session) {
     assert.ok(wake > startedAt + finalGrowth);
     await later(wake - startedAt);
     await play();
-    await page.locator('#pet-status').getByText(/봉홧불이가.*공/).waitFor();
+    await page.locator('#pet-status').getByText('공놀이를 마쳤어요.', {exact: true}).waitFor();
     await page.locator('#pet-habitat[data-reaction="beacon"]').waitFor();
     await page.locator('#pet-sprite[src$="fire-runner-scout-play.png"]').evaluate(img => img.decode());
     await closeGame();
@@ -468,7 +483,7 @@ async function checkPet(session) {
     await page.locator('#pet-path').getByText('불뭉이 → 잿코 → 펄럭귀').waitFor();
     await petButton(page, 'c');
     await play();
-    await page.locator('#pet-status').getByText(/펄럭귀가.*공/).waitFor();
+    await page.locator('#pet-status').getByText('공놀이를 마쳤어요.', {exact: true}).waitFor();
     await page.locator('#pet-habitat[data-reaction="flutter"]').waitFor();
     await page.locator('#pet-sprite[src$="fire-scout-runner-play.png"]').evaluate(img => img.decode());
     await closeGame();

@@ -104,13 +104,13 @@
                     <pre id="edit-conflict-draft" tabindex="0"></pre>
                   </div>
                   <div>
-                    <h4>현재 파일 내용</h4>
+                    <h4>현재 원본 내용</h4>
                     <pre id="edit-conflict-disk" tabindex="0"></pre>
                   </div>
                 </div>
                 <div class="inline-form edit-actions">
                   <button id="keep-edit-draft" class="document-action" type="button">작성본을 새 메모로 저장</button>
-                  <button id="use-disk-edit" class="document-action" type="button">파일 내용으로 편집 다시 시작</button>
+                  <button id="use-disk-edit" class="document-action" type="button">원본 내용으로 편집 다시 시작</button>
                 </div>
               </section>
             </form>
@@ -252,7 +252,6 @@
         </div>
         <div class="pet-popover-notes">
           <p id="pet-condition" hidden></p>
-          <p id="pet-habit" hidden></p>
           <p id="pet-status" role="status"></p>
           <blockquote id="pet-memo-excerpt" hidden></blockquote>
           <button type="button" id="pet-collection-open" aria-haspopup="dialog" aria-controls="pet-collection-dialog">
@@ -333,8 +332,9 @@
     <p id="reply-dialog-status" class="status" role="status"></p>
   </dialog>
 
-  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-message">
+  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-target delete-message">
     <div class="section-heading"><h2 id="delete-title">메모를 삭제할까요?</h2></div>
+    <p id="delete-target"></p>
     <p id="delete-message"></p>
     <div class="confirm-actions">
       <button id="delete-cancel" type="button" autofocus>취소</button>

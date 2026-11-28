@@ -358,6 +358,7 @@ dialog p { margin: 8px 0 13px; font-size: .9rem; line-height: 1.6; color: var(--
 .confirm-actions, .backup-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .confirm-actions { justify-content: flex-end; }
 #reply-delete-text { margin: 0; max-height: 8em; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+#delete-target { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
 #delete-confirm, #reply-dialog-confirm.danger { background: var(--clay); color: white; border-color: var(--clay); }
 #delete-confirm:hover, #reply-dialog-confirm.danger:hover { background: var(--olive); color: var(--canvas); }
 
@@ -709,13 +710,13 @@ dialog button:disabled, #unlock-submit:disabled { opacity: .56; }
 .pet-screen-panel { position: absolute; z-index: 2; inset: 0; padding: 8px 10px; overflow: auto; background: var(--lcd); }
 .pet-screen-panel h2 { color: var(--lcd-ink); font-size: 1rem; }
 #pet-device:is([data-mode="clock"], [data-mode="status"], [data-mode="menu"], [data-mode="confirm"]) .pet-stage { visibility: hidden; }
-#pet-device:not([data-mode="idle"]):not([data-mode="select"]) ~ .pet-popover-notes :is(#pet-habit, #pet-condition) { display: none; }
+#pet-device:not([data-mode="idle"]):not([data-mode="select"]) ~ .pet-popover-notes #pet-condition { display: none; }
 #pet-clock { display: grid; place-content: center; gap: 7px; text-align: center; }
 #pet-clock-time { font: 740 2.1rem/1.05 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .05em; }
 #pet-clock-date, #pet-time { font-size: .8rem; }
 #pet-stage-label { color: #8e432b; font-size: .76rem; font-weight: 730; margin-bottom: 4px; }
 #pet-path { margin: 4px 0 9px; color: #754b3a; font-size: .77rem; font-weight: 680; overflow-wrap: anywhere; }
-#pet-condition, #pet-habit { margin: 11px 6px 0; color: var(--garden-muted); line-height: 1.4; font-size: .75rem; }
+#pet-condition { margin: 11px 6px 0; color: var(--garden-muted); line-height: 1.4; font-size: .75rem; }
 #pet-growth-hint { margin-top: 10px; padding-left: 9px; border-left: 2px solid #c79570; color: #754b3a; font-size: .8rem; line-height: 1.5; }
 #pet-state[data-page="meters"] #pet-state-overview, #pet-state[data-page="overview"] #pet-meters { display: none; }
 .pet-meters { display: grid; gap: 3px; margin: 0; }
@@ -803,6 +804,18 @@ dialog button:disabled, #unlock-submit:disabled { opacity: .56; }
 #pet-icon-strip button span:first-child { font-size: .68rem; line-height: 1; filter: grayscale(1); }
 #pet-icon-strip button:is(:hover, [aria-pressed="true"]) { border-color: #637369; background: #fcf8e6; }
 #pet-icon-strip button:disabled { opacity: .65; }
+@media (max-width: 520px), (max-height: 440px) {
+  #pet-menu:has([data-pet-action="play"]:not([hidden])) { padding: 4px; gap: 3px; align-content: safe center; container-type: size; }
+  #pet-menu:has([data-pet-action="play"]:not([hidden])) h2 { position: absolute; clip-path: inset(50%); }
+  #pet-menu:has([data-pet-action="play"]:not([hidden])) .pet-menu-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+  }
+  #pet-menu .pet-menu-actions button { min-height: 26px; padding: 3px; text-align: center; font-size: .82rem; }
+  #pet-menu:has([data-pet-action="play"]:not([hidden])) button { min-height: clamp(24px, 40cqh, 42px); }
+  #pet-menu-help:empty { display: none; }
+  #pet-icon-strip button { font-size: .7rem; }
+}
 .pet-controls { position: absolute; inset: 78% 0 auto; display: flex; justify-content: center; align-items: start; gap: 9px; }
 .pet-controls button { display: grid; justify-items: center; gap: 4px; min-width: 38px; padding: 0 0 3px; border: 0; border-radius: 8px; background: transparent; color: var(--shell-ink); font-size: .65rem; font-weight: 780; }
 .pet-controls b { display: grid; place-items: center; width: 33px; aspect-ratio: 1; border: 1px solid var(--button-edge); border-radius: 50%; background: var(--button-face); box-shadow: 0 3px var(--button-shadow), inset 0 2px #fff; color: var(--shell-ink); font: 800 .93rem ui-monospace, monospace; }

@@ -1,5 +1,7 @@
 import { createTime, element, memoExcerpt } from './dom.js';
 
+const graphemes = new Intl.Segmenter('ko', { granularity: 'grapheme' });
+
 function searchText(text) {
   return text.normalize('NFC').toLocaleLowerCase('ko-KR');
 }
@@ -10,18 +12,38 @@ export function newestMemos(memos) {
 
 function showMatchingText(container, value, query) {
   const normalized = value.normalize('NFC');
-  const hit = query ? searchText(normalized).indexOf(query) : -1;
+  const folded = query && searchText(normalized);
+  const hit = query ? folded.indexOf(query) : -1;
   if (hit === -1) {
     container.textContent = value;
     return;
   }
+  const segments = graphemes.segment(normalized);
+  let matchStart = hit;
+  let matchEnd = hit + query.length;
+  // Lowercasing can expand a character, shifting offsets in the searchable text.
+  if (folded.length !== normalized.length) {
+    let offset = 0;
+    for (const { index, segment } of segments) {
+      const next = offset + searchText(segment).length;
+      if (offset <= hit && hit < next) matchStart = index;
+      if (next >= hit + query.length) {
+        matchEnd = index + segment.length;
+        break;
+      }
+      offset = next;
+    }
+  }
+  matchStart = segments.containing(matchStart).index;
+  const last = segments.containing(matchEnd - 1);
+  matchEnd = last.index + last.segment.length;
   const short = normalized.length <= 64;
-  const start = short ? 0 : Math.max(0, hit - 5);
-  const end = short ? normalized.length : Math.min(normalized.length, hit + query.length + 32);
+  const start = short ? 0 : segments.containing(Math.max(0, matchStart - 5)).index;
+  const end = short ? normalized.length : segments.containing(matchEnd + 32)?.index ?? normalized.length;
   const match = document.createElement('mark');
-  match.textContent = normalized.slice(hit, hit + query.length);
-  container.append((start ? '…' : '') + normalized.slice(start, hit), match,
-    normalized.slice(hit + query.length, end) + (end < normalized.length ? '…' : ''));
+  match.textContent = normalized.slice(matchStart, matchEnd);
+  container.append((start ? '…' : '') + normalized.slice(start, matchStart), match,
+    normalized.slice(matchEnd, end) + (end < normalized.length ? '…' : ''));
 }
 
 const PAGE_SIZE = 100;
