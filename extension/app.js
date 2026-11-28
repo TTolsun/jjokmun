@@ -1,4 +1,4 @@
-import { localDate, validDate, emptyState } from './store.js';
+import { localDate, validDate, emptyState, selectDaily } from './store.js';
 import { LockedError, readPayload, vaultStatus, dropVaultKey, lockVault, unlockVault } from './vault.js';
 import { createTime, element, formatDate, longDate, memoExcerpt } from './ui/dom.js';
 import { focusArchiveReturn, newestMemos, renderArchive, resetArchive } from './ui/archive.js';
@@ -9,7 +9,7 @@ import { readLastFolder } from './last-folder.js';
 import { FolderAccessError } from './folder.js';
 import { checkMemoSize, detectFormat, documentChanged } from './documents.js';
 import { bindFolderFiles } from './ui/folder-files.js';
-import { applyPetAction, petView } from './pet.js';
+import { applyMemoCare, applyPetAction, petHatched, petSubject, petView, PET_FORM_DETAILS } from './pet.js';
 import { bindPet } from './ui/pet.js';
 import { bindDocumentPreview } from './ui/document-preview.js';
 import { bindEditorReturn } from './ui/editor-return.js';
@@ -104,9 +104,14 @@ function clearSensitive(showLock) {
   for (const id of ['memo-input', 'archive-search', 'reply-input', 'edit-input']) element(id).value = '';
   for (const id of ['detail-original', 'detail-date', 'detail-replies', 'archive-list',
     'detail-status', 'copy-status', 'home-status', 'archive-status', 'settings-status',
-    'delete-message', 'vault-state', 'unlock-status', 'detail-path', 'document-path-choice', 'document-refresh-status']) {
+    'delete-message', 'vault-state', 'unlock-status', 'detail-path', 'document-path-choice', 'document-refresh-status',
+    'found-note-title', 'found-note-date', 'found-note-excerpt', 'found-note-hint']) {
     element(id).replaceChildren();
   }
+  element('found-note').hidden = true;
+  element('found-note-hint').hidden = true;
+  element('pet-expand').classList.remove('has-note');
+  element('pet-expand').setAttribute('aria-label', '정원 기기 확대');
   element('detail-date').removeAttribute('datetime');
   element('detail-dialog').hidden = true;
   element('edit-form').hidden = true;
@@ -166,7 +171,15 @@ function refresh() {
       if (element('lock-screen').hidden) clearSensitive(true);
       return;
     }
-    const result = await readPayload();
+    let result = await readPayload();
+    // A hatched pet finds one older memo a day. The pick is stored so the least recently found
+    // memo comes next and every tab sees the same note.
+    if (petHatched(result.payload.state.pet) && !result.payload.state.daily.some(entry => entry.date === date)) {
+      result = await readPayload(draft => {
+        if (draft.daily.some(entry => entry.date === date)) return false;
+        selectDaily(draft, date);
+      });
+    }
     const connection = folderConnection();
     if (expected === viewGeneration) {
       element('storage-recovery').hidden = true;
@@ -210,6 +223,7 @@ function render(date) {
   displayedDate = date;
   pet.render(state.pet);
   renderPetMemo();
+  renderFoundNote(date);
   element('today-date').textContent = formatDate(date, longDate);
   const sorted = newestMemos(state.memos);
   if (detailId && !currentMemo()) {
@@ -291,16 +305,103 @@ function newMemo(text, date) {
 
 bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text) => {
   let id;
+  let care;
   const previousId = detailId;
   await change((draft, date) => {
     const memo = newMemo(text, date);
     draft.memos.push(memo);
     id = memo.id;
+    care = applyMemoCare(draft, 'write', date);
   });
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
-  return '메모를 남겼어요.';
+  if (care) pet.readMemo(care);
+  return care ? '메모를 남겼어요. ' + care : '메모를 남겼어요.';
 }, input => input.value);
+
+// The note the pet found today, unless it was put back or its memo is gone.
+function foundNote(date = displayedDate) {
+  if (!petHatched(state.pet)) return undefined;
+  const entry = state.daily.find(record => record.date === date);
+  const memo = entry && !entry.folded && state.memos.find(record => record.id === entry.memoId);
+  if (!memo) return undefined;
+  return { memo, answered: memo.replies.some(reply => reply.createdOn === date) };
+}
+
+function petName() {
+  return PET_FORM_DETAILS[petView(state.pet)?.form]?.name ?? '펫';
+}
+
+function daysBetween(from, to) {
+  return Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86400000);
+}
+
+function renderFoundNote(date) {
+  const note = foundNote(date);
+  const card = element('found-note');
+  card.hidden = !note;
+  const waiting = Boolean(note && !note.answered);
+  const trigger = element('pet-expand');
+  trigger.classList.toggle('has-note', waiting);
+  trigger.setAttribute('aria-label', waiting ? '정원 기기 확대 · 펫이 쪽지를 찾아왔어요' : '정원 기기 확대');
+  renderFoundNoteHint(note);
+  if (!note) {
+    for (const id of ['found-note-title', 'found-note-date', 'found-note-excerpt']) element(id).replaceChildren();
+    return;
+  }
+  const { memo, answered } = note;
+  const name = petSubject(petName());
+  card.classList.toggle('answered', answered);
+  element('found-note-pet').src = element('pet-summary-sprite').getAttribute('src') || 'art/egg.png';
+  element('found-note-title').textContent = answered
+    ? `${name} 찾아온 쪽지에 오늘 답장했어요`
+    : `${name} 정원에서 묻어 둔 쪽지를 찾아왔어요`;
+  const [, month, day] = memo.createdOn.split('-').map(Number);
+  const time = element('found-note-date');
+  time.dateTime = memo.createdOn;
+  time.textContent = `${month}월 ${day}일에 쓴 메모 · ${daysBetween(memo.createdOn, date)}일 전`;
+  element('found-note-excerpt').textContent = memoExcerpt(memo, 120);
+  element('found-note-open').textContent = answered ? '다시 보기' : '다시 읽고 답장';
+  element('found-note-fold').hidden = answered;
+}
+
+function renderFoundNoteHint(note = foundNote()) {
+  const hint = element('found-note-hint');
+  hint.hidden = !note || note.answered || note.memo.id !== detailId;
+  hint.textContent = hint.hidden ? '' : `${petSubject(petName())} 찾아온 쪽지예요. 답장을 남기면 ${petSubject(petName())} 기뻐해요.`;
+}
+
+element('found-note-open').addEventListener('click', event => {
+  const note = foundNote();
+  if (!note) return;
+  openDetail(note.memo.id, undefined, event.currentTarget);
+  if (!note.answered && !element('reply-form').closest('[hidden]')) element('reply-input').focus();
+});
+
+element('found-note-fold').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  const expected = viewGeneration;
+  // Put back only the note on screen, even if the day rolled over or another tab changed it.
+  const shown = displayedDate;
+  const memoId = foundNote(shown)?.memo.id;
+  if (!memoId) return;
+  button.disabled = true;
+  try {
+    await change(draft => {
+      const entry = draft.daily.find(record => record.date === shown && record.memoId === memoId);
+      if (!entry || entry.folded) return false;
+      entry.folded = true;
+    });
+    if (expected === viewGeneration) {
+      setStatus('home-status', '쪽지를 정원에 다시 묻어 두었어요.');
+      element('memo-input').focus();
+    }
+  } catch (error) {
+    if (expected === viewGeneration) setStatus('home-status', textSaveError(error));
+  } finally {
+    button.disabled = false;
+  }
+});
 
 function renderPetMemo() {
   if (state.pet?.form === 'egg') readPetMemoId = undefined;
@@ -349,13 +450,19 @@ function findMemo(draft, id) {
 bindTextForm('reply-form', 'reply-input', 'reply-save', 'detail-status', async (text) => {
   const replyId = crypto.randomUUID();
   const memoId = detailId;
+  let care;
   await change((draft, date) => {
     const memo = findMemo(draft, memoId);
     if (memo.replies.some((reply) => reply.id === replyId)) return;
     memo.replies.push({ id: replyId, text, createdOn: date, createdAt: Date.now() });
+    // Only rereading counts: a reply on the day the memo was written is not a revisit.
+    const found = draft.daily.some(entry => entry.date === date && entry.memoId === memoId && !entry.folded);
+    care = found ? applyMemoCare(draft, 'found', date)
+      : memo.createdOn < date ? applyMemoCare(draft, 'revisit', date) : '';
   });
   if (detailId === memoId && document.activeElement === document.body) element('reply-input').focus();
-  return '답장을 저장했어요.';
+  if (care) pet.readMemo(care);
+  return care ? '답장을 저장했어요. ' + care : '답장을 저장했어요.';
 });
 
 bindTextForm('edit-form', 'edit-input', 'edit-save', 'detail-status', async (text) => {
@@ -448,6 +555,7 @@ element('relink-document').addEventListener('submit', async (event) => {
 
 function renderDetail() {
   const memo = currentMemo();
+  renderFoundNoteHint();
   const time = element('detail-date');
   time.dateTime = memo.createdOn;
   time.textContent = formatDate(memo.createdOn);

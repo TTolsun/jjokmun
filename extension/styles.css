@@ -942,3 +942,34 @@ dialog button:disabled, #unlock-submit:disabled { opacity: .56; }
 @media (prefers-reduced-motion: reduce) {
   #pet .pet-habitat #pet-sprite, #pet .pet-habitat #pet-effect, #pet-game-ball { animation: none; }
 }
+.found-note { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--olive); border-radius: 10px; background: var(--surface); }
+.found-note[hidden] { display: none; }
+#found-note-pet { flex: none; width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated; padding: 4px; border-radius: 8px; background: #dcf0e5; }
+.found-note-body { min-width: 0; flex: 1; }
+#found-note-title { margin: 0; color: var(--olive); font-size: .9rem; font-weight: 700; word-break: keep-all; }
+.found-note-body > p { margin: 2px 0 0; color: var(--muted); font-size: .78rem; }
+#found-note-excerpt { margin: 8px 0 0; overflow-wrap: anywhere; color: var(--ink); font: 400 1.02rem/1.55 var(--display); }
+.found-note-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.found-note-actions button { padding: 6px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: .8rem; }
+.found-note-actions button:hover { background: var(--raised); }
+#found-note-open { border-color: var(--olive); color: var(--olive); font-weight: 650; }
+.found-note.answered { border-left-color: var(--line); }
+.found-note.answered #found-note-excerpt { color: var(--muted); font-size: .92rem; }
+.found-note-hint { margin: 0 0 8px; padding: 6px 9px; border-radius: 6px; background: var(--raised); color: var(--olive); font-size: .8rem; }
+#pet-expand.has-note::after {
+  content: '';
+  position: absolute;
+  top: 4%;
+  right: 6%;
+  width: 22px;
+  height: 18px;
+  border: 2px solid #6b5a3a;
+  border-radius: 2px;
+  background: linear-gradient(135deg, transparent 0 62%, #e8dcb8 62%) , repeating-linear-gradient(#fff9e6 0 4px, #c9b98f 4px 5px);
+  box-shadow: 0 2px 0 #6b5a3a44;
+  transform: rotate(8deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  #pet-expand.has-note::after { animation: found-note-wiggle 2.6s ease-in-out infinite; }
+}
+@keyframes found-note-wiggle { 0%, 80%, 100% { transform: rotate(8deg); } 86% { transform: rotate(-4deg); } 92% { transform: rotate(12deg); } }

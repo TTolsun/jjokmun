@@ -31,6 +31,18 @@
           </form>
           <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
           <p class="status" id="home-status" role="status"></p>
+          <section id="found-note" class="found-note" aria-labelledby="found-note-title" hidden>
+            <img id="found-note-pet" width="44" height="44" alt="">
+            <div class="found-note-body">
+              <h2 id="found-note-title"></h2>
+              <p><time id="found-note-date"></time></p>
+              <blockquote id="found-note-excerpt"></blockquote>
+              <div class="found-note-actions">
+                <button type="button" id="found-note-open">다시 읽고 답장</button>
+                <button type="button" id="found-note-fold">다시 묻어 두기</button>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
       <button id="archive-toggle" type="button" aria-expanded="true" aria-controls="memo-archive">최근 메모</button>
@@ -112,6 +124,7 @@
             </div>
           </template>
           <form id="reply-form" autocomplete="off">
+            <p id="found-note-hint" class="found-note-hint" hidden></p>
             <label class="field-label" for="reply-input">답장 쓰기</label>
             <div class="inline-form">
               <textarea id="reply-input" rows="1" maxlength="65536" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
