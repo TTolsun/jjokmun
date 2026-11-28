@@ -68,6 +68,7 @@ async function checkFolder(session) {
     const appVersion = await page.evaluate(() => chrome.runtime.getManifest().version);
     for (const [name, stamp, message] of [
       ['미래 책방', '99.0.0', `이 저장 파일은 쪽문 99.0.0에서 저장되었습니다. 지금 쓰는 쪽문(${appVersion})을 업데이트한 뒤 다시 열어 주세요.`],
+      ['버전 표기 오류', '99.invalid', '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.'],
       ['낡은 책방', undefined, '저장 파일의 메모 기록을 읽을 수 없습니다. 쪽문이 최신 버전인지 확인해 주세요.']
     ]) {
       await page.evaluate(async ({name, stamp}) => {

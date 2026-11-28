@@ -418,8 +418,10 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
       event.preventDefault();
       const room = input.maxLength < 0 ? Infinity
         : input.maxLength - input.value.length + (input.selectionEnd - input.selectionStart);
-      const line = pasted.replace(/\s*[\r\n]+\s*/g, ' ').trim().slice(0, Math.max(0, room));
-      input.setRangeText(line, input.selectionStart, input.selectionEnd, 'end');
+      let line = pasted.replace(/\s*[\r\n]+\s*/g, ' ');
+      if (input.selectionStart === 0) line = line.trimStart();
+      if (input.selectionEnd === input.value.length) line = line.trimEnd();
+      input.setRangeText(line.slice(0, Math.max(0, room)), input.selectionStart, input.selectionEnd, 'end');
       input.dispatchEvent(new Event('input', { bubbles: true }));
       setStatus(statusId, '이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.');
     });
@@ -429,7 +431,7 @@ function bindTextForm(formId, inputId, buttonId, statusId, onSubmit, readText = 
     if (composing || pending) return;
     const original = input.value;
     const text = readText(input);
-    if (!text && input.required) {
+    if (input.required && !text.trim()) {
       setStatus(statusId, '한 줄을 적어 주세요.');
       input.focus();
       return;
@@ -482,7 +484,7 @@ bindTextForm('memo-form', 'memo-input', 'memo-save', 'home-status', async (text)
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('memo-input').focus();
   return '메모를 남겼어요. 새 책이 되어 책방 신간 매대에 꽂혔어요.';
-});
+}, input => input.value);
 
 // Writing on the shop floor keeps the owner in the shop: the memo becomes the
 // newest book on the cart and the next cart reader opens it.
@@ -497,7 +499,7 @@ bindTextForm('floor-memo-form', 'floor-memo-input', 'floor-memo-save', 'floor-me
   if (detailId === previousId) openDetail(id);
   if (document.activeElement === document.body) element('floor-memo-input').focus();
   return '새 책을 신간 매대에 꽂았어요. 곧 손님이 펼쳐 볼 거예요.';
-});
+}, input => input.value);
 
 // A sold book opens in the journal with the reply field ready.
 function openFromFloor(id) {

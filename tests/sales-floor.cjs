@@ -98,10 +98,12 @@ async function checkSalesFloor(session) {
     });
     await page.clock.setFixedTime(third + 500);
     await page.getByText('영업 3일차', {exact:true}).waitFor();
-    await page.locator('#floor-memo-input').fill('골목 끝 나무 아래에서 쓴 첫 책');
+    const floorSource = '    골목 끝 나무 아래에서 쓴 첫 책\n';
+    await page.locator('#floor-memo-input').fill(floorSource);
     await page.locator('#floor-memo-save').click();
     await page.locator('#floor-memo-status').getByText('새 책을 신간 매대에 꽂았어요. 곧 손님이 펼쳐 볼 거예요.').waitFor();
     assert.equal(await page.locator('#floor-memo-input').inputValue(), '');
+    assert.equal(await page.locator('#detail-original').textContent(), floorSource);
     const sale = await page.evaluate(async () => {
       const { memoBooks, dayFor, STEP_MS } = await import('./business.js');
       const state = (await (await import('./vault.js')).readPayload()).payload.state;

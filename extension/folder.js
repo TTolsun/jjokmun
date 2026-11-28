@@ -6,7 +6,9 @@ export class FolderAccessError extends Error {}
 
 function newerThanApp(version) {
   if (typeof version !== 'string' || !APP_VERSION) return false;
-  const theirs = version.split('.').map(Number);
+  const parts = version.split('.');
+  if (parts.length > 4 || parts.some(part => !/^(0|[1-9]\d{0,4})$/.test(part) || Number(part) > 65535)) return false;
+  const theirs = parts.map(Number);
   const ours = APP_VERSION.split('.').map(Number);
   for (let index = 0; index < Math.max(theirs.length, ours.length); index++) {
     const difference = (theirs[index] || 0) - (ours[index] || 0);

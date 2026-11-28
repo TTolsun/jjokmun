@@ -253,20 +253,26 @@ async function checkRendering(session) {
 
     // The memo field stays one row, keeps typed and filled line breaks, and saves on Enter.
     const memoInput = page.locator('#memo-input');
-    await memoInput.click();
-    await page.keyboard.type('첫 줄');
+    await memoInput.fill('   \n');
+    await memoInput.press('Enter');
+    await page.locator('#home-status').getByText('한 줄을 적어 주세요.').waitFor();
+    await memoInput.fill('');
+    await page.keyboard.type('    첫 줄');
     await page.keyboard.press('Shift+Enter');
     await page.keyboard.type('둘째 줄');
-    assert.equal(await memoInput.inputValue(), '첫 줄\n둘째 줄');
+    await page.keyboard.press('Shift+Enter');
+    const exactSource = '    첫 줄\n둘째 줄\n';
+    assert.equal(await memoInput.inputValue(), exactSource);
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.querySelector('#detail-path').textContent.startsWith('첫 줄-'));
     assert.equal(await memoInput.inputValue(), '');
-    assert.equal(await raw.textContent(), '첫 줄\n둘째 줄');
+    assert.equal(await raw.textContent(), exactSource);
     // A pasted diagram source becomes a .puml or .mmd file and renders without a code fence.
     const diskFile = path => page.evaluate(async ({folder, path}) => {
       const directory = await (await navigator.storage.getDirectory()).getDirectoryHandle(folder);
       return (await (await directory.getFileHandle(path)).getFile()).text();
     }, {folder, path});
+    assert.equal(await diskFile(await page.locator('#detail-path').innerText()), exactSource);
     for (const [source, extension, labels] of [
       [plantumlSequence, 'puml', diagramLabels[2]],
       [mermaidSequence, 'mmd', diagramLabels[1]]
@@ -314,6 +320,14 @@ async function checkRendering(session) {
     });
     assert.equal(await page.locator('#guest-input').inputValue(), '앞 첫 줄 둘째 줄');
     assert.equal(await page.locator('#guest-status').textContent(), '이 칸은 한 줄로 저장돼서 줄바꿈을 띄어쓰기로 바꿨어요.');
+    await page.locator('#guest-input').evaluate(input => {
+      input.value = '앞교체뒤';
+      input.setSelectionRange(1, 3);
+      const data = new DataTransfer();
+      data.setData('text/plain', '\r\n가운데\n');
+      input.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));
+    });
+    assert.equal(await page.locator('#guest-input').inputValue(), '앞 가운데 뒤');
     await page.locator('#guest-input').evaluate(input => { input.value = ''; });
     console.log('PASS  multi-line memo field, diagram file extensions, whole-diagram Markdown and single-line paste');
 
