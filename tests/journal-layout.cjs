@@ -72,12 +72,12 @@ async function checkJournalLayout(session) {
     await click('#memo-save');
     await page.locator(':is(#detail-original, #detail-preview):visible')
       .getByText('창가의 책을 다시 펼쳤다.', {exact: true}).waitFor();
-    await openSection(page, 'reply-compose');
-    await page.locator('#reply-input').fill('책 사이에 편지가 있었다.');
+    const detail = page.locator('#detail-dialog');
+    assert.equal(await detail.locator('summary').filter({ hasText: /답장 쓰기|메모·답장 관리/ }).count(), 0);
+    assert.equal(await detail.getByText(/새 단골 · 정 0/).count(), 0);
+    await detail.getByRole('textbox', { name: '답장 쓰기' }).fill('책 사이에 편지가 있었다.');
     await click('#reply-save');
     await page.locator('#detail-replies').getByText('책 사이에 편지가 있었다.').waitFor();
-    await click('#reply-compose > summary');
-    await openSection(page, 'memo-tools');
     await click('#edit-memo');
     const actions = await page.locator('#memo-tools .detail-actions').boundingBox();
     const label = await page.locator('#edit-form label').boundingBox();
@@ -85,7 +85,7 @@ async function checkJournalLayout(session) {
     await click('#edit-cancel');
     await click('#detail-replies [data-action="delete"]');
     await click('#reply-dialog-confirm');
-    await page.locator('#reply-compose > summary:focus').waitFor();
+    await page.locator('#reply-input:focus').waitFor();
     await toggle.click();
     await page.locator('.archive-entry').first().press('ArrowUp');
     await page.locator('#memo-search > summary:focus').waitFor();
