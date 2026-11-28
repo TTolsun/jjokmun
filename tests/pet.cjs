@@ -583,9 +583,38 @@ async function checkPetDeviceGeometry(session) {
   try {
     for (const width of widths) {
       await page.setViewportSize({width, height: 800});
+      await page.locator('#pet-expand').scrollIntoViewIfNeeded();
       const miniature = await page.locator('#pet-expand').boundingBox();
+      const garden = await page.locator('#pet').boundingBox();
+      const offset = miniature.x + miniature.width / 2 - garden.x - garden.width / 2;
+      assert.ok(Math.abs(offset) <= 1, 'the miniature is centered in the garden');
+      assert.deepEqual([miniature.width, miniature.height], [150, 187.5]);
       await liftPet(page);
       await mode('idle');
+      await page.locator('#pet-sprite').evaluate(image => image.decode());
+      const positions = await page.evaluate(() => {
+        function face(id, atBottom) {
+          const image = document.getElementById(id);
+          const rect = image.getBoundingClientRect();
+          const height = Math.min(rect.height, rect.width * image.naturalHeight / image.naturalWidth);
+          return [rect.left + rect.width / 2, rect.top + (rect.height - height) * (atBottom ? 1 : .5) + height * .4];
+        }
+        const box = document.getElementById('pet-popover').getBoundingClientRect();
+        return {
+          small: face('pet-summary-sprite', false), large: face('pet-sprite', true),
+          leading: [box.left, box.top], trailing: [innerWidth - box.right, innerHeight - box.bottom],
+          animations: document.getElementById('pet-popover').getAnimations().length
+        };
+      });
+      assert.equal(positions.animations, 0, 'reduced motion opens directly at the final position');
+      for (const axis of [0, 1]) {
+        const drift = positions.large[axis] - positions.small[axis];
+        assert.ok(Math.min(positions.leading[axis], positions.trailing[axis]) >= 9);
+        if (Math.abs(drift) > 1) {
+          const edge = drift > 0 ? positions.leading[axis] : positions.trailing[axis];
+          assert.ok(Math.abs(edge - 10) <= 1, 'only a viewport edge may displace the face at ' + width);
+        }
+      }
       const baseline = await size();
       baselines.set(width, baseline);
       const [[shellWidth, shellHeight], [lcdWidth, lcdHeight]] = baseline;
@@ -636,7 +665,49 @@ async function checkPetDeviceGeometry(session) {
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await compare(width, 'attention indicator');
     }
-    console.log('PASS  device and LCD dimensions remain stable across all panels and attention at 320–1600px');
+    await layPet(page);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const sizes = await page.evaluate(() => {
+      const trigger = document.getElementById('pet-expand');
+      const popover = document.getElementById('pet-popover');
+      trigger.click();
+      const [lift] = popover.getAnimations();
+      lift.pause();
+      lift.currentTime = 0;
+      const start = document.getElementById('pet-device').getBoundingClientRect();
+      lift.finish();
+      return [start.width, start.height];
+    });
+    assert.ok(Math.abs(sizes[0] - 150) < 1 && Math.abs(sizes[1] - 187.5) < 1,
+      'the first animation frame has the miniature shell dimensions');
+    await page.waitForFunction(() => !document.getElementById('pet-popover').getAnimations().length);
+    const landing = await page.evaluate(() => {
+      const shell = document.getElementById('pet-device');
+      const mini = document.getElementById('pet-expand').getBoundingClientRect();
+      const fullWidth = shell.getBoundingClientRect().width;
+      document.getElementById('pet-c').click();
+      const [shrink] = document.getElementById('pet-popover').getAnimations();
+      shrink.pause();
+      const duration = shrink.effect.getTiming().duration;
+      shrink.currentTime = duration / 2;
+      const midpoint = shell.getBoundingClientRect().width;
+      shrink.currentTime = duration;
+      const last = shell.getBoundingClientRect();
+      shrink.finish();
+      return {
+        shrinking: mini.width < midpoint && midpoint < fullWidth,
+        error: ['left', 'top', 'right', 'bottom'].map(side => Math.abs(mini[side] - last[side]))
+      };
+    });
+    assert.ok(landing.shrinking && landing.error.every(px => px < 1), 'C shrinks the shell onto the miniature');
+    await page.locator('#pet-expand:focus').waitFor();
+    await page.evaluate(() => {
+      document.getElementById('pet-expand').click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await page.locator('#pet-expand:focus').waitFor();
+    assert.equal(await page.locator('#pet-popover').isVisible(), false);
+    console.log('PASS  face-centered lift and return, viewport bounds, reduced motion and stable device dimensions at 320–1600px');
   } finally {
     await page.close();
   }

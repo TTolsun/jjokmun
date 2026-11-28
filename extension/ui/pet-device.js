@@ -25,10 +25,21 @@ function keysFor(pet) {
   return keys;
 }
 
+// Both sprites use object-fit: contain. The miniature centers the art; the full sprite rests on the floor.
+function faceY(box, image, bottomAligned) {
+  const height = image.naturalWidth
+    ? Math.min(box.height, box.width * image.naturalHeight / image.naturalWidth)
+    : box.height;
+  return box.top + (box.height - height) * (bottomAligned ? 1 : 0.5) + height * 0.4;
+}
+
 export function bindPetDevice(act, editorReturn) {
   const shell = element('pet-device');
   const trigger = element('pet-expand');
   const popover = element('pet-popover');
+  const summarySprite = element('pet-summary-sprite');
+  const habitat = element('pet-habitat');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const buttonB = element('pet-b');
   const icons = [...shell.querySelectorAll('[data-pet-menu]')];
   const actions = [...shell.querySelectorAll('[data-pet-action]')];
@@ -38,6 +49,8 @@ export function bindPetDevice(act, editorReturn) {
   let working = false;
   let active = false;
   let expanded = false;
+  let motion;
+  let faceHeightFraction;
   let mode = 'idle';
   let menuKey;
   let selectedAction;
@@ -56,8 +69,8 @@ export function bindPetDevice(act, editorReturn) {
     return action === 'back' || (pet?.available || ['adopt']).includes(action);
   }
 
-  function place() {
-    if (!expanded) return;
+  function place(lifting = false) {
+    if (!expanded || motion) return;
     const viewport = window.visualViewport;
     const margin = 10;
     const width = viewport?.width ?? window.innerWidth;
@@ -66,32 +79,71 @@ export function bindPetDevice(act, editorReturn) {
     popover.style.setProperty('--pet-view-height', `${height}px`);
     const viewLeft = (viewport?.offsetLeft ?? 0) + margin;
     const viewTop = (viewport?.offsetTop ?? 0) + margin;
-    const anchor = trigger.getBoundingClientRect();
+    const anchor = summarySprite.getBoundingClientRect();
+    const anchorX = anchor.left + anchor.width / 2;
+    const anchorY = faceY(anchor, summarySprite, false);
     const box = popover.getBoundingClientRect();
+    const screen = habitat.getBoundingClientRect();
+    if (lifting) {
+      // Remember the idle pose so the overlay stays put while the pet plays or changes panels.
+      const spriteBox = element('pet-sprite-button').getBoundingClientRect();
+      faceHeightFraction = (faceY(spriteBox, element('pet-sprite'), true) - screen.top) / (screen.height || 1);
+    }
+    const originX = screen.left + screen.width / 2 - box.left;
+    const originY = screen.top + screen.height * faceHeightFraction - box.top;
     const lastLeft = width + viewLeft - box.width - 2 * margin;
     const lastTop = height + viewTop - box.height - 2 * margin;
-    popover.style.left = `${Math.max(viewLeft, Math.min(anchor.left - margin, lastLeft))}px`;
-    popover.style.top = `${Math.max(viewTop, Math.min(anchor.top - margin, lastTop))}px`;
+    const left = Math.max(viewLeft, Math.min(anchorX - originX, lastLeft));
+    const top = Math.max(viewTop, Math.min(anchorY - originY, lastTop));
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  function animateDevice(direction) {
+    const mini = trigger.getBoundingClientRect();
+    const full = shell.getBoundingClientRect();
+    const box = popover.getBoundingClientRect();
+    const sprite = element('pet-sprite-button').getBoundingClientRect();
+    const x = sprite.left + sprite.width / 2;
+    const y = faceY(sprite, element('pet-sprite'), true);
+    popover.style.transformOrigin = `${x - box.left}px ${y - box.top}px`;
+    const scale = mini.width / full.width;
+    // Scaling around the face moves the shell edges. Land them on the miniature.
+    const dx = mini.left - (x + (full.left - x) * scale);
+    const dy = mini.top - (y + (full.top - y) * scale);
+    const dock = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    return popover.animate([{ transform: dock }, { transform: 'none' }], {
+      duration: 180, easing: 'cubic-bezier(.2, .7, .2, 1)', direction, fill: 'both'
+    });
   }
 
   function open() {
-    if (!active || expanded) return;
+    if (!active || !popover.hidden) return;
     editorReturn.capture();
     expanded = true;
     trigger.setAttribute('aria-expanded', 'true');
     popover.hidden = false;
+    popover.inert = false;
     popover.showPopover();
     popover.scrollTop = 0;
-    place();
+    place(true);
+    if (!reducedMotion.matches) {
+      motion = animateDevice('normal');
+      motion.onfinish = () => {
+        motion.cancel();
+        motion = undefined;
+        place();
+      };
+    }
     element('pet-a').focus({ preventScroll: true });
   }
 
-  function close(restoreFocus = true) {
-    if (!expanded) {
-      if (!restoreFocus) editorReturn.reset();
-      return;
+  function finishClose(restoreFocus) {
+    if (motion) {
+      motion.onfinish = null;
+      motion.cancel();
+      motion = undefined;
     }
-    expanded = false;
     game = gameOwner = undefined;
     idle();
     popover.hidePopover();
@@ -103,6 +155,29 @@ export function bindPetDevice(act, editorReturn) {
     } else {
       editorReturn.reset();
     }
+  }
+
+  function close(restoreFocus = true) {
+    if (popover.hidden || (!expanded && restoreFocus)) {
+      if (!restoreFocus) editorReturn.reset();
+      return;
+    }
+    expanded = false;
+    if (!restoreFocus || reducedMotion.matches) {
+      finishClose(restoreFocus);
+      return;
+    }
+    popover.inert = true;
+    if (motion) {
+      // A quick Escape retraces the lift from the currently visible frame.
+      motion.reverse();
+    } else {
+      motion = animateDevice('reverse');
+    }
+    motion.onfinish = () => {
+      const focus = document.activeElement;
+      finishClose(focus === document.body || popover.contains(focus) || focus === trigger);
+    };
   }
 
   function renderGame() {
@@ -300,11 +375,12 @@ export function bindPetDevice(act, editorReturn) {
   }
 
   trigger.addEventListener('click', open);
-  window.addEventListener('scroll', place, { passive: true });
-  window.addEventListener('resize', place);
-  window.visualViewport?.addEventListener('scroll', place);
-  window.visualViewport?.addEventListener('resize', place);
-  const geometry = new ResizeObserver(place);
+  const reposition = () => place();
+  window.addEventListener('scroll', reposition, { passive: true });
+  window.addEventListener('resize', reposition);
+  window.visualViewport?.addEventListener('scroll', reposition);
+  window.visualViewport?.addEventListener('resize', reposition);
+  const geometry = new ResizeObserver(reposition);
   geometry.observe(popover);
   geometry.observe(document.querySelector('.workspace'));
 
