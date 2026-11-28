@@ -20,8 +20,8 @@ function newerThanApp(version) {
 // Older releases reject data that newer ones write, so name the version gap when the file records it.
 export function unreadableVaultMessage(record, fallback) {
   if (newerThanApp(record?.appVersion)) {
-    return '이 저장 파일은 쪽문 ' + record.appVersion + '에서 저장되었습니다. 지금 쓰는 쪽문(' + APP_VERSION
-      + ')을 업데이트한 뒤 다시 열어 주세요.';
+    return '이 저장 파일은 메모고치 ' + record.appVersion + '에서 저장되었습니다. 현재 버전은 ' + APP_VERSION
+      + '입니다. 메모고치를 업데이트한 뒤 다시 열어 주세요.';
   }
   return fallback;
 }
@@ -41,7 +41,7 @@ export async function readVaultFile(directory, optional = false, allowPendingCop
       || !(record.mode === 'plain' && Array.isArray(record.payload?.state?.memos) && Array.isArray(record.payload?.state?.daily)
         && Array.isArray(record.payload?.state?.props) || record.mode === 'encrypted' && typeof record.salt === 'string'
         && typeof record.iv === 'string' && typeof record.ciphertext === 'string')) {
-      throw new Error(unreadableVaultMessage(record, '쪽문 저장 파일의 형식을 확인해 주세요.'));
+      throw new Error(unreadableVaultMessage(record, '메모고치 저장 파일의 형식을 확인해 주세요.'));
     }
     return record;
   } catch (error) {

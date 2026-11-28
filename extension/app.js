@@ -89,7 +89,7 @@ function clearSensitive(showLock) {
   header.hidden = true;
   element('lock-screen').hidden = !showLock;
   element('startup-status').hidden = showLock;
-  if (!showLock) setStatus('startup-status', 'jjokmun을 여는 중입니다.');
+  if (!showLock) setStatus('startup-status', '메모고치를 여는 중입니다.');
   replyDialog.reset();
   pet.reset();
   folderFiles.reset();
@@ -140,8 +140,8 @@ function renderPayload(result, date, storageMode = mode) {
   element('lock-vault').hidden = mode !== 'encrypted';
   element('refresh-documents').hidden = mode !== 'plain';
   setStatus('vault-state', mode === 'encrypted'
-    ? '쪽문 저장 파일에 메모를 암호화해 저장합니다. 폴더에 남은 .md와 .txt 파일은 계속 열 수 있습니다.'
-    : '새 메모는 저장 폴더에 파일로 저장됩니다. 답장과 펫 기록은 쪽문 저장 파일에 남습니다.');
+    ? '메모고치 저장 파일에 메모를 암호화해 저장합니다. 폴더에 남은 .md와 .txt 파일은 계속 열 수 있습니다.'
+    : '새 메모는 저장 폴더에 파일로 저장됩니다. 답장과 펫 기록은 메모고치 저장 파일에 남습니다.');
   render(date);
   if (resumed && ['#journal', '#pet'].includes(location.hash)) {
     element(location.hash.slice(1)).scrollIntoView();
@@ -912,7 +912,7 @@ element('lock-vault').addEventListener('click', async () => {
   try {
     await lockVault();
   } catch {
-    setStatus('unlock-status', '잠금 상태를 저장하지 못했습니다. 열린 jjokmun 탭을 모두 닫아 주세요.');
+    setStatus('unlock-status', '잠금 상태를 저장하지 못했습니다. 열린 메모고치 탭을 모두 닫아 주세요.');
   } finally {
     announce('security');
     lockPending = false;

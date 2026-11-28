@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "쪽문 · 나만의 메모장",
-  "version": "1.9.0",
-  "description": "메모와 답장을 쓰고 왼쪽의 작은 정원에서 펫을 돌보세요. 내 폴더의 Markdown 문서를 열고 Mermaid·PlantUML 다이어그램을 오프라인으로 읽고 편집하세요.",
+  "name": "메모고치 · 그때의 나에게 답장하는 메모장",
+  "short_name": "메모고치",
+  "version": "1.10.0",
+  "description": "오늘의 생각을 메모하고, 지난 메모를 열어 그때의 나에게 답장을 남겨 보세요. 메모장 곁에서는 돌보는 방식에 따라 다른 모습으로 진화하는 펫을 만날 수 있어요.",
   "icons": { "16": "icon-16.png", "32": "icon-32.png", "128": "icon-128.png" },
   "action": {
-    "default_title": "쪽문 · 나만의 메모장 열기",
+    "default_title": "메모고치 열기",
     "default_icon": {
       "16": "icon-16.png",
       "32": "icon-32.png"
