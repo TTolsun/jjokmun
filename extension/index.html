@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>jjokmun</title>
+  <title>메모고치</title>
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.js"></script>
 </head>
@@ -11,9 +11,9 @@
   <header class="site-header" hidden>
     <div class="brand">
       <img src="icon-32.png" width="30" height="30" alt="">
-      <span>jjokmun</span>
+      <span>메모고치</span>
     </div>
-    <nav aria-label="쪽문 설정">
+    <nav aria-label="메모고치 설정">
       <button type="button" id="open-settings">설정</button>
     </nav>
   </header>
@@ -31,6 +31,18 @@
           </form>
           <p class="legacy-writing" hidden>새 메모를 쓰려면 <button type="button" class="document-action">일반 폴더로 복사</button>해 주세요.</p>
           <p class="status" id="home-status" role="status"></p>
+          <section id="found-note" class="found-note" aria-labelledby="found-note-title" hidden>
+            <img id="found-note-pet" width="44" height="44" alt="">
+            <div class="found-note-body">
+              <h2 id="found-note-title"></h2>
+              <p><time id="found-note-date"></time></p>
+              <blockquote id="found-note-excerpt"></blockquote>
+              <div class="found-note-actions">
+                <button type="button" id="found-note-open">다시 읽고 답장</button>
+                <button type="button" id="found-note-fold">다시 묻어 두기</button>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
       <button id="archive-toggle" type="button" aria-expanded="true" aria-controls="memo-archive">최근 메모</button>
@@ -112,6 +124,7 @@
             </div>
           </template>
           <form id="reply-form" autocomplete="off">
+            <p id="found-note-hint" class="found-note-hint" hidden></p>
             <label class="field-label" for="reply-input">답장 쓰기</label>
             <div class="inline-form">
               <textarea id="reply-input" rows="1" maxlength="65536" data-enter-submits placeholder="이 메모를 지금 읽고 든 생각 (Shift+Enter로 줄바꿈)" required></textarea>
@@ -242,19 +255,30 @@
           <p id="pet-habit" hidden></p>
           <p id="pet-status" role="status"></p>
           <blockquote id="pet-memo-excerpt" hidden></blockquote>
-          <details id="pet-collection-panel" class="pet-collection journal-disclosure">
-            <summary><span id="pet-collection-title">성장 도감</span><span id="pet-collection-count"></span></summary>
-            <div id="pet-collection"></div>
-          </details>
+          <button type="button" id="pet-collection-open" aria-haspopup="dialog" aria-controls="pet-collection-dialog">
+            성장 도감<span id="pet-collection-count"></span>
+          </button>
         </div>
       </div>
+      <dialog id="pet-collection-dialog" aria-labelledby="pet-collection-title">
+        <header class="collection-header">
+          <h2 id="pet-collection-title">성장 도감</h2>
+          <form method="dialog"><button class="close" aria-label="성장 도감 닫기" autofocus>×</button></form>
+          <div class="collection-progress">
+            <span id="pet-discovery-total"></span>
+            <progress id="pet-discovery-progress" aria-label="전체 발견 수"></progress>
+          </div>
+        </header>
+        <div id="pet-collection-families" role="group" aria-label="계열 선택"></div>
+        <div id="pet-collection" tabindex="0" role="region" aria-label="성장 단계별 모습"></div>
+      </dialog>
     </section>
 
   </main>
 
   <main class="lock-screen panel" id="lock-screen" hidden>
     <img src="icon-32.png" width="36" height="36" alt="">
-    <h1>jjokmun 열기</h1>
+    <h1>메모고치 열기</h1>
     <p>이 저장소를 열려면 비밀번호를 입력하세요.</p>
     <form id="unlock-form" autocomplete="off">
       <label class="field-label" for="unlock-password">저장소 비밀번호</label>
@@ -264,7 +288,7 @@
     <p class="status" role="status" id="unlock-status"></p>
     <button id="choose-locked-folder" type="button">다른 저장 폴더 선택</button>
   </main>
-  <p id="startup-status" class="startup-status" role="status">jjokmun을 여는 중입니다.</p>
+  <p id="startup-status" class="startup-status" role="status">메모고치를 여는 중입니다.</p>
 
 
   <main id="storage-start" class="lock-screen panel" hidden aria-labelledby="start-title">

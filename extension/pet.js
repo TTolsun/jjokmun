@@ -101,6 +101,9 @@ const clamp = (value) => Math.min(100, Math.max(0, value));
 const validTime = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 const range = (value, max) => Number.isInteger(value) && value >= 0 && value <= max;
 const scoreHabit = (value) => value + Math.min(2, HABIT_SCORE_MAX - value);
+const dateLike = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+// Memo care keeps only the last local date each kind applied, so each kind counts once a day.
+const MEMO_CARE_DATES = { write: 'wroteOn', found: 'foundOn', revisit: 'repliedOn' };
 
 function isNight(now) {
   const hour = new Date(now).getHours();
@@ -146,12 +149,16 @@ export function validatePet(value) {
       || !Array.isArray(value.discovered) || value.discovered.length > PET_FORMS.length
       || !value.discovered.every(form => PET_FORMS.includes(form))
       || new Set(value.discovered).size !== value.discovered.length
-      || !value.discovered.includes(value.form) || !value.discovered.includes('egg')) {
+      || !value.discovered.includes(value.form) || !value.discovered.includes('egg')
+      || !Object.values(MEMO_CARE_DATES).every(key => value[key] === undefined || dateLike(value[key]))) {
     throw new Error('펫의 돌봄 기록이 올바르지 않습니다.');
   }
   const clean = newEgg(value.startedAt, value.lineage, value.growthSeed, value.discovered);
   for (const key of Object.keys(clean)) {
     if (key !== 'discovered') clean[key] = value[key];
+  }
+  for (const key of Object.values(MEMO_CARE_DATES)) {
+    if (value[key] !== undefined) clean[key] = value[key];
   }
   if (value.lineage === undefined) delete clean.lineage;
   if (value.growthSeed === undefined) delete clean.growthSeed;
@@ -397,4 +404,47 @@ export function applyPetAction(state, action, now = Date.now(), random = Math.ra
   }
   state.pet = pet;
   return { changed: true, event: evolution || event };
+}
+
+export function petHatched(pet, now = Date.now()) {
+  const view = petView(pet, now);
+  return Boolean(view && view.form !== 'egg');
+}
+
+// Korean subject particle after a pet name: 이 after a final consonant, 가 otherwise.
+export function petSubject(name) {
+  const code = name.charCodeAt(name.length - 1) - 0xac00;
+  return name + (code >= 0 && code < 11172 && code % 28 ? '이' : '가');
+}
+
+// Writing and rereading memos care for a hatched pet. The caller applies this inside the same
+// write as the memo or reply, so imports never feed the pet and another tab cannot repeat it.
+// 'write' is a new memo, 'found' a reply to the note the pet found today, and 'revisit' a reply
+// to a memo from an earlier day. Habit scores stay untouched so memo use never steers growth.
+export function applyMemoCare(state, kind, date, now = Date.now()) {
+  const key = MEMO_CARE_DATES[kind];
+  if (!state.pet || !key) return '';
+  const pet = { ...state.pet, discovered: [...state.pet.discovered] };
+  const evolution = settle(pet, now);
+  if (pet.form === 'egg' || pet[key] === date) {
+    if (evolution) state.pet = pet;
+    return '';
+  }
+  pet[key] = date;
+  const name = petSubject(PET_FORM_DETAILS[pet.form].name);
+  let event;
+  if (kind === 'write') {
+    pet.hunger = clamp(pet.hunger - 40);
+    pet.happiness = clamp(pet.happiness + 8);
+    event = pet.sleepUntil > now ? `${name} 잠든 사이 머리맡에 새 쪽지를 두었어요.` : `${name} 새 쪽지를 받아 들고 배가 든든해졌어요.`;
+  } else if (kind === 'found') {
+    pet.hunger = clamp(pet.hunger - 15);
+    pet.happiness = clamp(pet.happiness + 25);
+    event = `${name} 찾아온 쪽지에 답장이 붙자 신이 났어요.`;
+  } else {
+    pet.happiness = clamp(pet.happiness + 12);
+    event = `${name} 다시 펼친 쪽지를 함께 들여다봤어요.`;
+  }
+  state.pet = pet;
+  return event;
 }

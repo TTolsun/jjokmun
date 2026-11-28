@@ -6,6 +6,7 @@ node_modules/
 !.env.example
 memo-alley-*.json
 jjokmun-*.json
+메모고치-*.json
 test-results/
 playwright-report/
 /extension/local-art/

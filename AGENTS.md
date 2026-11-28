@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-jjokmun is an offline Chrome Manifest V3 extension for writing memos and replies and caring for a virtual pet. All runtime files live in `extension/`, including the toolbar icons. The service worker in `background.js` opens `index.html`. Edit `app.js` for memo interactions, `pet.js` and `ui/pet.js` for the pet garden, and `styles.css` for layout.
+메모고치 (memogochi) is an offline Chrome Manifest V3 extension for writing memos and replies and caring for a virtual pet. All runtime files live in `extension/`, including the toolbar icons. The service worker in `background.js` opens `index.html`. Edit `app.js` for memo interactions, `pet.js` and `ui/pet.js` for the pet garden, and `styles.css` for layout.
 
 Within `extension/`, `store.js` defines the memo model and validates backups. `vault.js` reads and writes the selected directory and manages locking. Keep the active connection and decryption key in tab memory. Persist the last selected directory handle separately in IndexedDB for reopening existing vaults. `legacy-profile.js` migrates older profile records after folder selection. `folder.js` handles local vault files and recursive directory scans. `crypto.js` handles encryption, and `imports.js` merges backups and undoes imports. Preserve compatibility with the existing `memo-alley` database and older backups when changing persistence.
 
@@ -10,7 +10,7 @@ In `extension/ui/`, edit `archive.js` for search and keyboard navigation and `ba
 
 ## Local Development
 
-Chrome runs the source directly. Enable **Developer mode** at `chrome://extensions`, choose **Load unpacked**, and select `extension/`. After edits, close open jjokmun tabs, reload the existing extension card, and click the toolbar icon. Keep the installation path stable so Chrome can find the same profile data.
+Chrome runs the source directly. Enable **Developer mode** at `chrome://extensions`, choose **Load unpacked**, and select `extension/`. After edits, close open 메모고치 tabs, reload the existing extension card, and click the toolbar icon. Keep the installation path stable so Chrome can find the same profile data.
 
 ## Testing
 

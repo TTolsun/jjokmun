@@ -93,7 +93,6 @@ export function bindPetDevice(act, editorReturn) {
     }
     expanded = false;
     idle();
-    element('pet-collection-panel').open = false;
     popover.hidePopover();
     popover.hidden = true;
     trigger.setAttribute('aria-expanded', 'false');

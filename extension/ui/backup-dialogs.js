@@ -41,7 +41,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, rend
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'jjokmun-' + today() + '.json';
+    link.download = '메모고치-' + today() + '.json';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -170,7 +170,7 @@ export function bindBackupDialogs({ activeView, today, setStatus, announce, rend
       try {
         parsed = JSON.parse(await file.text());
       } catch {
-        throw new Error('JSON 파일을 읽지 못했습니다. jjokmun 백업 파일을 선택해 주세요.');
+        throw new Error('JSON 파일을 읽지 못했습니다. 메모고치 백업 파일을 선택해 주세요.');
       }
       rejectStaleView(expected);
       if (parsed?.format === BACKUP_FORMAT) {
